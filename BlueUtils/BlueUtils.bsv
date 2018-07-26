@@ -28,14 +28,16 @@
 
 package BlueUtils;
 
-import SimUtils :: *;
-import Utils :: *;
 import BasicTypes :: *;
+import Utils :: *;
+import SimUtils :: *;
+import Virtualizable :: *;
 import Interface :: *;
 
-export SimUtils :: *;
-export Utils :: *;
 export BasicTypes :: *;
+export Utils :: *;
+export SimUtils :: *;
+export Virtualizable :: *;
 export Interface :: *;
 
 endpackage
