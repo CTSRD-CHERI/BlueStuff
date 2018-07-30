@@ -28,13 +28,13 @@
 
 package BlueUtils;
 
-import BasicTypes :: *;
+import BlueUtilsTypes :: *;
 import Utils :: *;
 import SimUtils :: *;
 import Virtualizable :: *;
 import Interface :: *;
 
-export BasicTypes :: *;
+export BlueUtilsTypes :: *;
 export Utils :: *;
 export SimUtils :: *;
 export Virtualizable :: *;
