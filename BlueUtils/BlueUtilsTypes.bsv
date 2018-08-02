@@ -83,13 +83,21 @@ endmodule
 interface PC#(type a);
   method Action _write(a x);
   method a _read();
+  interface Reg#(a) next_0;
   method a next();
 endinterface
 module mkPC#(a startVal) (PC#(a)) provisos(Bits#(a, n));
-  Reg#(a) r[2] <- mkCReg(2, startVal);
-  method Action _write(a x) = action r[0] <= x; endaction;
-  method a _read() = r[0];
-  method a next() = r[1];
+  Reg#(a)  r <- mkReg(startVal);
+  Wire#(a) w_0 <- mkDWire(r);
+  Wire#(a) w_1 <- mkDWire(w_0);
+  rule update_reg; r <= w_1; endrule
+  method Action _write(a x) = action w_0 <= x; endaction;
+  method a _read() = r;
+  interface next_0 = interface Reg;
+    method Action _write(a x) = action w_1 <= x; endaction;
+    method a _read() = w_0;
+  endinterface;
+  method a next() = w_1;
 endmodule
 
 // make an undefined register yeild compile time errors on reads and writes
