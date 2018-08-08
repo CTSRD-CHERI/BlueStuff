@@ -31,13 +31,11 @@ package BlueUtils;
 import BlueUtilsTypes :: *;
 import Utils :: *;
 import SimUtils :: *;
-import Virtualizable :: *;
 import Interface :: *;
 
 export BlueUtilsTypes :: *;
 export Utils :: *;
 export SimUtils :: *;
-export Virtualizable :: *;
 export Interface :: *;
 
 endpackage

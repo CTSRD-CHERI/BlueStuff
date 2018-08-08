@@ -29,26 +29,6 @@
 import Vector :: *;
 import Printf :: *;
 
-// Nice friendly list constructor lifted from Bluecheck's sources:
-// https://github.com/CTSRD-CHERI/bluecheck.git
-////////////////////////////////////////////////////////////////////////////////
-
-typeclass MkList#(type a, type b) dependencies (a determines b);
-  function a mkList(List#(b) acc);
-endtypeclass
-
-instance MkList#(List#(b), b);
-  function List#(b) mkList(List#(b) acc) = List::reverse(acc);
-endinstance
-
-instance MkList#(function a f(b val), b) provisos (MkList#(a, b));
-  function mkList(acc, val) = mkList(Cons(val, acc));
-endinstance
-
-function a list() provisos (MkList#(a, b));
-  return mkList(Nil);
-endfunction
-
 // Architectural state helpers
 ////////////////////////////////////////////////////////////////////////////////
 

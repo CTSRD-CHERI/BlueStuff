@@ -30,9 +30,9 @@ import Printf :: *;
 import List :: *;
 
 import AXI :: *;
+import BlueBasics :: *;
 import BlueUtilsTypes :: *;
 import SimUtils :: *;
-import Virtualizable :: *;
 import ClientServer :: *;
 
 /////////////////////
