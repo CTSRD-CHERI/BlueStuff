@@ -91,16 +91,18 @@ endmodule
 // make a Default Concurent Wire
 module mkDCWire#(Integer n, t dflt) (Array#(Wire#(t))) provisos (Bits#(t, tw));
   Wire#(t) ifc[n];
-  List#(RWire#(t)) newVal <- List::replicateM(n, mkRWire);
-  List#(Wire#(t)) prevVal <- List::replicateM(n, mkWire);
-  rule defVal; prevVal[0] <= dflt; endrule
-  for (Integer i = 0; i < n; i = i + 1) begin
-    t readVal = fromMaybe(prevVal[i], newVal[i].wget);
-    if (i < n-1) rule propagateVal; prevVal[i+1] <= readVal; endrule
-    ifc[i] = interface Wire#(t);
-      method _write = newVal[i].wset;
-      method _read  = readVal;
-    endinterface;
+  if (n > 0) begin
+    List#(RWire#(t)) newVal <- List::replicateM(n, mkRWire);
+    List#(Wire#(t)) prevVal <- List::replicateM(n, mkWire);
+    rule defVal; prevVal[0] <= dflt; endrule
+    for (Integer i = 0; i < n; i = i + 1) begin
+      t readVal = fromMaybe(prevVal[i], newVal[i].wget);
+      if (i < n-1) rule propagateVal; prevVal[i+1] <= readVal; endrule
+      ifc[i] = interface Wire#(t);
+        method _write = newVal[i].wset;
+        method _read  = readVal;
+      endinterface;
+    end
   end
   return ifc;
 endmodule
