@@ -27,6 +27,7 @@
  */
 
 import Vector :: *;
+import ConfigReg :: *;
 import Printf :: *;
 
 // Architectural state helpers
@@ -59,27 +60,6 @@ module mkBypassRegU (Reg#(a)) provisos(Bits#(a, a_sz));
   method a _read() = r[1];
 endmodule
 
-// PC register with "beginning of the cycle" + "next" interfaces
-interface PC#(type a);
-  method Action _write(a x);
-  method a _read();
-  interface Reg#(a) next_0;
-  method a next();
-endinterface
-module mkPC#(a startVal) (PC#(a)) provisos(Bits#(a, n));
-  Reg#(a)  r <- mkReg(startVal);
-  Wire#(a) w_0 <- mkDWire(r);
-  Wire#(a) w_1 <- mkDWire(w_0);
-  rule update_reg; r <= w_1; endrule
-  method Action _write(a x) = action w_0 <= x; endaction;
-  method a _read() = r;
-  interface next_0 = interface Reg;
-    method Action _write(a x) = action w_1 <= x; endaction;
-    method a _read() = w_0;
-  endinterface;
-  method a next() = w_1;
-endmodule
-
 // make an undefined register yeild compile time errors on reads and writes
 module mkRegUndef#(String name) (Reg#(a));
   method a _read() =
@@ -105,6 +85,37 @@ module mkDCWire#(Integer n, t dflt) (Array#(Wire#(t))) provisos (Bits#(t, tw));
     end
   end
   return ifc;
+endmodule
+
+// CReg with a ConfigReg at its core
+module mkConfigCReg#(Integer n, t dflt) (Array#(Reg#(t))) provisos (Bits#(t, tw));
+  Reg#(t)     r <- mkConfigReg(dflt);
+  Wire#(t) w[n] <- mkDCWire(n, r._read);
+  if (n > 0) rule update_reg; r._write(w[n-1]); endrule
+  Reg#(t) ifc[n];
+  for (Integer i = 0; i < n; i = i + 1) begin
+    ifc[i] = interface Reg#(t);
+      method _write = w[i]._write;
+      method  _read = (i > 0) ? w[i-1]._read : r._read;
+    endinterface;
+  end
+  return ifc;
+endmodule
+
+// PC register with "beginning of the cycle" + "next" interfaces
+interface PC#(type a);
+  method Action _write(a x);
+  method a _read();
+  interface Reg#(a) next;
+endinterface
+module mkPC#(a startVal) (PC#(a)) provisos(Bits#(a, n));
+  Reg#(a) r[3] <- mkConfigCReg(3,startVal);
+  method  _read = r[0]._read;
+  method _write = r[1]._write;
+  interface next = interface Reg;
+    method     _read = r[2]._read;
+    method _write(x) = r[0]._write(x);
+  endinterface;
 endmodule
 
 // Combinational primitives
