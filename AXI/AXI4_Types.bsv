@@ -27,6 +27,19 @@
  */
 
 import Connectable :: *;
+import DefaultValue :: *;
+
+//////////////////////
+// Common AXI types //
+////////////////////////////////////////////////////////////////////////////////
+
+typedef enum {
+  FIXED = 2'b00, INCR = 2'b01, WRAP = 2'b10, Res = 2'b11
+} AXIBurst deriving (Bits, Eq, FShow);
+
+typedef enum {
+  OKAY = 2'b00, EXOKAY = 2'b01, SLVERR = 2'b10, DECERR = 2'b11
+} AXIResp deriving (Bits, Eq, FShow);
 
 ///////////////////////////////
 // AXI Address Write Channel //
@@ -39,8 +52,8 @@ typedef struct {
   Bit#(addr_) awaddr;
   Bit#(8)     awlen;
   Bit#(3)     awsize;
-  Bit#(2)     awburst;
-  Bit#(1)     awlock;
+  AXIBurst    awburst;
+  Bool        awlock;
   Bit#(4)     awcache;
   Bit#(3)     awprot;
   Bit#(4)     awqos;
@@ -48,11 +61,21 @@ typedef struct {
   Bit#(user_) awuser;
 } AWFlit#(numeric type id_, numeric type addr_, numeric type user_)
 deriving (Bits, FShow);
+instance DefaultValue#(AWFlit#(id_, addr_, user_));
+  function defaultValue = AWFlit {
+    awid: 0, awaddr: ?, awlen: 0, awsize: 0,
+    awburst: FIXED, awlock: False, awcache: 0,
+    awprot: 0, awqos: 0, awregion: 0, awuser: ?
+  };
+endinstance
 
 typedef struct {
   Bit#(addr_) awaddr;
   Bit#(3)     awprot;
 } AWLiteFlit#(numeric type addr_) deriving (Bits, FShow);
+instance DefaultValue#(AWLiteFlit#(addr_));
+  function defaultValue = AWLiteFlit { awaddr: ?, awprot: 0};
+endinstance
 
 // Master interface
 
@@ -62,8 +85,8 @@ interface AWMaster#(numeric type id_, numeric type addr_, numeric type user_);
   method Bit#(addr_) awaddr;
   method Bit#(8)     awlen;
   method Bit#(3)     awsize;
-  method Bit#(2)     awburst;
-  method Bit#(1)     awlock;
+  method AXIBurst    awburst;
+  method Bool        awlock;
   method Bit#(4)     awcache;
   method Bit#(3)     awprot;
   method Bit#(4)     awqos;
@@ -89,8 +112,8 @@ interface AWSlave#(numeric type id_, numeric type addr_, numeric type user_);
   (* prefix="" *) method Action awaddr  (Bit#(addr_) awaddr);
   (* prefix="" *) method Action awlen   (Bit#(8)     awlen);
   (* prefix="" *) method Action awsize  (Bit#(3)     awsize);
-  (* prefix="" *) method Action awburst (Bit#(2)     awburst);
-  (* prefix="" *) method Action awlock  (Bit#(1)     awlock);
+  (* prefix="" *) method Action awburst (AXIBurst    awburst);
+  (* prefix="" *) method Action awlock  (Bool        awlock);
   (* prefix="" *) method Action awcache (Bit#(4)     awcache);
   (* prefix="" *) method Action awprot  (Bit#(3)     awprot);
   (* prefix="" *) method Action awqos   (Bit#(4)     awqos);
@@ -156,14 +179,20 @@ endinstance
 typedef struct {
   Bit#(data_)           wdata;
   Bit#(TDiv#(data_, 8)) wstrb;
-  Bit#(1)               wlast;
+  Bool                  wlast;
   Bit#(user_)           wuser;
 } WFlit#(numeric type data_, numeric type user_) deriving (Bits, FShow);
+instance DefaultValue#(WFlit#(data_, user_));
+  function defaultValue = WFlit { wdata: ?, wstrb: ~0, wlast: True, wuser: ? };
+endinstance
 
 typedef struct {
   Bit#(data_)           wdata;
   Bit#(TDiv#(data_, 8)) wstrb;
 } WLiteFlit#(numeric type data_) deriving (Bits, FShow);
+instance DefaultValue#(WLiteFlit#(data_));
+  function defaultValue = WLiteFlit { wdata: ?, wstrb: ~0};
+endinstance
 
 // Master interface
 
@@ -171,7 +200,7 @@ typedef struct {
 interface WMaster#(numeric type data_, numeric type user_);
   method Bit#(data_)           wdata;
   method Bit#(TDiv#(data_, 8)) wstrb;
-  method Bit#(1)               wlast;
+  method Bool                  wlast;
   method Bit#(user_)           wuser;
   method Bool                  wvalid;
   (* prefix="" *) method Action wready(Bool wready);
@@ -191,7 +220,7 @@ endinterface
 interface WSlave#(numeric type data_, numeric type user_);
   (* prefix="" *) method Action wdata (Bit#(data_)            wdata);
   (* prefix="" *) method Action wstrb (Bit#(TDiv#(data_,  8)) wstrb);
-  (* prefix="" *) method Action wlast (Bit#(1)                wlast);
+  (* prefix="" *) method Action wlast (Bool                   wlast);
   (* prefix="" *) method Action wuser (Bit#(user_)            wuser);
   (* prefix="" *) method Action wvalid(Bool                   wvalid);
   method Bool wready;
@@ -245,20 +274,26 @@ endinstance
 
 typedef struct {
   Bit#(id_)   bid;
-  Bit#(2)     bresp;
+  AXIResp     bresp;
   Bit#(user_) buser;
 } BFlit#(numeric type id_, numeric type user_) deriving (Bits, FShow);
+instance DefaultValue#(BFlit#(id_, user_));
+  function defaultValue = BFlit { bid: 0, bresp: OKAY, buser: ? };
+endinstance
 
 typedef struct {
-  Bit#(2) bresp;
+  AXIResp bresp;
 } BLiteFlit deriving (Bits, FShow);
+instance DefaultValue#(BLiteFlit);
+  function defaultValue = BLiteFlit { bresp: OKAY };
+endinstance
 
 // Master interface
 
 (* always_ready, always_enabled *)
 interface BMaster#(numeric type id_, numeric type user_);
   (* prefix="" *) method Action bid   (Bit#(id_)   bid);
-  (* prefix="" *) method Action bresp (Bit#(2)     bresp);
+  (* prefix="" *) method Action bresp (AXIResp     bresp);
   (* prefix="" *) method Action buser (Bit#(user_) buser);
   (* prefix="" *) method Action bvalid(Bool        bvalid);
   method Bool bready;
@@ -266,7 +301,7 @@ endinterface
 
 (* always_ready, always_enabled *)
 interface BLiteMaster;
-  (* prefix="" *) method Action bresp (Bit#(2) bresp);
+  (* prefix="" *) method Action bresp (AXIResp bresp);
   (* prefix="" *) method Action bvalid(Bool    bvalid);
   method Bool bready;
 endinterface
@@ -276,7 +311,7 @@ endinterface
 (* always_ready, always_enabled *)
 interface BSlave#(numeric type id_, numeric type user_);
   method Bit#(id_)   bid;
-  method Bit#(2)     bresp;
+  method AXIResp     bresp;
   method Bit#(user_) buser;
   method Bool        bvalid;
   (* prefix="" *) method Action bready(Bool bready);
@@ -284,7 +319,7 @@ endinterface
 
 (* always_ready, always_enabled *)
 interface BLiteSlave;
-  method Bit#(2) bresp;
+  method AXIResp bresp;
   method Bool bvalid;
   (* prefix="" *) method Action bready(Bool bready);
 endinterface
@@ -330,8 +365,8 @@ typedef struct {
   Bit#(addr_) araddr;
   Bit#(8)     arlen;
   Bit#(3)     arsize;
-  Bit#(2)     arburst;
-  Bit#(1)     arlock;
+  AXIBurst    arburst;
+  Bool        arlock;
   Bit#(4)     arcache;
   Bit#(3)     arprot;
   Bit#(4)     arqos;
@@ -339,11 +374,21 @@ typedef struct {
   Bit#(user_) aruser;
 } ARFlit#(numeric type id_, numeric type addr_, numeric type user_)
 deriving (Bits, FShow);
+instance DefaultValue#(ARFlit#(id_, addr_, user_));
+  function defaultValue = ARFlit {
+    arid: 0, araddr: ?, arlen: 0, arsize: 0,
+    arburst: FIXED, arlock: False, arcache: 0,
+    arprot: 0, arqos: 0, arregion: 0, aruser: ?
+  };
+endinstance
 
 typedef struct {
   Bit#(addr_) araddr;
   Bit#(3)     arprot;
 } ARLiteFlit#(numeric type addr_) deriving (Bits, FShow);
+instance DefaultValue#(ARLiteFlit#(addr_));
+  function defaultValue = ARLiteFlit { araddr: ?, arprot: 0};
+endinstance
 
 // Master interface
 
@@ -353,8 +398,8 @@ interface ARMaster#(numeric type id_, numeric type addr_, numeric type user_);
   method Bit#(addr_) araddr;
   method Bit#(8)     arlen;
   method Bit#(3)     arsize;
-  method Bit#(2)     arburst;
-  method Bit#(1)     arlock;
+  method AXIBurst    arburst;
+  method Bool        arlock;
   method Bit#(4)     arcache;
   method Bit#(3)     arprot;
   method Bit#(4)     arqos;
@@ -380,8 +425,8 @@ interface ARSlave#(numeric type id_, numeric type addr_, numeric type user_);
   (* prefix="" *) method Action araddr  (Bit#(addr_) araddr);
   (* prefix="" *) method Action arlen   (Bit#(8)     arlen);
   (* prefix="" *) method Action arsize  (Bit#(3)     arsize);
-  (* prefix="" *) method Action arburst (Bit#(2)     arburst);
-  (* prefix="" *) method Action arlock  (Bit#(1)     arlock);
+  (* prefix="" *) method Action arburst (AXIBurst    arburst);
+  (* prefix="" *) method Action arlock  (Bool        arlock);
   (* prefix="" *) method Action arcache (Bit#(4)     arcache);
   (* prefix="" *) method Action arprot  (Bit#(3)     arprot);
   (* prefix="" *) method Action arqos   (Bit#(4)     arqos);
@@ -447,16 +492,24 @@ endinstance
 typedef struct {
   Bit#(id_)   rid;
   Bit#(data_) rdata;
-  Bit#(2)     rresp;
-  Bit#(1)     rlast;
+  AXIResp     rresp;
+  Bool        rlast;
   Bit#(user_) ruser;
 } RFlit#(numeric type id_, numeric type data_, numeric type user_)
 deriving (Bits, FShow);
+instance DefaultValue#(RFlit#(id_, data_, user_));
+  function defaultValue = RFlit {
+    rid: 0, rdata: ?, rresp: OKAY, rlast: True, ruser: ?
+  };
+endinstance
 
 typedef struct {
   Bit#(data_) rdata;
-  Bit#(2)     rresp;
+  AXIResp     rresp;
 } RLiteFlit#(numeric type data_) deriving (Bits, FShow);
+instance DefaultValue#(RLiteFlit#(data_));
+  function defaultValue = RLiteFlit { rdata: ?, rresp: OKAY };
+endinstance
 
 // Master interface
 
@@ -464,8 +517,8 @@ typedef struct {
 interface RMaster#(numeric type id_, numeric type data_, numeric type user_);
   (* prefix="" *) method Action rid   (Bit#(id_)   rid);
   (* prefix="" *) method Action rdata (Bit#(data_) rdata);
-  (* prefix="" *) method Action rresp (Bit#(2)     rresp);
-  (* prefix="" *) method Action rlast (Bit#(1)     rlast);
+  (* prefix="" *) method Action rresp (AXIResp     rresp);
+  (* prefix="" *) method Action rlast (Bool        rlast);
   (* prefix="" *) method Action ruser (Bit#(user_) ruser);
   (* prefix="" *) method Action rvalid(Bool        rvalid);
   method Bool rready;
@@ -474,7 +527,7 @@ endinterface
 (* always_ready, always_enabled *)
 interface RLiteMaster#(numeric type data_);
   (* prefix="" *) method Action rdata (Bit#(data_) rdata);
-  (* prefix="" *) method Action rresp (Bit#(2)     rresp);
+  (* prefix="" *) method Action rresp (AXIResp     rresp);
   (* prefix="" *) method Action rvalid(Bool        rvalid);
   method Bool rready;
 endinterface
@@ -485,8 +538,8 @@ endinterface
 interface RSlave#(numeric type id_, numeric type data_, numeric type user_);
   method Bit#(id_)   rid;
   method Bit#(data_) rdata;
-  method Bit#(2)     rresp;
-  method Bit#(1)     rlast;
+  method AXIResp     rresp;
+  method Bool        rlast;
   method Bit#(user_) ruser;
   method Bool        rvalid;
   (* prefix="" *) method Action rready(Bool rready);
@@ -495,7 +548,7 @@ endinterface
 (* always_ready, always_enabled *)
 interface RLiteSlave#(numeric type data_);
   method Bit#(data_) rdata;
-  method Bit#(2)     rresp;
+  method AXIResp     rresp;
   method Bool        rvalid;
   (* prefix="" *) method Action rready(Bool rready);
 endinterface
