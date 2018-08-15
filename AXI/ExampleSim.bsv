@@ -39,11 +39,11 @@ typedef 128 DATA_sz;
 module axiLiteMaster (AXILiteMaster#(ADDR_sz, DATA_sz));
 
   // one FIFOF per channel
-  FIFOF#(AWLiteFlit#(ADDR_sz)) awff <- mkBypassFIFOF;
-  FIFOF#(WLiteFlit#(DATA_sz))  wff  <- mkBypassFIFOF;
-  FIFOF#(BLiteFlit)            bff  <- mkBypassFIFOF;
-  FIFOF#(ARLiteFlit#(ADDR_sz)) arff <- mkBypassFIFOF;
-  FIFOF#(RLiteFlit#(DATA_sz))  rff  <- mkBypassFIFOF;
+  AWLiteMasterShim#(ADDR_sz) awshim <- mkAWLiteMasterShim;
+  WLiteMasterShim#(DATA_sz)   wshim <- mkWLiteMasterShim;
+  BLiteMasterShim             bshim <- mkBLiteMasterShim;
+  ARLiteMasterShim#(ADDR_sz) arshim <- mkARLiteMasterShim;
+  RLiteMasterShim#(DATA_sz)   rshim <- mkRLiteMasterShim;
 
   // counter
   Reg#(Bit#(DATA_sz)) cnt <- mkReg(0);
@@ -53,34 +53,27 @@ module axiLiteMaster (AXILiteMaster#(ADDR_sz, DATA_sz));
   Bool sendWrite = cnt[3:0] == 0;
   rule enqAWFlit (sendWrite);
     AWLiteFlit#(ADDR_sz) f = ?;
-    awff.enq(f);
+    awshim.fifof.enq(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
   rule enqWFlit (sendWrite);
     WLiteFlit#(DATA_sz) f = WLiteFlit{wdata: cnt, wstrb: ?};
-    wff.enq(f);
+    wshim.fifof.enq(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
   rule deqBFlit;
-    bff.deq;
-    $display("%0t - MASTER - received ", $time, fshow(bff.first));
+    bshim.fifof.deq;
+    $display("%0t - MASTER - received ", $time, fshow(bshim.fifof.first));
   endrule
-  rule enqARFlit; arff.enq(?); endrule
-  rule deqRFlit;  rff.deq;     endrule
-
-  // turn FIFOFs to AXI interfaces
-  let awifc <- toAXIAWLiteMaster(awff);
-  let wifc  <- toAXIWLiteMaster(wff);
-  let bifc  <- toAXIBLiteMaster(bff);
-  let arifc <- toAXIARLiteMaster(arff);
-  let rifc  <- toAXIRLiteMaster(rff);
+  rule enqARFlit; arshim.fifof.enq(?); endrule
+  rule deqRFlit;  rshim.fifof.deq;     endrule
 
   // assign channel interfaces to module the interface
-  interface aw = awifc;
-  interface w  = wifc;
-  interface b  = bifc;
-  interface ar = arifc;
-  interface r  = rifc;
+  interface aw = awshim.master;
+  interface w  = wshim.master;
+  interface b  = bshim.master;
+  interface ar = arshim.master;
+  interface r  = rshim.master;
 
 endmodule
 
@@ -88,45 +81,38 @@ endmodule
 module axiLiteSlave (AXILiteSlave#(ADDR_sz, DATA_sz));
 
   // one FIFOF per channel
-  FIFOF#(AWLiteFlit#(ADDR_sz)) awff <- mkBypassFIFOF;
-  FIFOF#(WLiteFlit#(DATA_sz))  wff  <- mkBypassFIFOF;
-  FIFOF#(BLiteFlit)            bff  <- mkBypassFIFOF;
-  FIFOF#(ARLiteFlit#(ADDR_sz)) arff <- mkBypassFIFOF;
-  FIFOF#(RLiteFlit#(DATA_sz))  rff  <- mkBypassFIFOF;
+  AWLiteSlaveShim#(ADDR_sz) awshim <- mkAWLiteSlaveShim;
+  WLiteSlaveShim#(DATA_sz)   wshim <- mkWLiteSlaveShim;
+  BLiteSlaveShim             bshim <- mkBLiteSlaveShim;
+  ARLiteSlaveShim#(ADDR_sz) arshim <- mkARLiteSlaveShim;
+  RLiteSlaveShim#(DATA_sz)   rshim <- mkRLiteSlaveShim;
 
   // arbitrary work (enq/deq FIFOF) for each channel
   FIFOF#(Bit#(0)) writeResp <- mkFIFOF;
   rule deqAWFlit;
-    awff.deq;
-    $display("%0t - SLAVE - received ", $time, fshow(awff.first));
+    awshim.fifof.deq;
+    $display("%0t - SLAVE - received ", $time, fshow(awshim.fifof.first));
   endrule
   rule deqWFlit;
-    wff.deq;
-    $display("%0t - SLAVE - received ", $time, fshow(wff.first));
+    wshim.fifof.deq;
+    $display("%0t - SLAVE - received ", $time, fshow(wshim.fifof.first));
     writeResp.enq(?);
   endrule
   rule enqBFlit;
     writeResp.deq;
     BLiteFlit f = ?;
-    bff.enq(f);
+    bshim.fifof.enq(f);
     $display("%0t - SLAVE - sending ", $time, fshow(f));
   endrule
-  rule deqARFlit; arff.deq;   endrule
-  rule enqRFlit;  rff.enq(?); endrule
-
-  // turn FIFOFs to AXI interfaces
-  let awifc <- toAXIAWLiteSlave(awff);
-  let wifc  <- toAXIWLiteSlave(wff);
-  let bifc  <- toAXIBLiteSlave(bff);
-  let arifc <- toAXIARLiteSlave(arff);
-  let rifc  <- toAXIRLiteSlave(rff);
+  rule deqARFlit; arshim.fifof.deq;   endrule
+  rule enqRFlit;  rshim.fifof.enq(?); endrule
 
   // assign channel interfaces to module the interface
-  interface aw = awifc;
-  interface w  = wifc;
-  interface b  = bifc;
-  interface ar = arifc;
-  interface r  = rifc;
+  interface aw = awshim.slave;
+  interface w  = wshim.slave;
+  interface b  = bshim.slave;
+  interface ar = arshim.slave;
+  interface r  = rshim.slave;
 
 endmodule
 

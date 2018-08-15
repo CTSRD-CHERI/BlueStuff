@@ -29,6 +29,7 @@
 import AXI4_Types :: *;
 
 import FIFOF :: *;
+import SpecialFIFOs :: *;
 
 ////////////////////////////////
 // AXI Write Response Channel //
@@ -163,3 +164,55 @@ instance ToAXIBLiteSlave#(FIFOF);
 
   endmodule
 endinstance
+
+// Shim for BMaster to FIFOF#(BFlit)
+
+interface BMasterShim#(numeric type id_, numeric type user_);
+  interface BMaster#(id_, user_) master;
+  interface FIFOF#(BFlit#(id_, user_)) fifof;
+endinterface
+
+module mkBMasterShim (BMasterShim#(id_, user_));
+  let ff  <- mkBypassFIFOF;
+  let ifc <- toAXIBMaster(ff);
+  interface master = ifc;
+  interface fifof  = ff;
+endmodule
+
+interface BLiteMasterShim;
+  interface BLiteMaster master;
+  interface FIFOF#(BLiteFlit) fifof;
+endinterface
+
+module mkBLiteMasterShim (BLiteMasterShim);
+  let ff  <- mkBypassFIFOF;
+  let ifc <- toAXIBLiteMaster(ff);
+  interface master = ifc;
+  interface fifof  = ff;
+endmodule
+
+// Shim for FIFOF#(BFlit) to BSlave
+
+interface BSlaveShim#(numeric type id_, numeric type user_);
+  interface BSlave#(id_, user_) slave;
+  interface FIFOF#(BFlit#(id_, user_)) fifof;
+endinterface
+
+module mkBSlaveShim (BSlaveShim#(id_, user_));
+  let ff  <- mkBypassFIFOF;
+  let ifc <- toAXIBSlave(ff);
+  interface slave = ifc;
+  interface fifof = ff;
+endmodule
+
+interface BLiteSlaveShim;
+  interface BLiteSlave slave;
+  interface FIFOF#(BLiteFlit) fifof;
+endinterface
+
+module mkBLiteSlaveShim (BLiteSlaveShim);
+  let ff  <- mkBypassFIFOF;
+  let ifc <- toAXIBLiteSlave(ff);
+  interface slave = ifc;
+  interface fifof = ff;
+endmodule

@@ -29,6 +29,7 @@
 import AXI4_Types :: *;
 
 import FIFOF :: *;
+import SpecialFIFOs :: *;
 
 ///////////////////////////////
 // AXI Address Write Channel //
@@ -207,3 +208,55 @@ instance ToAXIAWLiteSlave#(FIFOF);
 
   endmodule
 endinstance
+
+// Shim for AWMaster to FIFOF#(AWFlit)
+
+interface AWMasterShim#(numeric type id_, numeric type addr_, numeric type user_);
+  interface AWMaster#(id_, addr_, user_) master;
+  interface FIFOF#(AWFlit#(id_, addr_, user_)) fifof;
+endinterface
+
+module mkAWMasterShim (AWMasterShim#(id_, addr_, user_));
+  let ff  <- mkBypassFIFOF;
+  let ifc <- toAXIAWMaster(ff);
+  interface master = ifc;
+  interface fifof  = ff;
+endmodule
+
+interface AWLiteMasterShim#(numeric type addr_);
+  interface AWLiteMaster#(addr_) master;
+  interface FIFOF#(AWLiteFlit#(addr_)) fifof;
+endinterface
+
+module mkAWLiteMasterShim (AWLiteMasterShim#(addr_));
+  let ff  <- mkBypassFIFOF;
+  let ifc <- toAXIAWLiteMaster(ff);
+  interface master = ifc;
+  interface fifof  = ff;
+endmodule
+
+// Shim for FIFOF#(AWFlit) to AWSlave
+
+interface AWSlaveShim#(numeric type id_, numeric type addr_, numeric type user_);
+  interface AWSlave#(id_, addr_, user_) slave;
+  interface FIFOF#(AWFlit#(id_, addr_, user_)) fifof;
+endinterface
+
+module mkAWSlaveShim (AWSlaveShim#(id_, addr_, user_));
+  let ff  <- mkBypassFIFOF;
+  let ifc <- toAXIAWSlave(ff);
+  interface slave = ifc;
+  interface fifof = ff;
+endmodule
+
+interface AWLiteSlaveShim#(numeric type addr_);
+  interface AWLiteSlave#(addr_) slave;
+  interface FIFOF#(AWLiteFlit#(addr_)) fifof;
+endinterface
+
+module mkAWLiteSlaveShim (AWLiteSlaveShim#(addr_));
+  let ff  <- mkBypassFIFOF;
+  let ifc <- toAXIAWLiteSlave(ff);
+  interface slave = ifc;
+  interface fifof = ff;
+endmodule

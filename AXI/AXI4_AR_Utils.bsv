@@ -29,6 +29,7 @@
 import AXI4_Types :: *;
 
 import FIFOF :: *;
+import SpecialFIFOs :: *;
 
 //////////////////////////////
 // AXI Read Address Channel //
@@ -204,3 +205,55 @@ instance ToAXIARLiteSlave#(FIFOF);
 
   endmodule
 endinstance
+
+// Shim for ARMaster to FIFOF#(ARFlit)
+
+interface ARMasterShim#(numeric type id_, numeric type addr_, numeric type user_);
+  interface ARMaster#(id_, addr_, user_) master;
+  interface FIFOF#(ARFlit#(id_, addr_, user_)) fifof;
+endinterface
+
+module mkARMasterShim (ARMasterShim#(id_, addr_, user_));
+  let ff  <- mkBypassFIFOF;
+  let ifc <- toAXIARMaster(ff);
+  interface master = ifc;
+  interface fifof  = ff;
+endmodule
+
+interface ARLiteMasterShim#(numeric type addr_);
+  interface ARLiteMaster#(addr_) master;
+  interface FIFOF#(ARLiteFlit#(addr_)) fifof;
+endinterface
+
+module mkARLiteMasterShim (ARLiteMasterShim#(addr_));
+  let ff  <- mkBypassFIFOF;
+  let ifc <- toAXIARLiteMaster(ff);
+  interface master = ifc;
+  interface fifof  = ff;
+endmodule
+
+// Shim for FIFOF#(ARFlit) to ARSlave
+
+interface ARSlaveShim#(numeric type id_, numeric type addr_, numeric type user_);
+  interface ARSlave#(id_, addr_, user_) slave;
+  interface FIFOF#(ARFlit#(id_, addr_, user_)) fifof;
+endinterface
+
+module mkARSlaveShim (ARSlaveShim#(id_, addr_, user_));
+  let ff  <- mkBypassFIFOF;
+  let ifc <- toAXIARSlave(ff);
+  interface slave = ifc;
+  interface fifof = ff;
+endmodule
+
+interface ARLiteSlaveShim#(numeric type addr_);
+  interface ARLiteSlave#(addr_) slave;
+  interface FIFOF#(ARLiteFlit#(addr_)) fifof;
+endinterface
+
+module mkARLiteSlaveShim (ARLiteSlaveShim#(addr_));
+  let ff  <- mkBypassFIFOF;
+  let ifc <- toAXIARLiteSlave(ff);
+  interface slave = ifc;
+  interface fifof = ff;
+endmodule
