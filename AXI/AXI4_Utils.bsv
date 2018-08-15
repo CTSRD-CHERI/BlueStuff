@@ -34,17 +34,39 @@ import AXI4_AR_Utils :: *;
 import AXI4_R_Utils :: *;
 
 import FIFOF :: *;
+import SpecialFIFOs :: *;
 
 //////////////////////
 // Util Typeclasses //
 ////////////////////////////////////////////////////////////////////////////////
 
+// NullSource / Sink
 typeclass NullSource#(type a);
   module mkNullSource(a);
 endtypeclass
 
 typeclass Sink#(type a);
   module mkSink(a);
+endtypeclass
+
+// Shim typeclass
+
+interface MasterShim#(type axi_master, type t);
+  interface axi_master master;
+  interface FIFOF#(t) ff;
+endinterface
+
+typeclass MkMasterShim#(type axi_master, type t);
+  module mkMasterShim (MasterShim#(axi_master, t));
+endtypeclass
+
+interface SlaveShim#(type axi_slave, type t);
+  interface axi_slave slave;
+  interface FIFOF#(t) ff;
+endinterface
+
+typeclass MkSlaveShim#(type axi_slave, type t);
+  module mkSlaveShim (SlaveShim#(axi_slave, t));
 endtypeclass
 
 ///////////////////////////////
@@ -107,6 +129,48 @@ instance Sink#(AWLiteSlave#(a));
   endmodule
 endinstance
 
+// Shim instances
+
+instance MkMasterShim#(AWMaster#(id_, addr_, user_), t)
+  provisos (Bits#(t, t_sz), ToAXIAWFlit#(t, id_, addr_, user_));
+  module mkMasterShim (MasterShim#(AWMaster#(id_, addr_, user_), t));
+    let ff_     <- mkBypassFIFOF;
+    let master_ <- toAXIAWMaster(ff_);
+    interface master = master_;
+    interface ff     = ff_;
+  endmodule
+endinstance
+
+instance MkMasterShim#(AWLiteMaster#(addr_), t)
+  provisos (Bits#(t, t_sz), ToAXIAWLiteFlit#(t, addr_));
+  module mkMasterShim (MasterShim#(AWLiteMaster#(addr_), t));
+    let ff_     <- mkBypassFIFOF;
+    let master_ <- toAXIAWLiteMaster(ff_);
+    interface master = master_;
+    interface ff     = ff_;
+  endmodule
+endinstance
+
+instance MkSlaveShim#(AWSlave#(id_, addr_, user_), t)
+  provisos (Bits#(t, t_sz), FromAXIAWFlit#(t, id_, addr_, user_));
+  module mkSlaveShim (SlaveShim#(AWSlave#(id_, addr_, user_), t));
+    let ff_    <- mkBypassFIFOF;
+    let slave_ <- toAXIAWSlave(ff_);
+    interface slave = slave_;
+    interface ff    = ff_;
+  endmodule
+endinstance
+
+instance MkSlaveShim#(AWLiteSlave#(addr_), t)
+  provisos (Bits#(t, t_sz), FromAXIAWLiteFlit#(t, addr_));
+  module mkSlaveShim (SlaveShim#(AWLiteSlave#(addr_), t));
+    let ff_    <- mkBypassFIFOF;
+    let slave_ <- toAXIAWLiteSlave(ff_);
+    interface slave = slave_;
+    interface ff    = ff_;
+  endmodule
+endinstance
+
 ////////////////////////////
 // AXI Write Data Channel //
 ////////////////////////////////////////////////////////////////////////////////
@@ -153,6 +217,48 @@ instance Sink#(WLiteSlave#(a));
   endmodule
 endinstance
 
+// Shim instances
+
+instance MkMasterShim#(WMaster#(data_, user), t)
+  provisos (Bits#(t, t_sz), ToAXIWFlit#(t, data_, user));
+  module mkMasterShim (MasterShim#(WMaster#(data_, user), t));
+    let ff_     <- mkBypassFIFOF;
+    let master_ <- toAXIWMaster(ff_);
+    interface master = master_;
+    interface ff     = ff_;
+  endmodule
+endinstance
+
+instance MkMasterShim#(WLiteMaster#(data_), t)
+  provisos (Bits#(t, t_sz), ToAXIWLiteFlit#(t, data_));
+  module mkMasterShim (MasterShim#(WLiteMaster#(data_), t));
+    let ff_     <- mkBypassFIFOF;
+    let master_ <- toAXIWLiteMaster(ff_);
+    interface master = master_;
+    interface ff     = ff_;
+  endmodule
+endinstance
+
+instance MkSlaveShim#(WSlave#(data_, user), t)
+  provisos (Bits#(t, t_sz), FromAXIWFlit#(t, data_, user));
+  module mkSlaveShim (SlaveShim#(WSlave#(data_, user), t));
+    let ff_    <- mkBypassFIFOF;
+    let slave_ <- toAXIWSlave(ff_);
+    interface slave = slave_;
+    interface ff    = ff_;
+  endmodule
+endinstance
+
+instance MkSlaveShim#(WLiteSlave#(data_), t)
+  provisos (Bits#(t, t_sz), FromAXIWLiteFlit#(t, data_));
+  module mkSlaveShim (SlaveShim#(WLiteSlave#(data_), t));
+    let ff_    <- mkBypassFIFOF;
+    let slave_ <- toAXIWLiteSlave(ff_);
+    interface slave = slave_;
+    interface ff    = ff_;
+  endmodule
+endinstance
+
 ////////////////////////////////
 // AXI Write Response Channel //
 ////////////////////////////////////////////////////////////////////////////////
@@ -192,6 +298,48 @@ instance NullSource#(BLiteSlave);
     method bresp  = ?;
     method bvalid = False;
     method bready(_) = noAction;
+  endmodule
+endinstance
+
+// Shim instances
+
+instance MkMasterShim#(BMaster#(id_, user_), t)
+  provisos (Bits#(t, t_sz), FromAXIBFlit#(t, id_, user_));
+  module mkMasterShim (MasterShim#(BMaster#(id_, user_), t));
+    let ff_     <- mkBypassFIFOF;
+    let master_ <- toAXIBMaster(ff_);
+    interface master = master_;
+    interface ff     = ff_;
+  endmodule
+endinstance
+
+instance MkMasterShim#(BLiteMaster, t)
+  provisos (Bits#(t, t_sz), FromAXIBLiteFlit#(t));
+  module mkMasterShim (MasterShim#(BLiteMaster, t));
+    let ff_     <- mkBypassFIFOF;
+    let master_ <- toAXIBLiteMaster(ff_);
+    interface master = master_;
+    interface ff     = ff_;
+  endmodule
+endinstance
+
+instance MkSlaveShim#(BSlave#(id_, user_), t)
+  provisos (Bits#(t, t_sz), ToAXIBFlit#(t, id_, user_));
+  module mkSlaveShim (SlaveShim#(BSlave#(id_, user_), t));
+    let ff_    <- mkBypassFIFOF;
+    let slave_ <- toAXIBSlave(ff_);
+    interface slave = slave_;
+    interface ff    = ff_;
+  endmodule
+endinstance
+
+instance MkSlaveShim#(BLiteSlave, t)
+  provisos (Bits#(t, t_sz), ToAXIBLiteFlit#(t));
+  module mkSlaveShim (SlaveShim#(BLiteSlave, t));
+    let ff_    <- mkBypassFIFOF;
+    let slave_ <- toAXIBLiteSlave(ff_);
+    interface slave = slave_;
+    interface ff    = ff_;
   endmodule
 endinstance
 
@@ -255,6 +403,48 @@ instance Sink#(ARLiteSlave#(a));
   endmodule
 endinstance
 
+// Shim instances
+
+instance MkMasterShim#(ARMaster#(id_, addr_, user_), t)
+  provisos (Bits#(t, t_sz), ToAXIARFlit#(t, id_, addr_, user_));
+  module mkMasterShim (MasterShim#(ARMaster#(id_, addr_, user_), t));
+    let ff_     <- mkBypassFIFOF;
+    let master_ <- toAXIARMaster(ff_);
+    interface master = master_;
+    interface ff     = ff_;
+  endmodule
+endinstance
+
+instance MkMasterShim#(ARLiteMaster#(addr_), t)
+  provisos (Bits#(t, t_sz), ToAXIARLiteFlit#(t, addr_));
+  module mkMasterShim (MasterShim#(ARLiteMaster#(addr_), t));
+    let ff_     <- mkBypassFIFOF;
+    let master_ <- toAXIARLiteMaster(ff_);
+    interface master = master_;
+    interface ff     = ff_;
+  endmodule
+endinstance
+
+instance MkSlaveShim#(ARSlave#(id_, addr_, user_), t)
+  provisos (Bits#(t, t_sz), FromAXIARFlit#(t, id_, addr_, user_));
+  module mkSlaveShim (SlaveShim#(ARSlave#(id_, addr_, user_), t));
+    let ff_    <- mkBypassFIFOF;
+    let slave_ <- toAXIARSlave(ff_);
+    interface slave = slave_;
+    interface ff    = ff_;
+  endmodule
+endinstance
+
+instance MkSlaveShim#(ARLiteSlave#(addr_), t)
+  provisos (Bits#(t, t_sz), FromAXIARLiteFlit#(t, addr_));
+  module mkSlaveShim (SlaveShim#(ARLiteSlave#(addr_), t));
+    let ff_    <- mkBypassFIFOF;
+    let slave_ <- toAXIARLiteSlave(ff_);
+    interface slave = slave_;
+    interface ff    = ff_;
+  endmodule
+endinstance
+
 ///////////////////////////
 // AXI Read Data Channel //
 ////////////////////////////////////////////////////////////////////////////////
@@ -303,6 +493,48 @@ instance NullSource#(RLiteSlave#(a));
   endmodule
 endinstance
 
+// Shim instances
+
+instance MkMasterShim#(RMaster#(id_, data_, user_), t)
+  provisos (Bits#(t, t_sz), FromAXIRFlit#(t, id_, data_, user_));
+  module mkMasterShim (MasterShim#(RMaster#(id_, data_, user_), t));
+    let ff_     <- mkBypassFIFOF;
+    let master_ <- toAXIRMaster(ff_);
+    interface master = master_;
+    interface ff     = ff_;
+  endmodule
+endinstance
+
+instance MkMasterShim#(RLiteMaster#(data_), t)
+  provisos (Bits#(t, t_sz), FromAXIRLiteFlit#(t, data_));
+  module mkMasterShim (MasterShim#(RLiteMaster#(data_), t));
+    let ff_     <- mkBypassFIFOF;
+    let master_ <- toAXIRLiteMaster(ff_);
+    interface master = master_;
+    interface ff     = ff_;
+  endmodule
+endinstance
+
+instance MkSlaveShim#(RSlave#(id_, data_, user_), t)
+  provisos (Bits#(t, t_sz), ToAXIRFlit#(t, id_, data_, user_));
+  module mkSlaveShim (SlaveShim#(RSlave#(id_, data_, user_), t));
+    let ff_    <- mkBypassFIFOF;
+    let slave_ <- toAXIRSlave(ff_);
+    interface slave = slave_;
+    interface ff    = ff_;
+  endmodule
+endinstance
+
+instance MkSlaveShim#(RLiteSlave#(data_), t)
+  provisos (Bits#(t, t_sz), ToAXIRLiteFlit#(t, data_));
+  module mkSlaveShim (SlaveShim#(RLiteSlave#(data_), t));
+    let ff_    <- mkBypassFIFOF;
+    let slave_ <- toAXIRLiteSlave(ff_);
+    interface slave = slave_;
+    interface ff    = ff_;
+  endmodule
+endinstance
+
 ////////////////
 // AXI Master //
 ////////////////////////////////////////////////////////////////////////////////
@@ -323,11 +555,11 @@ interface AXIMasterShim#(
 endinterface
 
 module mkAXIMasterShim (AXIMasterShim#(id_, addr_, data_, user_));
-  let awshim <- mkAWMasterShim;
-  let  wshim <- mkWMasterShim;
-  let  bshim <- mkBMasterShim;
-  let arshim <- mkARMasterShim;
-  let  rshim <- mkRMasterShim;
+  let awshim <- mkMasterShim;
+  let  wshim <- mkMasterShim;
+  let  bshim <- mkMasterShim;
+  let arshim <- mkMasterShim;
+  let  rshim <- mkMasterShim;
   interface master = interface AXIMaster;
     interface aw = awshim.master;
     interface  w = wshim.master;
@@ -335,11 +567,11 @@ module mkAXIMasterShim (AXIMasterShim#(id_, addr_, data_, user_));
     interface ar = arshim.master;
     interface  r = rshim.master;
   endinterface;
-  interface awff = awshim.fifof;
-  interface  wff = wshim.fifof;
-  interface  bff = bshim.fifof;
-  interface arff = arshim.fifof;
-  interface  rff = rshim.fifof;
+  interface awff = awshim.ff;
+  interface  wff = wshim.ff;
+  interface  bff = bshim.ff;
+  interface arff = arshim.ff;
+  interface  rff = rshim.ff;
 endmodule
 
 interface AXILiteMasterShim#(numeric type addr_, numeric type data_);
@@ -352,11 +584,11 @@ interface AXILiteMasterShim#(numeric type addr_, numeric type data_);
 endinterface
 
 module mkAXILiteMasterShim (AXILiteMasterShim#(addr_, data_));
-  let awshim <- mkAWLiteMasterShim;
-  let  wshim <- mkWLiteMasterShim;
-  let  bshim <- mkBLiteMasterShim;
-  let arshim <- mkARLiteMasterShim;
-  let  rshim <- mkRLiteMasterShim;
+  let awshim <- mkMasterShim;
+  let  wshim <- mkMasterShim;
+  let  bshim <- mkMasterShim;
+  let arshim <- mkMasterShim;
+  let  rshim <- mkMasterShim;
   interface master = interface AXILiteMaster;
     interface aw = awshim.master;
     interface  w = wshim.master;
@@ -364,11 +596,11 @@ module mkAXILiteMasterShim (AXILiteMasterShim#(addr_, data_));
     interface ar = arshim.master;
     interface  r = rshim.master;
   endinterface;
-  interface awff = awshim.fifof;
-  interface  wff = wshim.fifof;
-  interface  bff = bshim.fifof;
-  interface arff = arshim.fifof;
-  interface  rff = rshim.fifof;
+  interface awff = awshim.ff;
+  interface  wff = wshim.ff;
+  interface  bff = bshim.ff;
+  interface arff = arshim.ff;
+  interface  rff = rshim.ff;
 endmodule
 
 ///////////////
@@ -391,11 +623,11 @@ interface AXISlaveShim#(
 endinterface
 
 module mkAXISlaveShim (AXISlaveShim#(id_, addr_, data_, user_));
-  let awshim <- mkAWSlaveShim;
-  let  wshim <- mkWSlaveShim;
-  let  bshim <- mkBSlaveShim;
-  let arshim <- mkARSlaveShim;
-  let  rshim <- mkRSlaveShim;
+  let awshim <- mkSlaveShim;
+  let  wshim <- mkSlaveShim;
+  let  bshim <- mkSlaveShim;
+  let arshim <- mkSlaveShim;
+  let  rshim <- mkSlaveShim;
   interface slave = interface AXISlave;
     interface aw = awshim.slave;
     interface  w = wshim.slave;
@@ -403,11 +635,11 @@ module mkAXISlaveShim (AXISlaveShim#(id_, addr_, data_, user_));
     interface ar = arshim.slave;
     interface  r = rshim.slave;
   endinterface;
-  interface awff = awshim.fifof;
-  interface  wff = wshim.fifof;
-  interface  bff = bshim.fifof;
-  interface arff = arshim.fifof;
-  interface  rff = rshim.fifof;
+  interface awff = awshim.ff;
+  interface  wff = wshim.ff;
+  interface  bff = bshim.ff;
+  interface arff = arshim.ff;
+  interface  rff = rshim.ff;
 endmodule
 
 interface AXILiteSlaveShim#(numeric type addr_, numeric type data_);
@@ -420,11 +652,11 @@ interface AXILiteSlaveShim#(numeric type addr_, numeric type data_);
 endinterface
 
 module mkAXILiteSlaveShim (AXILiteSlaveShim#(addr_, data_));
-  let awshim <- mkAWLiteSlaveShim;
-  let  wshim <- mkWLiteSlaveShim;
-  let  bshim <- mkBLiteSlaveShim;
-  let arshim <- mkARLiteSlaveShim;
-  let  rshim <- mkRLiteSlaveShim;
+  let awshim <- mkSlaveShim;
+  let  wshim <- mkSlaveShim;
+  let  bshim <- mkSlaveShim;
+  let arshim <- mkSlaveShim;
+  let  rshim <- mkSlaveShim;
   interface slave = interface AXILiteSlave;
     interface aw = awshim.slave;
     interface  w = wshim.slave;
@@ -432,11 +664,11 @@ module mkAXILiteSlaveShim (AXILiteSlaveShim#(addr_, data_));
     interface ar = arshim.slave;
     interface  r = rshim.slave;
   endinterface;
-  interface awff = awshim.fifof;
-  interface  wff = wshim.fifof;
-  interface  bff = bshim.fifof;
-  interface arff = arshim.fifof;
-  interface  rff = rshim.fifof;
+  interface awff = awshim.ff;
+  interface  wff = wshim.ff;
+  interface  bff = bshim.ff;
+  interface arff = arshim.ff;
+  interface  rff = rshim.ff;
 endmodule
 
 ///////////////////////////
