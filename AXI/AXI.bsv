@@ -34,6 +34,7 @@ import AXI4_W_Utils :: *;
 import AXI4_B_Utils :: *;
 import AXI4_AR_Utils :: *;
 import AXI4_R_Utils :: *;
+import AXI4_Utils :: *;
 
 export AXI4_Types :: *;
 export AXI4_AW_Utils :: *;
@@ -41,5 +42,6 @@ export AXI4_W_Utils :: *;
 export AXI4_B_Utils :: *;
 export AXI4_AR_Utils :: *;
 export AXI4_R_Utils :: *;
+export AXI4_Utils :: *;
 
 endpackage

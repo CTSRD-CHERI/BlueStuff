@@ -38,12 +38,8 @@ typedef 128 DATA_sz;
 (* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
 module axiLiteMaster (AXILiteMaster#(ADDR_sz, DATA_sz));
 
-  // one FIFOF per channel
-  AWLiteMasterShim#(ADDR_sz) awshim <- mkAWLiteMasterShim;
-  WLiteMasterShim#(DATA_sz)   wshim <- mkWLiteMasterShim;
-  BLiteMasterShim             bshim <- mkBLiteMasterShim;
-  ARLiteMasterShim#(ADDR_sz) arshim <- mkARLiteMasterShim;
-  RLiteMasterShim#(DATA_sz)   rshim <- mkRLiteMasterShim;
+  // AXI master shim
+  AXILiteMasterShim#(ADDR_sz, DATA_sz) shim <- mkAXILiteMasterShim;
 
   // counter
   Reg#(Bit#(DATA_sz)) cnt <- mkReg(0);
@@ -53,66 +49,54 @@ module axiLiteMaster (AXILiteMaster#(ADDR_sz, DATA_sz));
   Bool sendWrite = cnt[3:0] == 0;
   rule enqAWFlit (sendWrite);
     AWLiteFlit#(ADDR_sz) f = ?;
-    awshim.fifof.enq(f);
+    shim.awff.enq(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
   rule enqWFlit (sendWrite);
     WLiteFlit#(DATA_sz) f = WLiteFlit{wdata: cnt, wstrb: ?};
-    wshim.fifof.enq(f);
+    shim.wff.enq(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
   rule deqBFlit;
-    bshim.fifof.deq;
-    $display("%0t - MASTER - received ", $time, fshow(bshim.fifof.first));
+    shim.bff.deq;
+    $display("%0t - MASTER - received ", $time, fshow(shim.bff.first));
   endrule
-  rule enqARFlit; arshim.fifof.enq(?); endrule
-  rule deqRFlit;  rshim.fifof.deq;     endrule
+  rule enqARFlit; shim.arff.enq(?); endrule
+  rule deqRFlit;  shim.rff.deq;     endrule
 
-  // assign channel interfaces to module the interface
-  interface aw = awshim.master;
-  interface w  = wshim.master;
-  interface b  = bshim.master;
-  interface ar = arshim.master;
-  interface r  = rshim.master;
+  // return AXI interface
+  return shim.master;
 
 endmodule
 
 (* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
 module axiLiteSlave (AXILiteSlave#(ADDR_sz, DATA_sz));
 
-  // one FIFOF per channel
-  AWLiteSlaveShim#(ADDR_sz) awshim <- mkAWLiteSlaveShim;
-  WLiteSlaveShim#(DATA_sz)   wshim <- mkWLiteSlaveShim;
-  BLiteSlaveShim             bshim <- mkBLiteSlaveShim;
-  ARLiteSlaveShim#(ADDR_sz) arshim <- mkARLiteSlaveShim;
-  RLiteSlaveShim#(DATA_sz)   rshim <- mkRLiteSlaveShim;
+  // AXI slave shim
+  AXILiteSlaveShim#(ADDR_sz, DATA_sz) shim <- mkAXILiteSlaveShim;
 
   // arbitrary work (enq/deq FIFOF) for each channel
   FIFOF#(Bit#(0)) writeResp <- mkFIFOF;
   rule deqAWFlit;
-    awshim.fifof.deq;
-    $display("%0t - SLAVE - received ", $time, fshow(awshim.fifof.first));
+    shim.awff.deq;
+    $display("%0t - SLAVE - received ", $time, fshow(shim.awff.first));
   endrule
   rule deqWFlit;
-    wshim.fifof.deq;
-    $display("%0t - SLAVE - received ", $time, fshow(wshim.fifof.first));
+    shim.wff.deq;
+    $display("%0t - SLAVE - received ", $time, fshow(shim.wff.first));
     writeResp.enq(?);
   endrule
   rule enqBFlit;
     writeResp.deq;
     BLiteFlit f = ?;
-    bshim.fifof.enq(f);
+    shim.bff.enq(f);
     $display("%0t - SLAVE - sending ", $time, fshow(f));
   endrule
-  rule deqARFlit; arshim.fifof.deq;   endrule
-  rule enqRFlit;  rshim.fifof.enq(?); endrule
+  rule deqARFlit; shim.arff.deq;   endrule
+  rule enqRFlit;  shim.rff.enq(?); endrule
 
-  // assign channel interfaces to module the interface
-  interface aw = awshim.slave;
-  interface w  = wshim.slave;
-  interface b  = bshim.slave;
-  interface ar = arshim.slave;
-  interface r  = rshim.slave;
+  // return AXI interface
+  return shim.slave;
 
 endmodule
 

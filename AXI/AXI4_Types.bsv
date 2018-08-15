@@ -28,18 +28,6 @@
 
 import Connectable :: *;
 
-//////////////////////
-// Util Typeclasses //
-////////////////////////////////////////////////////////////////////////////////
-
-typeclass NullSource#(type a);
-  module mkNullSource(a);
-endtypeclass
-
-typeclass Sink#(type a);
-  module mkSink(a);
-endtypeclass
-
 ///////////////////////////////
 // AXI Address Write Channel //
 ////////////////////////////////////////////////////////////////////////////////
@@ -119,62 +107,6 @@ interface AWLiteSlave#(numeric type addr_);
   (* prefix="" *) method Action awvalid(Bool        awvalid);
   method Bool awready;
 endinterface
-
-// NullSource / Sink instances
-
-instance NullSource#(AWMaster#(a, b, c));
-  module mkNullSource(AWMaster#(a, b, c));
-    method awid     = ?;
-    method awaddr   = ?;
-    method awlen    = ?;
-    method awsize   = ?;
-    method awburst  = ?;
-    method awlock   = ?;
-    method awcache  = ?;
-    method awprot   = ?;
-    method awqos    = ?;
-    method awregion = ?;
-    method awuser   = ?;
-    method awvalid  = False;
-    method awready(_) = noAction;
-  endmodule
-endinstance
-
-instance NullSource#(AWLiteMaster#(a));
-  module mkNullSource(AWLiteMaster#(a));
-    method awaddr  = ?;
-    method awprot  = ?;
-    method awvalid = False;
-    method awready(_) = noAction;
-  endmodule
-endinstance
-
-instance Sink#(AWSlave#(a, b, c));
-  module mkSink(AWSlave#(a, b, c));
-    method awid    (_) = noAction;
-    method awaddr  (_) = noAction;
-    method awlen   (_) = noAction;
-    method awsize  (_) = noAction;
-    method awburst (_) = noAction;
-    method awlock  (_) = noAction;
-    method awcache (_) = noAction;
-    method awprot  (_) = noAction;
-    method awqos   (_) = noAction;
-    method awregion(_) = noAction;
-    method awuser  (_) = noAction;
-    method awvalid (_) = noAction;
-    method awready = True;
-  endmodule
-endinstance
-
-instance Sink#(AWLiteSlave#(a));
-  module mkSink(AWLiteSlave#(a));
-    method awaddr  (_) = noAction;
-    method awprot  (_) = noAction;
-    method awvalid (_) = noAction;
-    method awready = True;
-  endmodule
-endinstance
 
 // connectable instances
 
@@ -273,48 +205,6 @@ interface WLiteSlave#(numeric type data_);
   method Bool wready;
 endinterface
 
-// NullSource / Sink instances
-
-instance NullSource#(WMaster#(a, b));
-  module mkNullSource(WMaster#(a, b));
-    method wdata  = ?;
-    method wstrb  = ?;
-    method wlast  = ?;
-    method wuser  = ?;
-    method wvalid = False;
-    method wready(_) = noAction;
-  endmodule
-endinstance
-
-instance NullSource#(WLiteMaster#(a));
-  module mkNullSource(WLiteMaster#(a));
-    method wdata  = ?;
-    method wstrb  = ?;
-    method wvalid = False;
-    method wready(_) = noAction;
-  endmodule
-endinstance
-
-instance Sink#(WSlave#(a, b));
-  module mkSink(WSlave#(a, b));
-    method wdata (_) = noAction;
-    method wstrb (_) = noAction;
-    method wlast (_) = noAction;
-    method wuser (_) = noAction;
-    method wvalid(_) = noAction;
-    method wready = True;
-  endmodule
-endinstance
-
-instance Sink#(WLiteSlave#(a));
-  module mkSink(WLiteSlave#(a));
-    method wdata (_) = noAction;
-    method wstrb (_) = noAction;
-    method wvalid(_) = noAction;
-    method wready = True;
-  endmodule
-endinstance
-
 // connectable instances
 
 instance Connectable#(WMaster#(a, b), WSlave#(a, b));
@@ -398,44 +288,6 @@ interface BLiteSlave;
   method Bool bvalid;
   (* prefix="" *) method Action bready(Bool bready);
 endinterface
-
-// NullSource / Sink instances
-
-instance Sink#(BMaster#(a, b));
-  module mkSink(BMaster#(a, b));
-    method bid   (_) = noAction;
-    method bresp (_) = noAction;
-    method buser (_) = noAction;
-    method bvalid(_) = noAction;
-    method bready = True;
-  endmodule
-endinstance
-
-instance Sink#(BLiteMaster);
-  module mkSink(BLiteMaster);
-    method bresp (_) = noAction;
-    method bvalid(_) = noAction;
-    method bready = True;
-  endmodule
-endinstance
-
-instance NullSource#(BSlave#(a, b));
-  module mkNullSource(BSlave#(a, b));
-    method bid    = ?;
-    method bresp  = ?;
-    method buser  = ?;
-    method bvalid = False;
-    method bready(_) = noAction;
-  endmodule
-endinstance
-
-instance NullSource#(BLiteSlave);
-  module mkNullSource(BLiteSlave);
-    method bresp  = ?;
-    method bvalid = False;
-    method bready(_) = noAction;
-  endmodule
-endinstance
 
 // connectable instances
 
@@ -547,62 +399,6 @@ interface ARLiteSlave#(numeric type addr_);
   method Bool arready;
 endinterface
 
-// NullSource / Sink instances
-
-instance NullSource#(ARMaster#(a, b, c));
-  module mkNullSource(ARMaster#(a, b, c));
-    method arid     = ?;
-    method araddr   = ?;
-    method arlen    = ?;
-    method arsize   = ?;
-    method arburst  = ?;
-    method arlock   = ?;
-    method arcache  = ?;
-    method arprot   = ?;
-    method arqos    = ?;
-    method arregion = ?;
-    method aruser   = ?;
-    method arvalid  = False;
-    method arready(_) = noAction;
-  endmodule
-endinstance
-
-instance NullSource#(ARLiteMaster#(a));
-  module mkNullSource(ARLiteMaster#(a));
-    method araddr  = ?;
-    method arprot  = ?;
-    method arvalid = False;
-    method arready(_) = noAction;
-  endmodule
-endinstance
-
-instance Sink#(ARSlave#(a, b, c));
-  module mkSink(ARSlave#(a, b, c));
-    method arid    (_) = noAction;
-    method araddr  (_) = noAction;
-    method arlen   (_) = noAction;
-    method arsize  (_) = noAction;
-    method arburst (_) = noAction;
-    method arlock  (_) = noAction;
-    method arcache (_) = noAction;
-    method arprot  (_) = noAction;
-    method arqos   (_) = noAction;
-    method arregion(_) = noAction;
-    method aruser  (_) = noAction;
-    method arvalid (_) = noAction;
-    method arready = True;
-  endmodule
-endinstance
-
-instance Sink#(ARLiteSlave#(a));
-  module mkSink(ARLiteSlave#(a));
-    method araddr  (_) = noAction;
-    method arprot  (_) = noAction;
-    method arvalid (_) = noAction;
-    method arready = True;
-  endmodule
-endinstance
-
 // connectable instances
 
 instance Connectable#(ARMaster#(a, b, c), ARSlave#(a, b, c));
@@ -704,50 +500,6 @@ interface RLiteSlave#(numeric type data_);
   (* prefix="" *) method Action rready(Bool rready);
 endinterface
 
-// NullSource / Sink instances
-
-instance Sink#(RMaster#(a, b, c));
-  module mkSink(RMaster#(a, b, c));
-    method rid   (_) = noAction;
-    method rdata (_) = noAction;
-    method rresp (_) = noAction;
-    method rlast (_) = noAction;
-    method ruser (_) = noAction;
-    method rvalid(_) = noAction;
-    method rready = True;
-  endmodule
-endinstance
-
-instance Sink#(RLiteMaster#(a));
-  module mkSink(RLiteMaster#(a));
-    method rdata (_) = noAction;
-    method rresp (_) = noAction;
-    method rvalid(_) = noAction;
-    method rready = True;
-  endmodule
-endinstance
-
-instance NullSource#(RSlave#(a, b, c));
-  module mkNullSource(RSlave#(a, b, c));
-    method rid    = ?;
-    method rdata  = ?;
-    method rresp  = ?;
-    method rlast  = ?;
-    method ruser  = ?;
-    method rvalid = False;
-    method rready(_) = noAction;
-  endmodule
-endinstance
-
-instance NullSource#(RLiteSlave#(a));
-  module mkNullSource(RLiteSlave#(a));
-    method rdata  = ?;
-    method rresp  = ?;
-    method rvalid = False;
-    method rready(_) = noAction;
-  endmodule
-endinstance
-
 // connectable instances
 
 instance Connectable#(RMaster#(a, b, c), RSlave#(a, b, c));
@@ -829,42 +581,8 @@ interface AXILiteSlave#(numeric type addr_, numeric type data_);
   interface RLiteSlave#(data_)  r;
 endinterface
 
-///////////////////////////
-// AXI NullSource / Sink //
-////////////////////////////////////////////////////////////////////////////////
-
-instance NullSource#(AXIMaster#(a, b, c, d));
-  module mkNullSource(AXIMaster#(a, b, c, d));
-    let aw_source <- mkNullSource;
-    let w_source  <- mkNullSource;
-    let b_sink    <- mkSink;
-    let ar_source <- mkNullSource;
-    let r_sink    <- mkSink;
-    interface aw = aw_source;
-    interface w  = w_source;
-    interface b  = b_sink;
-    interface ar = ar_source;
-    interface r  = r_sink;
-  endmodule
-endinstance
-
-instance Sink#(AXISlave#(a, b, c, d));
-  module mkSink(AXISlave#(a, b, c, d));
-    let aw_sink  <- mkSink;
-    let w_sink   <- mkSink;
-    let b_source <- mkNullSource;
-    let ar_sink  <- mkSink;
-    let r_source <- mkNullSource;
-    interface aw = aw_sink;
-    interface w  = w_sink;
-    interface b  = b_source;
-    interface ar = ar_sink;
-    interface r  = r_source;
-  endmodule
-endinstance
-
-/////////////////////
-// AXI Connectable //
+///////////////////////////////
+// AXI Connectable instances //
 ////////////////////////////////////////////////////////////////////////////////
 
 instance Connectable#(AXIMaster#(a, b, c, d), AXISlave#(a, b, c, d));
