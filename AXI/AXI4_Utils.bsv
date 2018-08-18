@@ -137,7 +137,7 @@ instance MkMasterShim#(AWMaster#(id_, addr_, user_), t)
     let ff_     <- mkBypassFIFOF;
     let master_ <- toAXIAWMaster(ff_);
     interface master = master_;
-    interface ff     = ff_;
+    interface ff     = asSink(ff_);
   endmodule
 endinstance
 
@@ -147,7 +147,7 @@ instance MkMasterShim#(AWLiteMaster#(addr_), t)
     let ff_     <- mkBypassFIFOF;
     let master_ <- toAXIAWLiteMaster(ff_);
     interface master = master_;
-    interface ff     = ff_;
+    interface ff     = asSink(ff_);
   endmodule
 endinstance
 
@@ -157,7 +157,7 @@ instance MkSlaveShim#(AWSlave#(id_, addr_, user_), t)
     let ff_    <- mkBypassFIFOF;
     let slave_ <- toAXIAWSlave(ff_);
     interface slave = slave_;
-    interface ff    = ff_;
+    interface ff    = asSource(ff_);
   endmodule
 endinstance
 
@@ -167,7 +167,7 @@ instance MkSlaveShim#(AWLiteSlave#(addr_), t)
     let ff_    <- mkBypassFIFOF;
     let slave_ <- toAXIAWLiteSlave(ff_);
     interface slave = slave_;
-    interface ff    = ff_;
+    interface ff    = asSource(ff_);
   endmodule
 endinstance
 
@@ -225,7 +225,7 @@ instance MkMasterShim#(WMaster#(data_, user), t)
     let ff_     <- mkBypassFIFOF;
     let master_ <- toAXIWMaster(ff_);
     interface master = master_;
-    interface ff     = ff_;
+    interface ff     = asSink(ff_);
   endmodule
 endinstance
 
@@ -235,7 +235,7 @@ instance MkMasterShim#(WLiteMaster#(data_), t)
     let ff_     <- mkBypassFIFOF;
     let master_ <- toAXIWLiteMaster(ff_);
     interface master = master_;
-    interface ff     = ff_;
+    interface ff     = asSink(ff_);
   endmodule
 endinstance
 
@@ -245,7 +245,7 @@ instance MkSlaveShim#(WSlave#(data_, user), t)
     let ff_    <- mkBypassFIFOF;
     let slave_ <- toAXIWSlave(ff_);
     interface slave = slave_;
-    interface ff    = ff_;
+    interface ff    = asSource(ff_);
   endmodule
 endinstance
 
@@ -255,7 +255,7 @@ instance MkSlaveShim#(WLiteSlave#(data_), t)
     let ff_    <- mkBypassFIFOF;
     let slave_ <- toAXIWLiteSlave(ff_);
     interface slave = slave_;
-    interface ff    = ff_;
+    interface ff    = asSource(ff_);
   endmodule
 endinstance
 
@@ -309,7 +309,7 @@ instance MkMasterShim#(BMaster#(id_, user_), t)
     let ff_     <- mkBypassFIFOF;
     let master_ <- toAXIBMaster(ff_);
     interface master = master_;
-    interface ff     = ff_;
+    interface ff     = asSource(ff_);
   endmodule
 endinstance
 
@@ -319,7 +319,7 @@ instance MkMasterShim#(BLiteMaster, t)
     let ff_     <- mkBypassFIFOF;
     let master_ <- toAXIBLiteMaster(ff_);
     interface master = master_;
-    interface ff     = ff_;
+    interface ff     = asSource(ff_);
   endmodule
 endinstance
 
@@ -329,7 +329,7 @@ instance MkSlaveShim#(BSlave#(id_, user_), t)
     let ff_    <- mkBypassFIFOF;
     let slave_ <- toAXIBSlave(ff_);
     interface slave = slave_;
-    interface ff    = ff_;
+    interface ff    = asSink(ff_);
   endmodule
 endinstance
 
@@ -339,7 +339,7 @@ instance MkSlaveShim#(BLiteSlave, t)
     let ff_    <- mkBypassFIFOF;
     let slave_ <- toAXIBLiteSlave(ff_);
     interface slave = slave_;
-    interface ff    = ff_;
+    interface ff    = asSink(ff_);
   endmodule
 endinstance
 
@@ -411,7 +411,7 @@ instance MkMasterShim#(ARMaster#(id_, addr_, user_), t)
     let ff_     <- mkBypassFIFOF;
     let master_ <- toAXIARMaster(ff_);
     interface master = master_;
-    interface ff     = ff_;
+    interface ff     = asSink(ff_);
   endmodule
 endinstance
 
@@ -421,7 +421,7 @@ instance MkMasterShim#(ARLiteMaster#(addr_), t)
     let ff_     <- mkBypassFIFOF;
     let master_ <- toAXIARLiteMaster(ff_);
     interface master = master_;
-    interface ff     = ff_;
+    interface ff     = asSink(ff_);
   endmodule
 endinstance
 
@@ -431,7 +431,7 @@ instance MkSlaveShim#(ARSlave#(id_, addr_, user_), t)
     let ff_    <- mkBypassFIFOF;
     let slave_ <- toAXIARSlave(ff_);
     interface slave = slave_;
-    interface ff    = ff_;
+    interface ff    = asSource(ff_);
   endmodule
 endinstance
 
@@ -441,7 +441,7 @@ instance MkSlaveShim#(ARLiteSlave#(addr_), t)
     let ff_    <- mkBypassFIFOF;
     let slave_ <- toAXIARLiteSlave(ff_);
     interface slave = slave_;
-    interface ff    = ff_;
+    interface ff    = asSource(ff_);
   endmodule
 endinstance
 
@@ -501,7 +501,7 @@ instance MkMasterShim#(RMaster#(id_, data_, user_), t)
     let ff_     <- mkBypassFIFOF;
     let master_ <- toAXIRMaster(ff_);
     interface master = master_;
-    interface ff     = ff_;
+    interface ff     = asSource(ff_);
   endmodule
 endinstance
 
@@ -511,7 +511,7 @@ instance MkMasterShim#(RLiteMaster#(data_), t)
     let ff_     <- mkBypassFIFOF;
     let master_ <- toAXIRLiteMaster(ff_);
     interface master = master_;
-    interface ff     = ff_;
+    interface ff     = asSource(ff_);
   endmodule
 endinstance
 
@@ -521,7 +521,7 @@ instance MkSlaveShim#(RSlave#(id_, data_, user_), t)
     let ff_    <- mkBypassFIFOF;
     let slave_ <- toAXIRSlave(ff_);
     interface slave = slave_;
-    interface ff    = ff_;
+    interface ff    = asSink(ff_);
   endmodule
 endinstance
 
@@ -531,7 +531,7 @@ instance MkSlaveShim#(RLiteSlave#(data_), t)
     let ff_    <- mkBypassFIFOF;
     let slave_ <- toAXIRLiteSlave(ff_);
     interface slave = slave_;
-    interface ff    = ff_;
+    interface ff    = asSink(ff_);
   endmodule
 endinstance
 

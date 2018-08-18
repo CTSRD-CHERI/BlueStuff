@@ -28,6 +28,7 @@
 
 import Connectable :: *;
 import DefaultValue :: *;
+import FIFOF :: *;
 
 //////////////////////
 // Common AXI types //
@@ -671,3 +672,25 @@ instance Connectable#(AXILiteSlave#(a, b), AXILiteMaster#(a, b));
     mkConnection(m, s);
   endmodule
 endinstance
+
+///////////////////////////////////////
+// FIFOF interface as source or sink //
+////////////////////////////////////////////////////////////////////////////////
+
+function FIFOF#(t) asSource(FIFOF#(t) ff) = interface FIFOF;
+  method   enq(x) = error("cannot use 'enq' method of a source FIFOF");
+  method      deq = ff.deq;
+  method    first = ff.first;
+  method    clear = error("cannot use 'clear' method of a source FIFOF");
+  method  notFull = error("cannot use 'notFull' method of a source FIFOF");
+  method notEmpty = ff.notEmpty;
+endinterface;
+
+function FIFOF#(t) asSink(FIFOF#(t) ff) = interface FIFOF;
+  method   enq(x) = ff.enq(x);
+  method      deq = error("cannot use 'deq' method of a sink FIFOF");
+  method    first = error("cannot use 'first' method of a sink FIFOF");
+  method    clear = error("cannot use 'clear' method of a sink FIFOF");
+  method  notFull = ff.notFull;
+  method notEmpty = error("cannot use 'notEmpty' method of a sink FIFOF");
+endinterface;
