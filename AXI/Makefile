@@ -29,6 +29,11 @@
 # BSV compiler
 BSC = bsc
 
+# dependencies
+BLUESTUFFDIR = ../
+BLUEBASICSDIR = $(BLUESTUFFDIR)/BlueBasics
+BSVPATH = +:$(BLUEBASICSDIR)
+
 # Top level modules
 TOPVERILOGFILE = ExampleVerilog.bsv
 AXIMASTERMOD = axiMaster
@@ -47,7 +52,8 @@ OUTPUTDIR = output
 VDIR = $(OUTPUTDIR)/vdir
 INFODIR = $(OUTPUTDIR)/info
 
-BSCFLAGS = -bdir $(BDIR)
+BSCFLAGS = -p $(BSVPATH)
+BSCFLAGS += -bdir $(BDIR)
 BSCFLAGS += -info-dir $(INFODIR)
 BSCFLAGS += -show-schedule -sched-dot
 

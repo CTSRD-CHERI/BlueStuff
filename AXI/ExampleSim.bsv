@@ -28,6 +28,8 @@
 
 import AXI :: *;
 
+import SourceSink :: *;
+
 import Connectable :: *;
 import FIFOF :: *;
 import SpecialFIFOs :: *;
@@ -45,24 +47,24 @@ module axiLiteMaster (AXILiteMaster#(ADDR_sz, DATA_sz));
   Reg#(Bit#(DATA_sz)) cnt <- mkReg(0);
   rule counteUp; cnt <= cnt + 1; endrule
 
-  // arbitrary work (enq/deq FIFOF) for each channel
+  // arbitrary work for each channel
   Bool sendWrite = cnt[3:0] == 0;
-  rule enqAWFlit (sendWrite);
+  rule putAWFlit (sendWrite);
     AWLiteFlit#(ADDR_sz) f = ?;
-    shim.awff.enq(f);
+    shim.awSink.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
-  rule enqWFlit (sendWrite);
+  rule putWFlit (sendWrite);
     WLiteFlit#(DATA_sz) f = WLiteFlit{wdata: cnt, wstrb: ?};
-    shim.wff.enq(f);
+    shim.wSink.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
-  rule deqBFlit;
-    shim.bff.deq;
-    $display("%0t - MASTER - received ", $time, fshow(shim.bff.first));
+  rule getBFlit;
+    let rsp <- shim.bSource.get;
+    $display("%0t - MASTER - received ", $time, fshow(rsp));
   endrule
-  rule enqARFlit; shim.arff.enq(?); endrule
-  rule deqRFlit;  shim.rff.deq;     endrule
+  rule putARFlit; shim.arSink.put(?); endrule
+  rule getRFlit; let _ <- shim.rSource.get; endrule
 
   // return AXI interface
   return shim.master;
@@ -75,25 +77,25 @@ module axiLiteSlave (AXILiteSlave#(ADDR_sz, DATA_sz));
   // AXI slave shim
   AXILiteSlaveShim#(ADDR_sz, DATA_sz) shim <- mkAXILiteSlaveShim;
 
-  // arbitrary work (enq/deq FIFOF) for each channel
+  // arbitrary work for each channel
   FIFOF#(Bit#(0)) writeResp <- mkFIFOF;
-  rule deqAWFlit;
-    shim.awff.deq;
-    $display("%0t - SLAVE - received ", $time, fshow(shim.awff.first));
+  rule getAWFlit;
+    let req <- shim.awSource.get;
+    $display("%0t - SLAVE - received ", $time, fshow(req));
   endrule
-  rule deqWFlit;
-    shim.wff.deq;
-    $display("%0t - SLAVE - received ", $time, fshow(shim.wff.first));
+  rule getWFlit;
+    let req <- shim.wSource.get;
+    $display("%0t - SLAVE - received ", $time, fshow(req));
     writeResp.enq(?);
   endrule
-  rule enqBFlit;
+  rule putBFlit;
     writeResp.deq;
     BLiteFlit f = ?;
-    shim.bff.enq(f);
+    shim.bSink.put(f);
     $display("%0t - SLAVE - sending ", $time, fshow(f));
   endrule
-  rule deqARFlit; shim.arff.deq;   endrule
-  rule enqRFlit;  shim.rff.enq(?); endrule
+  rule getARFlit; let _ <- shim.arSource.get; endrule
+  rule putRFlit; shim.rSink.put(?); endrule
 
   // return AXI interface
   return shim.slave;

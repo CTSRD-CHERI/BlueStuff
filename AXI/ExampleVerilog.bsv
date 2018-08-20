@@ -28,7 +28,7 @@
 
 import AXI :: *;
 
-import FIFOF :: *;
+import SourceSink :: *;
 
 typedef 4 ID_sz;
 typedef 32 ADDR_sz;
@@ -41,12 +41,12 @@ module axiMaster (AXIMaster#(ID_sz, ADDR_sz, DATA_sz, USER_sz));
   // AXI master shim
   AXIMasterShim#(ID_sz, ADDR_sz, DATA_sz, USER_sz) shim <- mkAXIMasterShim;
 
-  // arbitrary work (enq/deq FIFOF) for each channel
-  rule enqAWFlit; shim.awff.enq(?); endrule
-  rule enqWFlit;  shim.wff.enq(?);  endrule
-  rule deqBFlit;  shim.bff.deq;     endrule
-  rule enqARFlit; shim.arff.enq(?); endrule
-  rule deqRFlit;  shim.rff.deq;     endrule
+  // arbitrary work for each channel
+  rule enqAWFlit; shim.awSink.put(?); endrule
+  rule enqWFlit;  shim.wSink.put(?);  endrule
+  rule enqARFlit; shim.arSink.put(?); endrule
+  rule deqBFlit; let _ <- shim.bSource.get; endrule
+  rule deqRFlit; let _ <- shim.rSource.get; endrule
 
   // return AXI interface
   return shim.master;
@@ -59,12 +59,12 @@ module axiLiteMaster (AXILiteMaster#(ADDR_sz, DATA_sz));
   // AXI master shim
   AXILiteMasterShim#(ADDR_sz, DATA_sz) shim <- mkAXILiteMasterShim;
 
-  // arbitrary work (enq/deq FIFOF) for each channel
-  rule enqAWFlit; shim.awff.enq(?); endrule
-  rule enqWFlit;  shim.wff.enq(?);  endrule
-  rule deqBFlit;  shim.bff.deq;     endrule
-  rule enqARFlit; shim.arff.enq(?); endrule
-  rule deqRFlit;  shim.rff.deq;     endrule
+  // arbitrary work for each channel
+  rule enqAWFlit; shim.awSink.put(?); endrule
+  rule enqWFlit;  shim.wSink.put(?);  endrule
+  rule enqARFlit; shim.arSink.put(?); endrule
+  rule deqBFlit; let _ <- shim.bSource.get; endrule
+  rule deqRFlit; let _ <- shim.rSource.get; endrule
 
   // return AXI interface
   return shim.master;
@@ -77,12 +77,12 @@ module axiSlave (AXISlave#(ID_sz, ADDR_sz, DATA_sz, USER_sz));
   // AXI slave shim
   AXISlaveShim#(ID_sz, ADDR_sz, DATA_sz, USER_sz) shim <- mkAXISlaveShim;
 
-  // arbitrary work (enq/deq FIFOF) for each channel
-  rule deqAWFlit; shim.awff.deq;   endrule
-  rule deqWFlit;  shim.wff.deq;    endrule
-  rule enqBFlit;  shim.bff.enq(?); endrule
-  rule deqARFlit; shim.arff.deq;   endrule
-  rule enqRFlit;  shim.rff.enq(?); endrule
+  // arbitrary work for each channel
+  rule deqAWFlit; let _ <- shim.awSource.get; endrule
+  rule deqWFlit;  let _ <- shim.wSource.get;  endrule
+  rule deqARFlit; let _ <- shim.arSource.get; endrule
+  rule enqBFlit; shim.bSink.put(?); endrule
+  rule enqRFlit; shim.rSink.put(?); endrule
 
   // return AXI interface
   return shim.slave;
@@ -95,12 +95,12 @@ module axiLiteSlave (AXILiteSlave#(ADDR_sz, DATA_sz));
   // AXI slave shim
   AXILiteSlaveShim#(ADDR_sz, DATA_sz) shim <- mkAXILiteSlaveShim;
 
-  // arbitrary work (enq/deq FIFOF) for each channel
-  rule deqAWFlit; shim.awff.deq;   endrule
-  rule deqWFlit;  shim.wff.deq;    endrule
-  rule enqBFlit;  shim.bff.enq(?); endrule
-  rule deqARFlit; shim.arff.deq;   endrule
-  rule enqRFlit;  shim.rff.enq(?); endrule
+  // arbitrary work for each channel
+  rule deqAWFlit; let _ <- shim.awSource.get; endrule
+  rule deqWFlit;  let _ <- shim.wSource.get;  endrule
+  rule deqARFlit; let _ <- shim.arSource.get; endrule
+  rule enqBFlit; shim.bSink.put(?); endrule
+  rule enqRFlit; shim.rSink.put(?); endrule
 
   // return AXI interface
   return shim.slave;
