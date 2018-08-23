@@ -40,6 +40,10 @@ typeclass Arbitrable#(type a);
   function Bool isRequesting(a x);
 endtypeclass
 
+instance Arbitrable#(Bool);
+  function isRequesting(x) = x;
+endinstance
+
 instance Arbitrable#(FIFOF#(t));
   function isRequesting(x) = x.notEmpty;
 endinstance
