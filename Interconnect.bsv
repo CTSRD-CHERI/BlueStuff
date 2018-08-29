@@ -32,6 +32,7 @@ import Printf :: *;
 import List :: *;
 
 import SourceSink :: *;
+import MasterSlave :: *;
 import OneHotArbiter :: *;
 
 ////////////////////////
@@ -170,6 +171,27 @@ module mkOneWayBus#(
     endrules);
   end
   addRules(sinkRules);
+
+endmodule
+
+/////////////////
+// Two-way bus //
+////////////////////////////////////////////////////////////////////////////////
+
+module mkTwoWayBus#(
+    function List#(Bool) routeM2S (route_m2s_t m2s_val),
+    function List#(Bool) routeS2M (route_s2m_t s2m_val),
+    List#(Master#(m2s_t, s2m_t)) ms,
+    List#(Slave#(m2s_t, s2m_t)) ss
+  ) (Empty) provisos (
+    Bits#(m2s_t, m2s_sz), Routable#(m2s_t, route_m2s_t),
+    Bits#(s2m_t, s2m_sz), Routable#(s2m_t, route_s2m_t)
+  );
+
+  // Master to Slave bus
+  mkOneWayBus(routeM2S, map(getMasterSource, ms), map(getSlaveSink, ss));
+  // Slave to Master bus
+  mkOneWayBus(routeS2M, map(getSlaveSource, ss), map(getMasterSink, ms));
 
 endmodule
 

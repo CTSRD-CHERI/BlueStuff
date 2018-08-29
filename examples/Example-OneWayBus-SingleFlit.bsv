@@ -51,16 +51,6 @@ function List#(Bool) route (Bit#(a) x);
   endcase
 endfunction
 
-function Bit#(n) firstHot(Bit#(n) x);
-  Bit#(n) res = 0;
-  Bool found = False;
-  for (Integer i = valueOf(n) - 1; i >= 0; i = i - 1) begin
-    if (x[i] == 1) found = True;
-    res[i] = (found) ? 0 : x[i];
-  end
-  return res;
-endfunction
-
 typedef 4 NIns;
 typedef 3 NOuts;
 
