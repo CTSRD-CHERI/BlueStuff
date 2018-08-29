@@ -26,6 +26,8 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
+import SourceSink :: *;
+
 import AXI4_Types :: *;
 
 import FIFOF :: *;
@@ -78,6 +80,37 @@ typeclass ToAXIRMaster#(type t);
   provisos (FromAXIRFlit#(x, id_, data_, user_));
 endtypeclass
 
+instance ToAXIRMaster#(Sink);
+  module toAXIRMaster#(Sink#(t) snk)
+  (RMaster#(id_, data_, user_)) provisos (FromAXIRFlit#(t, id_, data_, user_));
+
+    let w_rid   <- mkDWire(?);
+    let w_rdata <- mkDWire(?);
+    let w_rresp <- mkDWire(?);
+    let w_rlast <- mkDWire(?);
+    let w_ruser <- mkDWire(?);
+    PulseWire putWire <- mkPulseWire;
+    rule doPut (putWire && snk.canPut);
+      snk.put(fromAXIRFlit(RFlit{
+        rid:   w_rid,
+        rdata: w_rdata,
+        rresp: w_rresp,
+        rlast: w_rlast,
+        ruser: w_ruser
+      }));
+    endrule
+
+    method rid(id)       = action w_rid   <= id; endaction;
+    method rdata(data)   = action w_rdata <= data; endaction;
+    method rresp(resp)   = action w_rresp <= resp; endaction;
+    method rlast(last)   = action w_rlast <= last; endaction;
+    method ruser(user)   = action w_ruser <= user; endaction;
+    method rvalid(valid) = action if (valid) putWire.send; endaction;
+    method rready        = snk.canPut;
+
+  endmodule
+endinstance
+
 instance ToAXIRMaster#(FIFOF);
   module toAXIRMaster#(FIFOF#(t) ff)
   (RMaster#(id_, data_, user_)) provisos (FromAXIRFlit#(t, id_, data_, user_));
@@ -114,6 +147,25 @@ typeclass ToAXIRLiteMaster#(type t);
   provisos (FromAXIRLiteFlit#(x, data_));
 endtypeclass
 
+instance ToAXIRLiteMaster#(Sink);
+  module toAXIRLiteMaster#(Sink#(t) snk)
+  (RLiteMaster#(data_)) provisos (FromAXIRLiteFlit#(t, data_));
+
+    let w_rdata <- mkDWire(?);
+    let w_rresp <- mkDWire(?);
+    PulseWire putWire <- mkPulseWire;
+    rule doPut (putWire && snk.canPut);
+      snk.put(fromAXIRLiteFlit(RLiteFlit{rdata: w_rdata, rresp: w_rresp}));
+    endrule
+
+    method rdata(data)   = action w_rdata <= data; endaction;
+    method rresp(resp)   = action w_rresp <= resp; endaction;
+    method rvalid(valid) = action if (valid) putWire.send; endaction;
+    method rready        = snk.canPut;
+
+  endmodule
+endinstance
+
 instance ToAXIRLiteMaster#(FIFOF);
   module toAXIRLiteMaster#(FIFOF#(t) ff)
   (RLiteMaster#(data_)) provisos (FromAXIRLiteFlit#(t, data_));
@@ -140,6 +192,26 @@ typeclass ToAXIRSlave#(type t);
   provisos (ToAXIRFlit#(x, id_, data_, user_));
 endtypeclass
 
+instance ToAXIRSlave#(Source);
+  module toAXIRSlave#(Source#(t) src)
+  (RSlave#(id_, data_, user_)) provisos (ToAXIRFlit#(t, id_, data_, user_));
+
+    Wire#(RFlit#(id_, data_, user_)) flit <- mkDWire(?);
+    rule getFlit (src.canGet); flit <= toAXIRFlit(src.peek); endrule
+    PulseWire getWire <- mkPulseWire;
+    rule doGet (getWire && src.canGet); let _ <- src.get; endrule
+
+    method rid    = flit.rid;
+    method rdata  = flit.rdata;
+    method rresp  = flit.rresp;
+    method rlast  = flit.rlast;
+    method ruser  = flit.ruser;
+    method rvalid = src.canGet;
+    method rready(rdy) = action if (rdy) getWire.send; endaction;
+
+  endmodule
+endinstance
+
 instance ToAXIRSlave#(FIFOF);
   module toAXIRSlave#(FIFOF#(t) ff)
   (RSlave#(id_, data_, user_)) provisos (ToAXIRFlit#(t, id_, data_, user_));
@@ -164,6 +236,23 @@ typeclass ToAXIRLiteSlave#(type t);
   module toAXIRLiteSlave#(t#(x) ifc) (RLiteSlave#(data_))
   provisos (ToAXIRLiteFlit#(x, data_));
 endtypeclass
+
+instance ToAXIRLiteSlave#(Source);
+  module toAXIRLiteSlave#(Source#(t) src)
+  (RLiteSlave#(data_)) provisos (ToAXIRLiteFlit#(t, data_));
+
+    Wire#(RLiteFlit#(data_)) flit <- mkDWire(?);
+    rule getFlit (src.canGet); flit <= toAXIRLiteFlit(src.peek); endrule
+    PulseWire getWire <- mkPulseWire;
+    rule doGet (getWire && src.canGet); let _ <- src.get; endrule
+
+    method rdata  = flit.rdata;
+    method rresp  = flit.rresp;
+    method rvalid = src.canGet;
+    method rready(rdy) = action if (rdy) getWire.send; endaction;
+
+  endmodule
+endinstance
 
 instance ToAXIRLiteSlave#(FIFOF);
   module toAXIRLiteSlave#(FIFOF#(t) ff)

@@ -36,73 +36,77 @@ typedef 128 DATA_sz;
 typedef 0 USER_sz;
 
 (* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiMaster (AXIMaster#(ID_sz, ADDR_sz, DATA_sz, USER_sz));
+module axiMaster (AXIMasterSynth#(ID_sz, ADDR_sz, DATA_sz, USER_sz));
 
   // AXI master shim
-  AXIMasterShim#(ID_sz, ADDR_sz, DATA_sz, USER_sz) shim <- mkAXIMasterShim;
+  AXIShim#(ID_sz, ADDR_sz, DATA_sz, USER_sz) shim <- mkAXIShim;
 
   // arbitrary work for each channel
-  rule enqAWFlit; shim.awSink.put(?); endrule
-  rule enqWFlit;  shim.wSink.put(?);  endrule
-  rule enqARFlit; shim.arSink.put(?); endrule
-  rule deqBFlit; let _ <- shim.bSource.get; endrule
-  rule deqRFlit; let _ <- shim.rSource.get; endrule
+  rule enqAWFlit; shim.slave.aw.put(?); endrule
+  rule enqWFlit;  shim.slave.w.put(?);  endrule
+  rule enqARFlit; shim.slave.ar.put(?); endrule
+  rule deqBFlit; let _ <- shim.slave.b.get; endrule
+  rule deqRFlit; let _ <- shim.slave.r.get; endrule
 
   // return AXI interface
-  return shim.master;
+  let ifcSynth <- toAXIMasterSynth(shim.master);
+  return ifcSynth;
 
 endmodule
 
 (* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiLiteMaster (AXILiteMaster#(ADDR_sz, DATA_sz));
+module axiLiteMaster (AXILiteMasterSynth#(ADDR_sz, DATA_sz));
 
   // AXI master shim
-  AXILiteMasterShim#(ADDR_sz, DATA_sz) shim <- mkAXILiteMasterShim;
+  AXILiteShim#(ADDR_sz, DATA_sz) shim <- mkAXILiteShim;
 
   // arbitrary work for each channel
-  rule enqAWFlit; shim.awSink.put(?); endrule
-  rule enqWFlit;  shim.wSink.put(?);  endrule
-  rule enqARFlit; shim.arSink.put(?); endrule
-  rule deqBFlit; let _ <- shim.bSource.get; endrule
-  rule deqRFlit; let _ <- shim.rSource.get; endrule
+  rule enqAWFlit; shim.slave.aw.put(?); endrule
+  rule enqWFlit;  shim.slave.w.put(?);  endrule
+  rule enqARFlit; shim.slave.ar.put(?); endrule
+  rule deqBFlit; let _ <- shim.slave.b.get; endrule
+  rule deqRFlit; let _ <- shim.slave.r.get; endrule
 
   // return AXI interface
-  return shim.master;
+  let ifcSynth <- toAXILiteMasterSynth(shim.master);
+  return ifcSynth;
 
 endmodule
 
 (* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiSlave (AXISlave#(ID_sz, ADDR_sz, DATA_sz, USER_sz));
+module axiSlave (AXISlaveSynth#(ID_sz, ADDR_sz, DATA_sz, USER_sz));
 
   // AXI slave shim
-  AXISlaveShim#(ID_sz, ADDR_sz, DATA_sz, USER_sz) shim <- mkAXISlaveShim;
+  AXIShim#(ID_sz, ADDR_sz, DATA_sz, USER_sz) shim <- mkAXIShim;
 
   // arbitrary work for each channel
-  rule deqAWFlit; let _ <- shim.awSource.get; endrule
-  rule deqWFlit;  let _ <- shim.wSource.get;  endrule
-  rule deqARFlit; let _ <- shim.arSource.get; endrule
-  rule enqBFlit; shim.bSink.put(?); endrule
-  rule enqRFlit; shim.rSink.put(?); endrule
+  rule deqAWFlit; let _ <- shim.master.aw.get; endrule
+  rule deqWFlit;  let _ <- shim.master.w.get;  endrule
+  rule deqARFlit; let _ <- shim.master.ar.get; endrule
+  rule enqBFlit; shim.master.b.put(?); endrule
+  rule enqRFlit; shim.master.r.put(?); endrule
 
   // return AXI interface
-  return shim.slave;
+  let ifcSynth <- toAXISlaveSynth(shim.slave);
+  return ifcSynth;
 
 endmodule
 
 (* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiLiteSlave (AXILiteSlave#(ADDR_sz, DATA_sz));
+module axiLiteSlave (AXILiteSlaveSynth#(ADDR_sz, DATA_sz));
 
   // AXI slave shim
-  AXILiteSlaveShim#(ADDR_sz, DATA_sz) shim <- mkAXILiteSlaveShim;
+  AXILiteShim#(ADDR_sz, DATA_sz) shim <- mkAXILiteShim;
 
   // arbitrary work for each channel
-  rule deqAWFlit; let _ <- shim.awSource.get; endrule
-  rule deqWFlit;  let _ <- shim.wSource.get;  endrule
-  rule deqARFlit; let _ <- shim.arSource.get; endrule
-  rule enqBFlit; shim.bSink.put(?); endrule
-  rule enqRFlit; shim.rSink.put(?); endrule
+  rule deqAWFlit; let _ <- shim.master.aw.get; endrule
+  rule deqWFlit;  let _ <- shim.master.w.get;  endrule
+  rule deqARFlit; let _ <- shim.master.ar.get; endrule
+  rule enqBFlit; shim.master.b.put(?); endrule
+  rule enqRFlit; shim.master.r.put(?); endrule
 
   // return AXI interface
-  return shim.slave;
+  let ifcSynth <- toAXILiteSlaveSynth(shim.slave);
+  return ifcSynth;
 
 endmodule

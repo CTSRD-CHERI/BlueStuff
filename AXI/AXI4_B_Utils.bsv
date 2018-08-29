@@ -26,6 +26,8 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
+import SourceSink :: *;
+
 import AXI4_Types :: *;
 
 import FIFOF :: *;
@@ -76,6 +78,27 @@ typeclass ToAXIBMaster#(type t);
   provisos (FromAXIBFlit#(x, id_, user_));
 endtypeclass
 
+instance ToAXIBMaster#(Sink);
+  module toAXIBMaster#(Sink#(t) snk)
+  (BMaster#(id_, user_)) provisos (FromAXIBFlit#(t, id_, user_));
+
+    let w_bid   <- mkDWire(?);
+    let w_bresp <- mkDWire(?);
+    let w_buser <- mkDWire(?);
+    PulseWire putWire <- mkPulseWire;
+    rule doPut (putWire && snk.canPut);
+      snk.put(fromAXIBFlit(BFlit{bid: w_bid, bresp: w_bresp, buser: w_buser}));
+    endrule
+
+    method bid(id)       = action w_bid   <= id; endaction;
+    method bresp(resp)   = action w_bresp <= resp; endaction;
+    method buser(user)   = action w_buser <= user; endaction;
+    method bvalid(valid) = action if (valid) putWire.send; endaction;
+    method bready        = snk.canPut;
+
+  endmodule
+endinstance
+
 instance ToAXIBMaster#(FIFOF);
   module toAXIBMaster#(FIFOF#(t) ff)
   (BMaster#(id_, user_)) provisos (FromAXIBFlit#(t, id_, user_));
@@ -102,6 +125,23 @@ typeclass ToAXIBLiteMaster#(type t);
   provisos (FromAXIBLiteFlit#(x));
 endtypeclass
 
+instance ToAXIBLiteMaster#(Sink);
+  module toAXIBLiteMaster#(Sink#(t) snk)
+  (BLiteMaster) provisos (FromAXIBLiteFlit#(t));
+
+    let w_bresp <- mkDWire(?);
+    PulseWire putWire <- mkPulseWire;
+    rule doPut (putWire && snk.canPut);
+      snk.put(fromAXIBLiteFlit(BLiteFlit{bresp: w_bresp}));
+    endrule
+
+    method bresp(resp)   = action w_bresp <= resp; endaction;
+    method bvalid(valid) = action if (valid) putWire.send; endaction;
+    method bready        = snk.canPut;
+
+  endmodule
+endinstance
+
 instance ToAXIBLiteMaster#(FIFOF);
   module toAXIBLiteMaster#(FIFOF#(t) ff)
   (BLiteMaster) provisos (FromAXIBLiteFlit#(t));
@@ -126,6 +166,24 @@ typeclass ToAXIBSlave#(type t);
   provisos (ToAXIBFlit#(x, id_, user_));
 endtypeclass
 
+instance ToAXIBSlave#(Source);
+  module toAXIBSlave#(Source#(t) src)
+  (BSlave#(id_, user_)) provisos (ToAXIBFlit#(t, id_, user_));
+
+    Wire#(BFlit#(id_, user_)) flit <- mkDWire(?);
+    rule getFlit (src.canGet); flit <= toAXIBFlit(src.peek); endrule
+    PulseWire getWire <- mkPulseWire;
+    rule doGet (getWire && src.canGet); let _ <- src.get; endrule
+
+    method bid    = flit.bid;
+    method bresp  = flit.bresp;
+    method buser  = flit.buser;
+    method bvalid = src.canGet;
+    method bready(rdy) = action if (rdy) getWire.send; endaction;
+
+  endmodule
+endinstance
+
 instance ToAXIBSlave#(FIFOF);
   module toAXIBSlave#(FIFOF#(t) ff)
   (BSlave#(id_, user_)) provisos (ToAXIBFlit#(t, id_, user_));
@@ -148,6 +206,22 @@ typeclass ToAXIBLiteSlave#(type t);
   module toAXIBLiteSlave#(t#(x) ifc) (BLiteSlave)
   provisos (ToAXIBLiteFlit#(x));
 endtypeclass
+
+instance ToAXIBLiteSlave#(Source);
+  module toAXIBLiteSlave#(Source#(t) src)
+  (BLiteSlave) provisos (ToAXIBLiteFlit#(t));
+
+    Wire#(BLiteFlit) flit <- mkDWire(?);
+    rule getFlit (src.canGet); flit <= toAXIBLiteFlit(src.peek); endrule
+    PulseWire getWire <- mkPulseWire;
+    rule doGet (getWire && src.canGet); let _ <- src.get; endrule
+
+    method bresp  = flit.bresp;
+    method bvalid = src.canGet;
+    method bready(rdy) = action if (rdy) getWire.send; endaction;
+
+  endmodule
+endinstance
 
 instance ToAXIBLiteSlave#(FIFOF);
   module toAXIBLiteSlave#(FIFOF#(t) ff)

@@ -29,6 +29,9 @@
 import Connectable :: *;
 import DefaultValue :: *;
 
+// BlueBasics import
+import SourceSink :: *;
+
 //////////////////////
 // Common AXI types //
 ////////////////////////////////////////////////////////////////////////////////
@@ -595,6 +598,18 @@ interface AXIMaster#(
   numeric type addr_,
   numeric type data_,
   numeric type user_);
+  interface Source#(AWFlit#(id_, addr_, user_)) aw;
+  interface Source#(WFlit#(data_, user_))       w;
+  interface Sink#(BFlit#(id_, user_))           b;
+  interface Source#(ARFlit#(id_, addr_, user_)) ar;
+  interface Sink#(RFlit#(id_, data_, user_))    r;
+endinterface
+
+interface AXIMasterSynth#(
+  numeric type id_,
+  numeric type addr_,
+  numeric type data_,
+  numeric type user_);
   interface AWMaster#(id_, addr_, user_) aw;
   interface WMaster#(data_, user_)       w;
   interface BMaster#(id_, user_)         b;
@@ -603,6 +618,14 @@ interface AXIMaster#(
 endinterface
 
 interface AXILiteMaster#(numeric type addr_, numeric type data_);
+  interface Source#(AWLiteFlit#(addr_)) aw;
+  interface Source#(WLiteFlit#(data_))  w;
+  interface Sink#(BLiteFlit)            b;
+  interface Source#(ARLiteFlit#(addr_)) ar;
+  interface Sink#(RLiteFlit#(data_))    r;
+endinterface
+
+interface AXILiteMasterSynth#(numeric type addr_, numeric type data_);
   interface AWLiteMaster#(addr_) aw;
   interface WLiteMaster#(data_)  w;
   interface BLiteMaster          b;
@@ -619,6 +642,18 @@ interface AXISlave#(
   numeric type addr_,
   numeric type data_,
   numeric type user_);
+  interface Sink#(AWFlit#(id_, addr_, user_))  aw;
+  interface Sink#(WFlit#(data_, user_))        w;
+  interface Source#(BFlit#(id_, user_))        b;
+  interface Sink#(ARFlit#(id_, addr_, user_))  ar;
+  interface Source#(RFlit#(id_, data_, user_)) r;
+endinterface
+
+interface AXISlaveSynth#(
+  numeric type id_,
+  numeric type addr_,
+  numeric type data_,
+  numeric type user_);
   interface AWSlave#(id_, addr_, user_) aw;
   interface WSlave#(data_, user_)       w;
   interface BSlave#(id_, user_)         b;
@@ -627,11 +662,39 @@ interface AXISlave#(
 endinterface
 
 interface AXILiteSlave#(numeric type addr_, numeric type data_);
+  interface Sink#(AWLiteFlit#(addr_))  aw;
+  interface Sink#(WLiteFlit#(data_))   w;
+  interface Source#(BLiteFlit)         b;
+  interface Sink#(ARLiteFlit#(addr_))  ar;
+  interface Source#(RLiteFlit#(data_)) r;
+endinterface
+
+interface AXILiteSlaveSynth#(numeric type addr_, numeric type data_);
   interface AWLiteSlave#(addr_) aw;
   interface WLiteSlave#(data_)  w;
   interface BLiteSlave          b;
   interface ARLiteSlave#(addr_) ar;
   interface RLiteSlave#(data_)  r;
+endinterface
+
+///////////////////////////////
+// AXI Shim Master <-> Slave //
+////////////////////////////////////////////////////////////////////////////////
+
+interface AXIShim#(
+  numeric type id_,
+  numeric type addr_,
+  numeric type data_,
+  numeric type user_);
+  interface AXIMaster#(id_, addr_, data_, user_) master;
+  interface AXISlave#(id_, addr_, data_, user_) slave;
+endinterface
+
+interface AXILiteShim#(
+  numeric type addr_,
+  numeric type data_);
+  interface AXILiteMaster#(addr_, data_) master;
+  interface AXILiteSlave#(addr_, data_) slave;
 endinterface
 
 ///////////////////////////////

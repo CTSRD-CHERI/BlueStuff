@@ -41,7 +41,7 @@ typedef 128 DATA_sz;
 module axiLiteMaster (AXILiteMaster#(ADDR_sz, DATA_sz));
 
   // AXI master shim
-  AXILiteMasterShim#(ADDR_sz, DATA_sz) shim <- mkAXILiteMasterShim;
+  AXILiteShim#(ADDR_sz, DATA_sz) shim <- mkAXILiteShim;
 
   // counter
   Reg#(Bit#(DATA_sz)) cnt <- mkReg(0);
@@ -51,20 +51,20 @@ module axiLiteMaster (AXILiteMaster#(ADDR_sz, DATA_sz));
   Bool sendWrite = cnt[3:0] == 0;
   rule putAWFlit (sendWrite);
     AWLiteFlit#(ADDR_sz) f = ?;
-    shim.awSink.put(f);
+    shim.slave.aw.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
   rule putWFlit (sendWrite);
     WLiteFlit#(DATA_sz) f = WLiteFlit{wdata: cnt, wstrb: ?};
-    shim.wSink.put(f);
+    shim.slave.w.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
   rule getBFlit;
-    let rsp <- shim.bSource.get;
+    let rsp <- shim.slave.b.get;
     $display("%0t - MASTER - received ", $time, fshow(rsp));
   endrule
-  rule putARFlit; shim.arSink.put(?); endrule
-  rule getRFlit; let _ <- shim.rSource.get; endrule
+  rule putARFlit; shim.slave.ar.put(?); endrule
+  rule getRFlit; let _ <- shim.slave.r.get; endrule
 
   // return AXI interface
   return shim.master;
@@ -75,27 +75,27 @@ endmodule
 module axiLiteSlave (AXILiteSlave#(ADDR_sz, DATA_sz));
 
   // AXI slave shim
-  AXILiteSlaveShim#(ADDR_sz, DATA_sz) shim <- mkAXILiteSlaveShim;
+  AXILiteShim#(ADDR_sz, DATA_sz) shim <- mkAXILiteShim;
 
   // arbitrary work for each channel
   FIFOF#(Bit#(0)) writeResp <- mkFIFOF;
   rule getAWFlit;
-    let req <- shim.awSource.get;
+    let req <- shim.master.aw.get;
     $display("%0t - SLAVE - received ", $time, fshow(req));
   endrule
   rule getWFlit;
-    let req <- shim.wSource.get;
+    let req <- shim.master.w.get;
     $display("%0t - SLAVE - received ", $time, fshow(req));
     writeResp.enq(?);
   endrule
   rule putBFlit;
     writeResp.deq;
     BLiteFlit f = ?;
-    shim.bSink.put(f);
+    shim.master.b.put(f);
     $display("%0t - SLAVE - sending ", $time, fshow(f));
   endrule
-  rule getARFlit; let _ <- shim.arSource.get; endrule
-  rule putRFlit; shim.rSink.put(?); endrule
+  rule getARFlit; let _ <- shim.master.ar.get; endrule
+  rule putRFlit; shim.master.r.put(?); endrule
 
   // return AXI interface
   return shim.slave;

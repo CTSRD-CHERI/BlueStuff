@@ -26,6 +26,8 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
+import SourceSink :: *;
+
 import AXI4_Types :: *;
 
 import FIFOF :: *;
@@ -78,6 +80,32 @@ typeclass ToAXIARMaster#(type t);
   provisos (ToAXIARFlit#(x, id_, addr_, user_));
 endtypeclass
 
+instance ToAXIARMaster#(Source);
+  module toAXIARMaster#(Source#(t) src)
+  (ARMaster#(id_, addr_, user_)) provisos (ToAXIARFlit#(t, id_, addr_, user_));
+
+    Wire#(ARFlit#(id_, addr_, user_)) flit <- mkDWire(?);
+    rule getFlit (src.canGet); flit <= toAXIARFlit(src.peek); endrule
+    PulseWire getWire <- mkPulseWire;
+    rule doGet (getWire && src.canGet); let _ <- src.get; endrule
+
+    method arid     = flit.arid;
+    method araddr   = flit.araddr;
+    method arlen    = flit.arlen;
+    method arsize   = flit.arsize;
+    method arburst  = flit.arburst;
+    method arlock   = flit.arlock;
+    method arcache  = flit.arcache;
+    method arprot   = flit.arprot;
+    method arqos    = flit.arqos;
+    method arregion = flit.arregion;
+    method aruser   = flit.aruser;
+    method arvalid  = src.canGet;
+    method arready(rdy) = action if (rdy) getWire.send; endaction;
+
+  endmodule
+endinstance
+
 instance ToAXIARMaster#(FIFOF);
   module toAXIARMaster#(FIFOF#(t) ff)
   (ARMaster#(id_, addr_, user_)) provisos (ToAXIARFlit#(t, id_, addr_, user_));
@@ -109,6 +137,23 @@ typeclass ToAXIARLiteMaster#(type t);
   provisos (ToAXIARLiteFlit#(x, addr_));
 endtypeclass
 
+instance ToAXIARLiteMaster#(Source);
+  module toAXIARLiteMaster#(Source#(t) src)
+  (ARLiteMaster#(addr_)) provisos (ToAXIARLiteFlit#(t, addr_));
+
+    Wire#(ARLiteFlit#(addr_)) flit <- mkDWire(?);
+    rule getFlit (src.canGet); flit <= toAXIARLiteFlit(src.peek); endrule
+    PulseWire getWire <- mkPulseWire;
+    rule doGet (getWire && src.canGet); let _ <- src.get; endrule
+
+    method araddr   = flit.araddr;
+    method arprot   = flit.arprot;
+    method arvalid  = src.canGet;
+    method arready(rdy) = action if (rdy) getWire.send; endaction;
+
+  endmodule
+endinstance
+
 instance ToAXIARLiteMaster#(FIFOF);
   module toAXIARLiteMaster#(FIFOF#(t) ff)
   (ARLiteMaster#(addr_)) provisos (ToAXIARLiteFlit#(t, addr_));
@@ -132,6 +177,55 @@ typeclass ToAXIARSlave#(type t);
   module toAXIARSlave#(t#(x) ifc) (ARSlave#(id_, addr_, user_))
   provisos (FromAXIARFlit#(x, id_, addr_, user_));
 endtypeclass
+
+instance ToAXIARSlave#(Sink);
+  module toAXIARSlave#(Sink#(t) snk)
+  (ARSlave#(id_, addr_, user_)) provisos (FromAXIARFlit#(t, id_, addr_, user_));
+
+    let w_arid     <- mkDWire(?);
+    let w_araddr   <- mkDWire(?);
+    let w_arlen    <- mkDWire(?);
+    let w_arsize   <- mkDWire(?);
+    let w_arburst  <- mkDWire(?);
+    let w_arlock   <- mkDWire(?);
+    let w_arcache  <- mkDWire(?);
+    let w_arprot   <- mkDWire(?);
+    let w_arqos    <- mkDWire(?);
+    let w_arregion <- mkDWire(?);
+    let w_aruser   <- mkDWire(?);
+    PulseWire putWire <- mkPulseWire;
+    rule doPut (putWire && snk.canPut);
+      snk.put(fromAXIARFlit(ARFlit{
+        arid:     w_arid,
+        araddr:   w_araddr,
+        arlen:    w_arlen,
+        arsize:   w_arsize,
+        arburst:  w_arburst,
+        arlock:   w_arlock,
+        arcache:  w_arcache,
+        arprot:   w_arprot,
+        arqos:    w_arqos,
+        arregion: w_arregion,
+        aruser:   w_aruser
+      }));
+    endrule
+
+    method arid(id)         = action w_arid     <= id; endaction;
+    method araddr(addr)     = action w_araddr   <= addr; endaction;
+    method arlen(len)       = action w_arlen    <= len; endaction;
+    method arsize(size)     = action w_arsize   <= size; endaction;
+    method arburst(burst)   = action w_arburst  <= burst; endaction;
+    method arlock(lock)     = action w_arlock   <= lock; endaction;
+    method arcache(cache)   = action w_arcache  <= cache; endaction;
+    method arprot(prot)     = action w_arprot   <= prot; endaction;
+    method arqos(qos)       = action w_arqos    <= qos; endaction;
+    method arregion(region) = action w_arregion <= region; endaction;
+    method aruser(user)     = action w_aruser   <= user; endaction;
+    method arvalid(valid)   = action if (valid) putWire.send; endaction;
+    method arready          = snk.canPut;
+
+  endmodule
+endinstance
 
 instance ToAXIARSlave#(FIFOF);
   module toAXIARSlave#(FIFOF#(t) ff)
@@ -186,6 +280,25 @@ typeclass ToAXIARLiteSlave#(type t);
   module toAXIARLiteSlave#(t#(x) ifc) (ARLiteSlave#(addr_))
   provisos (FromAXIARLiteFlit#(x, addr_));
 endtypeclass
+
+instance ToAXIARLiteSlave#(Sink);
+  module toAXIARLiteSlave#(Sink#(t) snk)
+  (ARLiteSlave#(addr_)) provisos (FromAXIARLiteFlit#(t, addr_));
+
+    let w_araddr   <- mkDWire(?);
+    let w_arprot   <- mkDWire(?);
+    PulseWire putWire <- mkPulseWire;
+    rule doPut (putWire && snk.canPut);
+      snk.put(fromAXIARLiteFlit(ARLiteFlit{araddr: w_araddr, arprot: w_arprot}));
+    endrule
+
+    method araddr(addr)   = action w_araddr <= addr; endaction;
+    method arprot(prot)   = action w_arprot <= prot; endaction;
+    method arvalid(valid) = action if (valid) putWire.send; endaction;
+    method arready        = snk.canPut;
+
+  endmodule
+endinstance
 
 instance ToAXIARLiteSlave#(FIFOF);
   module toAXIARLiteSlave#(FIFOF#(t) ff)

@@ -26,6 +26,8 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
+import SourceSink :: *;
+
 import AXI4_Types :: *;
 
 import FIFOF :: *;
@@ -77,6 +79,25 @@ typeclass ToAXIWMaster#(type t);
   provisos (ToAXIWFlit#(x, data_, user_));
 endtypeclass
 
+instance ToAXIWMaster#(Source);
+  module toAXIWMaster#(Source#(t) src)
+  (WMaster#(data_, user_)) provisos (ToAXIWFlit#(t, data_, user_));
+
+    Wire#(WFlit#(data_, user_)) flit <- mkDWire(?);
+    rule getFlit (src.canGet); flit <= toAXIWFlit(src.peek); endrule
+    PulseWire getWire <- mkPulseWire;
+    rule doGet (getWire && src.canGet); let _ <- src.get; endrule
+
+    method wdata  = flit.wdata;
+    method wstrb  = flit.wstrb;
+    method wlast  = flit.wlast;
+    method wuser  = flit.wuser;
+    method wvalid = src.canGet;
+    method wready(rdy) = action if (rdy) getWire.send; endaction;
+
+  endmodule
+endinstance
+
 instance ToAXIWMaster#(FIFOF);
   module toAXIWMaster#(FIFOF#(t) ff)
   (WMaster#(data_, user_)) provisos (ToAXIWFlit#(t, data_, user_));
@@ -101,6 +122,23 @@ typeclass ToAXIWLiteMaster#(type t);
   provisos (ToAXIWLiteFlit#(x, data_));
 endtypeclass
 
+instance ToAXIWLiteMaster#(Source);
+  module toAXIWLiteMaster#(Source#(t) src)
+  (WLiteMaster#(data_)) provisos (ToAXIWLiteFlit#(t, data_));
+
+    Wire#(WLiteFlit#(data_)) flit <- mkDWire(?);
+    rule getFlit (src.canGet); flit <= toAXIWLiteFlit(src.peek); endrule
+    PulseWire getWire <- mkPulseWire;
+    rule doGet (getWire && src.canGet); let _ <- src.get; endrule
+
+    method wdata  = flit.wdata;
+    method wstrb  = flit.wstrb;
+    method wvalid = src.canGet;
+    method wready(rdy) = action if (rdy) getWire.send; endaction;
+
+  endmodule
+endinstance
+
 instance ToAXIWLiteMaster#(FIFOF);
   module toAXIWLiteMaster#(FIFOF#(t) ff)
   (WLiteMaster#(data_)) provisos (ToAXIWLiteFlit#(t, data_));
@@ -124,6 +162,31 @@ typeclass ToAXIWSlave#(type t);
   module toAXIWSlave#(t#(x) ifc) (WSlave#(data_, user_))
   provisos (FromAXIWFlit#(x, data_, user_));
 endtypeclass
+
+instance ToAXIWSlave#(Sink);
+  module toAXIWSlave#(Sink#(t) snk)
+  (WSlave#(data_, user_)) provisos (FromAXIWFlit#(t, data_, user_));
+
+    let w_wdata <- mkDWire(?);
+    let w_wstrb <- mkDWire(?);
+    let w_wlast <- mkDWire(?);
+    let w_wuser <- mkDWire(?);
+    PulseWire putWire <- mkPulseWire;
+    rule doPut (putWire && snk.canPut);
+      snk.put(fromAXIWFlit(WFlit{
+        wdata: w_wdata, wstrb: w_wstrb, wlast: w_wlast, wuser: w_wuser
+      }));
+    endrule
+
+    method wdata(data)   = action w_wdata <= data; endaction;
+    method wstrb(strb)   = action w_wstrb <= strb; endaction;
+    method wlast(last)   = action w_wlast <= last; endaction;
+    method wuser(user)   = action w_wuser <= user; endaction;
+    method wvalid(valid) = action if (valid) putWire.send; endaction;
+    method wready        = snk.canPut;
+
+  endmodule
+endinstance
 
 instance ToAXIWSlave#(FIFOF);
   module toAXIWSlave#(FIFOF#(t) ff)
@@ -154,6 +217,25 @@ typeclass ToAXIWLiteSlave#(type t);
   module toAXIWLiteSlave#(t#(x) ifc) (WLiteSlave#(data_))
   provisos (FromAXIWLiteFlit#(x, data_));
 endtypeclass
+
+instance ToAXIWLiteSlave#(Sink);
+  module toAXIWLiteSlave#(Sink#(t) snk)
+  (WLiteSlave#(data_)) provisos (FromAXIWLiteFlit#(t, data_));
+
+    let w_wdata <- mkDWire(?);
+    let w_wstrb <- mkDWire(?);
+    PulseWire putWire <- mkPulseWire;
+    rule doPut (putWire && snk.canPut);
+      snk.put(fromAXIWLiteFlit(WLiteFlit{wdata: w_wdata, wstrb: w_wstrb}));
+    endrule
+
+    method wdata(data)   = action w_wdata <= data; endaction;
+    method wstrb(strb)   = action w_wstrb <= strb; endaction;
+    method wvalid(valid) = action if (valid) putWire.send; endaction;
+    method wready        = snk.canPut;
+
+  endmodule
+endinstance
 
 instance ToAXIWLiteSlave#(FIFOF);
   module toAXIWLiteSlave#(FIFOF#(t) ff)
