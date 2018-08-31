@@ -27,6 +27,7 @@
  */
 
 
+import Routable :: *;
 import Interconnect :: *;
 import ListExtra :: *;
 import SourceSink :: *;

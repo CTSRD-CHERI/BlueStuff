@@ -34,15 +34,7 @@ import List :: *;
 import SourceSink :: *;
 import MasterSlave :: *;
 import OneHotArbiter :: *;
-
-////////////////////////
-// Routable typeclass //
-////////////////////////////////////////////////////////////////////////////////
-
-typeclass Routable#(type a, type b) dependencies(a determines b);
-  function b    routingField (a val);
-  function Bool isLast       (a val);
-endtypeclass
+import Routable :: *;
 
 /////////////////
 // One-way bus //

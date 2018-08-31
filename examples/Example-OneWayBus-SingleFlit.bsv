@@ -26,6 +26,7 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
+import Routable :: *;
 import Interconnect :: *;
 import ListExtra :: *;
 
