@@ -32,7 +32,7 @@ BSC = bsc
 # dependencies
 BLUESTUFFDIR = ../
 BLUEBASICSDIR = $(BLUESTUFFDIR)/BlueBasics
-BSVPATH = +:$(BLUEBASICSDIR)
+BSVPATH = +:$(BLUESTUFFDIR):$(BLUEBASICSDIR)
 
 # Top level modules
 TOPVERILOGFILE = ExampleVerilog.bsv

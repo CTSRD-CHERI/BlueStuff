@@ -29,6 +29,8 @@
 import Connectable :: *;
 import DefaultValue :: *;
 
+// BlueStuff import
+import Routable :: *;
 // BlueBasics import
 import SourceSink :: *;
 
@@ -70,6 +72,10 @@ instance DefaultValue#(AWFlit#(id_, addr_, user_));
     awburst: FIXED, awlock: False, awcache: 0,
     awprot: 0, awqos: 0, awregion: 0, awuser: ?
   };
+endinstance
+instance Routable#(AWFlit#(id_, addr_, user_), Bit#(addr_));
+  function routingField(x) = x.awaddr;
+  function isLast(x)       = True;
 endinstance
 
 typedef struct {
@@ -283,6 +289,10 @@ typedef struct {
 instance DefaultValue#(BFlit#(id_, user_));
   function defaultValue = BFlit { bid: 0, bresp: OKAY, buser: ? };
 endinstance
+instance Routable#(BFlit#(id_, user_), Bit#(id_));
+  function routingField(x) = x.bid;
+  function isLast(x)       = True;
+endinstance
 
 typedef struct {
   AXIResp bresp;
@@ -383,6 +393,10 @@ instance DefaultValue#(ARFlit#(id_, addr_, user_));
     arburst: FIXED, arlock: False, arcache: 0,
     arprot: 0, arqos: 0, arregion: 0, aruser: ?
   };
+endinstance
+instance Routable#(ARFlit#(id_, addr_, user_), Bit#(addr_));
+  function routingField(x) = x.araddr;
+  function isLast(x)       = True;
 endinstance
 
 typedef struct {
@@ -504,6 +518,10 @@ instance DefaultValue#(RFlit#(id_, data_, user_));
   function defaultValue = RFlit {
     rid: 0, rdata: ?, rresp: OKAY, rlast: True, ruser: ?
   };
+endinstance
+instance Routable#(RFlit#(id_, data_, user_), Bit#(id_));
+  function routingField(x) = x.rid;
+  function isLast(x)       = x.rlast;
 endinstance
 
 typedef struct {
