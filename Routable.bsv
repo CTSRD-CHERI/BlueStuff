@@ -29,6 +29,7 @@
 package Routable;
 
 import List :: *;
+import ListExtra :: *;
 
 import Dict :: *;
 
@@ -41,15 +42,28 @@ typeclass Routable#(type a, type b) dependencies(a determines b);
   function Bool isLast       (a val);
 endtypeclass
 
+///////////////////////
+// Memory Range type //
+////////////////////////////////////////////////////////////////////////////////
+
+typedef struct {
+  Bit#(n) base;
+  Bit#(n) size;
+} Range#(numeric type n);
+function Bit#(n) rangeBase(Range#(n) range) = range.base;
+function Bit#(n) rangeSize(Range#(n) range) = range.size;
+function Bit#(n) rangeTop (Range#(n) range) = range.base + range.size;
+function Bool inRange(Bit#(n) addr, Range#(n) range) =
+  (addr >= range.base && addr < rangeTop(range));
+
 ////////////////////////
 // Mapping table type //
 ////////////////////////////////////////////////////////////////////////////////
-
-typedef Dict#(Tuple2#(Bit#(n), Bit#(n)), List#(Bool)) MappingTable#(numeric type n);
+typedef List#(Range#(n)) MappingTable#(numeric type n);
 function List#(Bool) routeFromMappingTable (MappingTable#(n) mt, Bit#(n) addr);
-  function inRange (x, y) = (x >= tpl_1(y) && x < tpl_2(y));
-  case (lookupWith(inRange(addr), mt)) matches
-    tagged Valid .dest: return dest;
+  function pred(x) = inRange(addr, tpl_1(x));
+  case (find(pred, zip(mt, upto(0, valueOf(n)-1)))) matches
+    tagged Valid {.range, .idx}: return oneHotList(length(mt), idx);
     tagged Invalid: return replicate(valueOf(n), False);
   endcase
 endfunction
