@@ -28,20 +28,26 @@
 
 import AXI :: *;
 
+import Routable :: *;
 import SourceSink :: *;
+import ListExtra :: *;
 
 import Connectable :: *;
 import FIFOF :: *;
 import SpecialFIFOs :: *;
+import List :: *;
+import Vector :: *;
 
 typedef 32 ADDR_sz;
 typedef 128 DATA_sz;
 
-(* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiLiteMaster (AXILiteMaster#(ADDR_sz, DATA_sz));
+`define MASTER_T AXIMaster#(0, ADDR_sz, DATA_sz, 0)
+`define SLAVE_T(id) AXISlave#(id, ADDR_sz, DATA_sz, 0)
+
+module axiMaster (`MASTER_T);
 
   // AXI master shim
-  AXILiteShim#(ADDR_sz, DATA_sz) shim <- mkAXILiteShim;
+  AXIShim#(0, ADDR_sz, DATA_sz, 0) shim <- mkAXIShim;
 
   // counter
   Reg#(Bit#(DATA_sz)) cnt <- mkReg(0);
@@ -50,12 +56,12 @@ module axiLiteMaster (AXILiteMaster#(ADDR_sz, DATA_sz));
   // arbitrary work for each channel
   Bool sendWrite = cnt[3:0] == 0;
   rule putAWFlit (sendWrite);
-    AWLiteFlit#(ADDR_sz) f = ?;
+    AWFlit#(0, ADDR_sz, 0) f = ?;
     shim.slave.aw.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
   rule putWFlit (sendWrite);
-    WLiteFlit#(DATA_sz) f = WLiteFlit{wdata: cnt, wstrb: ?};
+    WFlit#(DATA_sz, 0) f = WFlit{wdata: cnt, wstrb: ?, wlast: True, wuser: ?};
     shim.slave.w.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
@@ -71,11 +77,10 @@ module axiLiteMaster (AXILiteMaster#(ADDR_sz, DATA_sz));
 
 endmodule
 
-(* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiLiteSlave (AXILiteSlave#(ADDR_sz, DATA_sz));
+module axiSlave (`SLAVE_T(id_sz));
 
   // AXI slave shim
-  AXILiteShim#(ADDR_sz, DATA_sz) shim <- mkAXILiteShim;
+  AXIShim#(id_sz, ADDR_sz, DATA_sz, 0) shim <- mkAXIShim;
 
   // arbitrary work for each channel
   FIFOF#(Bit#(0)) writeResp <- mkFIFOF;
@@ -90,7 +95,7 @@ module axiLiteSlave (AXILiteSlave#(ADDR_sz, DATA_sz));
   endrule
   rule putBFlit;
     writeResp.deq;
-    BLiteFlit f = ?;
+    BFlit#(id_sz, 0) f = ?;
     shim.master.b.put(f);
     $display("%0t - SLAVE - sending ", $time, fshow(f));
   endrule
@@ -102,8 +107,21 @@ module axiLiteSlave (AXILiteSlave#(ADDR_sz, DATA_sz));
 
 endmodule
 
-module exampleSim (Empty);
-  AXILiteMaster#(ADDR_sz, DATA_sz) master <- axiLiteMaster;
-  AXILiteSlave#(ADDR_sz, DATA_sz)  slave  <- axiLiteSlave;
-  mkConnection(master, slave);
+typedef 2 NMASTERS;
+typedef 3 NSLAVES;
+
+module exampleBus (Empty);
+  Vector#(NMASTERS, `MASTER_T) ms;
+  Vector#(NSLAVES, `SLAVE_T(TLog#(NMASTERS))) ss;
+  for (Integer i = 0; i < valueOf(NMASTERS); i = i + 1)
+    ms[i] <- axiMaster;
+  MappingTable#(NSLAVES, ADDR_sz) maptab = newVector;
+  for (Integer i = 0; i < valueOf(NSLAVES); i = i + 1) begin
+    maptab[i] = Range{base: fromInteger(i*4096), size: 4096};
+    ss[i] <- axiSlave;
+  end
+  mkAXIBus(maptab, ms, ss);
 endmodule
+
+`undef MASTER_T
+`undef SLAVE_T

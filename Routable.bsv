@@ -28,8 +28,7 @@
 
 package Routable;
 
-import List :: *;
-import ListExtra :: *;
+import Vector :: *;
 
 import Dict :: *;
 
@@ -53,19 +52,19 @@ typedef struct {
 function Bit#(n) rangeBase(Range#(n) range) = range.base;
 function Bit#(n) rangeSize(Range#(n) range) = range.size;
 function Bit#(n) rangeTop (Range#(n) range) = range.base + range.size;
-function Bool inRange(Bit#(n) addr, Range#(n) range) =
+function Bool inRange(Range#(n) range, Bit#(n) addr) =
   (addr >= range.base && addr < rangeTop(range));
 
 ////////////////////////
 // Mapping table type //
 ////////////////////////////////////////////////////////////////////////////////
-typedef List#(Range#(n)) MappingTable#(numeric type n);
-function List#(Bool) routeFromMappingTable (MappingTable#(n) mt, Bit#(n) addr);
-  function pred(x) = inRange(addr, tpl_1(x));
-  case (find(pred, zip(mt, upto(0, valueOf(n)-1)))) matches
-    tagged Valid {.range, .idx}: return oneHotList(length(mt), idx);
-    tagged Invalid: return replicate(valueOf(n), False);
-  endcase
+typedef Vector#(n, Range#(a)) MappingTable#(numeric type n, numeric type a);
+function Vector#(n, Bool) routeFromMappingTable (MappingTable#(n, a) mt, Bit#(a) addr);
+  function pred = flip(inRange);
+  let route = replicate(False);
+  let mIdx = findIndex(pred(addr), mt);
+  if (isValid(mIdx)) route[mIdx.Valid] = True;
+  return route;
 endfunction
 
 endpackage

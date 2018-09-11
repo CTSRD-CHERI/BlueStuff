@@ -40,8 +40,8 @@ AXIMASTERMOD = axiMaster
 AXILITEMASTERMOD = axiLiteMaster
 AXISLAVEMOD = axiSlave
 AXILITESLAVEMOD = axiLiteSlave
-TOPSIMFILE = ExampleSim.bsv
-TOPSIMMOD = exampleSim
+TOPSIMFILE = ExampleBus.bsv
+TOPSIMMOD = exampleBus
 
 # bluespec flags
 BUILDDIR = build

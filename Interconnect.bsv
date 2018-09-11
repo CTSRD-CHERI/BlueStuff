@@ -29,7 +29,7 @@
 package Interconnect;
 
 import Printf :: *;
-import List :: *;
+import Vector :: *;
 
 import SourceSink :: *;
 import MasterSlave :: *;
@@ -41,15 +41,19 @@ import Routable :: *;
 ////////////////////////////////////////////////////////////////////////////////
 typedef enum {UNALLOCATED, ALLOCATED} BusState deriving (Bits, Eq, FShow);
 module mkOneWayBus#(
-    function List#(Bool) route (routing_t routing_val),
-    List#(in_t#(flit_t)) ins,
-    List#(out_t#(flit_t)) outs
+    function Vector#(nRoutes, Bool) route (routing_t routing_val),
+    Vector#(nIns, in_t#(flit_t)) ins,
+    Vector#(nOuts, out_t#(flit_t)) outs
   ) (Empty) provisos (
     Bits#(flit_t, flit_sz),
     Routable#(flit_t, routing_t),
     Arbitrable#(in_t#(flit_t)),
     ToSource#(in_t#(flit_t), flit_t),
-    ToSink#(out_t#(flit_t), flit_t)
+    ToSink#(out_t#(flit_t), flit_t),
+    // assertion on argument sizes
+    Add#(1, a__, nIns), // at least one source is needed
+    Add#(1, b__, nOuts), // at least one sink is needed
+    Add#(nRoutes, 0, nOuts) // there must be as many routes as there are sinks
   );
 
   ////////////////
@@ -59,61 +63,44 @@ module mkOneWayBus#(
   // convert arguments to Source and Sink
   let sources = map(toSource, ins);
   let   sinks = map(toSink, outs);
-  // count the number of sources and sinks
-  Integer nSources = length(sources);
-  if (nSources < 1)
-    error(sprintf("mkBus needs at least one source (%0d provided)", nSources));
-  Integer nSinks = length(sinks);
-  if (nSinks < 1)
-    error(sprintf("mkBus needs at least one sink (%0d provided)", nSinks));
   // XXX XXX XXX XXX
   // The routing function must return a one hot encoded List#(Bool) of the same
   // size as the list of sinks, with True in the selected sink's position. All
   // False should mean that no route was found.
-  Integer nRoute = length(route(?));
-  if (nSinks != nRoute)
-    error(sprintf("mkBus needs the routing function to return a one hot list"
-                + " with a size (%0d) equal to the number of provided sinks "
-                + "(%0d)", nRoute, nSinks));
 
   //////////////////////////////////////
   // general helpers, state and rules //
   //////////////////////////////////////////////////////////////////////////////
 
   // helpers
-  function writeRegList (r, v) =
-    action let _ <- zipWithM(writeReg, r, v); endaction;
   function Action forwardFlit (x f, Bool c, Wire#(x) w) =
     action if (c) w <= f; endaction;
   function pulse(c, w) = action if (c) w.send(); endaction;
   function Bool readPulse(PulseWire w) = w._read;
   function isReady(s)  = s.canPut;
   // for each source, potential transaction state (as a Maybe one hot dest)
-  List#(Maybe#(List#(Bool))) dests = Nil;
-  for (Integer i = 0; i < nSources; i = i + 1) begin
-    let potentialDest = Invalid;
+  Vector#(nIns, Maybe#(Vector#(nOuts, Bool))) dests = replicate(Invalid);
+  for (Integer i = 0; i < valueOf(nIns); i = i + 1) begin
     if (sources[i].canGet) begin
       let desiredSink = route(routingField(sources[i].peek));
       if (\or (zipWith(\&& , desiredSink, map(isReady, sinks))))
-        potentialDest = Valid(desiredSink);
+        dests[i] = Valid(desiredSink);
     end
-    dests = cons(potentialDest, dests);
   end
-  dests = reverse(dests);
   // internal state
   let state        <- mkReg(UNALLOCATED);
-  let arbiter      <- mkOneHotArbiter(map(isValid, dests));
-  let sourceSelect <- replicateM(nSources, mkPulseWire);
-  let activeSource <- replicateM(nSources, mkReg(False));
-  let toSink       <- replicateM(nSinks, mkWire);
-  let activeSink   <- replicateM(nSinks, mkReg(False));
+  let arbiter      <- mkOneHotArbiter(toList(map(isValid, dests)));
+  Vector#(nIns, PulseWire)      sourceSelect <- replicateM(mkPulseWire);
+  Vector#(nIns, Reg#(Bool))     activeSource <- replicateM(mkReg(False));
+  Vector#(nOuts, Wire#(flit_t)) flitToSink   <- replicateM(mkWire);
+  Vector#(nOuts, Reg#(Bool))    activeSink   <- replicateM(mkReg(False));
   let activeSinkReady =
     \or (zipWith(\&& , map(readReg, activeSink), map(isReady, sinks)));
 
   // do arbitration
   rule arbitrate (state == UNALLOCATED);
     let nexts <- arbiter.next;
-    let _ <- zipWithM(pulse, nexts, sourceSelect);
+    let _ <- zipWithM(pulse, toVector(nexts), sourceSelect);
   endrule
 
   //////////////////////
@@ -122,15 +109,15 @@ module mkOneWayBus#(
 
   // per source rules
   Rules sourceRules = emptyRules;
-  for (Integer i = 0; i < nSources; i = i + 1) begin
+  for (Integer i = 0; i < valueOf(nIns); i = i + 1) begin
     sourceRules = rJoinMutuallyExclusive(sourceRules, rules
       rule source_selected (state == UNALLOCATED && sourceSelect[i]);
         if (isValid(dests[i])) begin
           let flit <- sources[i].get;
-          let _ <- zipWithM(forwardFlit(flit), dests[i].Valid, toSink);
+          let _ <- zipWithM(forwardFlit(flit), dests[i].Valid, flitToSink);
           if (!isLast(flit)) begin
-            writeRegList(activeSource, map(readPulse, sourceSelect));
-            writeRegList(activeSink, dests[i].Valid);
+            writeVReg(activeSource, map(readPulse, sourceSelect));
+            writeVReg(activeSink, dests[i].Valid);
             state <= ALLOCATED;
           end
         end else begin // XXX THIS SHOULD NEVER HAPPEN
@@ -141,7 +128,7 @@ module mkOneWayBus#(
       endrule
       rule burst (state == ALLOCATED && activeSource[i] && activeSinkReady);
         let flit <- sources[i].get;
-        let _ <- zipWithM(forwardFlit(flit), map(readReg, activeSink), toSink);
+        let _ <- zipWithM(forwardFlit(flit), map(readReg, activeSink), flitToSink);
         if (isLast(flit)) state <= UNALLOCATED;
       endrule
     endrules);
@@ -154,10 +141,10 @@ module mkOneWayBus#(
 
   // per sink rules
   Rules sinkRules = emptyRules;
-  for (Integer i = 0; i < nSinks; i = i + 1) begin
+  for (Integer i = 0; i < valueOf(nOuts); i = i + 1) begin
     sinkRules = rJoinMutuallyExclusive(sinkRules, rules
       rule sink_selected;
-        sinks[i].put(toSink[i]);
+        sinks[i].put(flitToSink[i]);
       endrule
     endrules);
   end
@@ -170,13 +157,18 @@ endmodule
 ////////////////////////////////////////////////////////////////////////////////
 
 module mkTwoWayBus#(
-    function List#(Bool) routeM2S (route_m2s_t m2s_val),
-    function List#(Bool) routeS2M (route_s2m_t s2m_val),
-    List#(Master#(m2s_t, s2m_t)) ms,
-    List#(Slave#(m2s_t, s2m_t)) ss
+    function Vector#(nRoutesM2S, Bool) routeM2S (route_m2s_t m2s_val),
+    function Vector#(nRoutesS2M, Bool) routeS2M (route_s2m_t s2m_val),
+    Vector#(nMasters, Master#(m2s_t, s2m_t)) ms,
+    Vector#(nSlaves, Slave#(m2s_t, s2m_t)) ss
   ) (Empty) provisos (
     Bits#(m2s_t, m2s_sz), Routable#(m2s_t, route_m2s_t),
-    Bits#(s2m_t, s2m_sz), Routable#(s2m_t, route_s2m_t)
+    Bits#(s2m_t, s2m_sz), Routable#(s2m_t, route_s2m_t),
+    // assertion on argument sizes
+    Add#(1, a__, nMasters), // at least one Master is needed
+    Add#(1, b__, nSlaves), // at least one slave is needed
+    Add#(nRoutesM2S, 0, nSlaves), // nRoutesM2S == nSlaves
+    Add#(nRoutesS2M, 0, nMasters) // nRoutesS2M == nMasters
   );
 
   // Master to Slave bus

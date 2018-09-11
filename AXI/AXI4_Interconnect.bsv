@@ -51,7 +51,7 @@ typedef union tagged {
 instance Routable#(MergedWriteFlit#(id_, addr_, data_, user_), Bit#(addr_));
   function routingField(x) = case (x) matches
     tagged FirstFlit {.aw, .w}: routingField(aw);
-    default: error("routingField should not be called on OtherFlit");
+    default: ?;
   endcase;
   function isLast(x) = case (x) matches
     tagged FirstFlit {.aw, .w}: w.wlast;
@@ -249,10 +249,16 @@ function Sink#(RFlit#(sid_, data_, user_)) widenR (
 ////////////////////////////////////////////////////////////////////////////////
 
 module mkAXIBus#(
-    MappingTable#(addr_) maptab,
+    MappingTable#(nRoutes, addr_) maptab,
     Vector#(nMasters, AXIMaster#(id_, addr_, data_, user_)) masters,
     Vector#(nSlaves, AXISlave#(sid_, addr_, data_, user_)) slaves
-  ) (Empty) provisos (Add#(id_, TLog#(nMasters), sid_));
+  ) (Empty) provisos (
+    Add#(id_, TLog#(nMasters), sid_),
+    // assertion on argument sizes
+    Add#(1, a__, nMasters), // at least one master is needed
+    Add#(1, b__, nSlaves), // at least one slave is needed
+    Add#(nRoutes, 0, nSlaves) // nRoutes == nSlaves
+  );
 
   // count the number of masters and slaves
   if (valueOf(nMasters) < 1)
@@ -290,15 +296,15 @@ module mkAXIBus#(
   end
 
   // routing function from slave to master
-  function List#(Bool) routeBack(Bit#(sid_) x);
+  function Vector#(nMasters, Bool) routeBack(Bit#(sid_) x);
     Bit#(nMasters) dest = 1;
     Bit#(TLog#(nMasters)) y = truncateLSB(x); 
-    return bitToList(dest << y);
+    return unpack(dest << y);
   endfunction
   // connect with standard busses
-  mkOneWayBus(routeFromMappingTable(maptab), toList(write_masters), toList(write_slaves));
-  mkOneWayBus(routeBack, toList(b_slaves), toList(b_masters));
-  mkOneWayBus(routeFromMappingTable(maptab), toList(ar_masters), toList(ar_slaves));
-  mkOneWayBus(routeBack, toList(r_slaves), toList(r_masters));
+  mkOneWayBus(routeFromMappingTable(maptab), write_masters, write_slaves);
+  mkOneWayBus(routeBack, b_slaves, b_masters);
+  mkOneWayBus(routeFromMappingTable(maptab), ar_masters, ar_slaves);
+  mkOneWayBus(routeBack, r_slaves, r_masters);
 
 endmodule

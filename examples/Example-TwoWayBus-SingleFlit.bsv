@@ -34,11 +34,12 @@ import SourceSink :: *;
 import MasterSlave :: *;
 
 import FIFOF :: *;
+import Vector :: *;
 
-function List#(Bool) route (Bit#(a) x);
-  case (firstHotToOneHot(bitToList(x))) matches
-    tagged Valid .dest: return dest;
-    tagged Invalid: return cons(True, replicate(valueOf(a)-1, False));
+function Vector#(n, Bool) route (Bit#(a) x);
+  case (firstHotToOneHot(toList(unpack((x))))) matches
+    tagged Valid .dest: return toVector(dest);
+    tagged Invalid: return replicate(False);
   endcase
 endfunction
 
@@ -103,14 +104,11 @@ endmodule
 
 module top (Empty);
 
-  Integer nMasters = valueOf(NMasters);
-  Integer nSlaves  = valueOf(NSlaves);
-
   function Bit#(n) intToOneHot(Integer i) = (1 << i);
-  List#(Bit#(NMasters)) mIDs = map(intToOneHot, upto(0,nMasters-1));
-  List#(Bit#(NSlaves))  sIDs = map(intToOneHot, upto(0,nSlaves-1));
-  List#(Master#(Req#(NMasters, NSlaves),Rsp#(NSlaves, NMasters))) masters <- mapM(mkMaster, mIDs);
-  List#(Slave#(Req#(NMasters, NSlaves),Rsp#(NSlaves, NMasters)))   slaves <- mapM(mkSlave, sIDs);
+  Vector#(NMasters, Bit#(NMasters)) mIDs = genWith(intToOneHot);
+  Vector#(NSlaves, Bit#(NSlaves))   sIDs = genWith(intToOneHot);
+  Vector#(NMasters, Master#(Req#(NMasters, NSlaves),Rsp#(NSlaves, NMasters))) masters <- mapM(mkMaster, mIDs);
+  Vector#(NSlaves, Slave#(Req#(NMasters, NSlaves),Rsp#(NSlaves, NMasters)))   slaves  <- mapM(mkSlave, sIDs);
 
   let cnt <- mkReg(0);
   rule count; cnt <= cnt + 1; endrule

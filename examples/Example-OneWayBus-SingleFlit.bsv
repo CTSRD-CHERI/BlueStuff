@@ -31,6 +31,7 @@ import Interconnect :: *;
 import ListExtra :: *;
 
 import FIFOF :: *;
+import Vector :: *;
 
 typedef struct {
   Bit#(i) id;
@@ -45,10 +46,10 @@ instance Routable#(Flit#(x,y), Bit#(y));
   function isLast (x) = True;
 endinstance
 
-function List#(Bool) route (Bit#(a) x);
-  case (firstHotToOneHot(bitToList(x))) matches
-    tagged Valid .dest: return dest;
-    tagged Invalid: return cons(True, replicate(valueOf(a)-1, False));
+function Vector#(n, Bool) route (Bit#(a) x);
+  case (firstHotToOneHot(toList(unpack(x)))) matches
+    tagged Valid .dest: return toVector(dest);
+    tagged Invalid: return replicate(False);
   endcase
 endfunction
 
@@ -73,10 +74,10 @@ module top (Empty);
   Integer nIns  = valueOf(NIns);
   Integer nOuts = valueOf(NOuts);
 
-  let destGen <- replicateM(nIns, mkNextDest);
+  Vector#(NIns, NextDest#(NOuts)) destGen <- replicateM(mkNextDest);
 
-  List#(FIFOF#(Flit#(NIns, NOuts))) ins  <- replicateM(nIns, mkFIFOF);
-  List#(FIFOF#(Flit#(NIns, NOuts))) outs <- replicateM(nOuts, mkFIFOF);
+  Vector#(NIns, FIFOF#(Flit#(NIns, NOuts)))  ins  <- replicateM(mkFIFOF);
+  Vector#(NOuts, FIFOF#(Flit#(NIns, NOuts))) outs <- replicateM(mkFIFOF);
 
   let cnt <- mkReg(0);
   rule count; cnt <= cnt + 1; endrule
