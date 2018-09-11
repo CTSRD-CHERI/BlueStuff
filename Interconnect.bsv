@@ -86,6 +86,7 @@ module mkOneWayBus#(
   function Action forwardFlit (x f, Bool c, Wire#(x) w) =
     action if (c) w <= f; endaction;
   function pulse(c, w) = action if (c) w.send(); endaction;
+  function Bool readPulse(PulseWire w) = w._read;
   function isReady(s)  = s.canPut;
   // for each source, potential transaction state (as a Maybe one hot dest)
   List#(Maybe#(List#(Bool))) dests = Nil;
@@ -128,10 +129,8 @@ module mkOneWayBus#(
           let flit <- sources[i].get;
           let _ <- zipWithM(forwardFlit(flit), dests[i].Valid, toSink);
           if (!isLast(flit)) begin
-            for (Integer j = 0; j < nSources; j = j + 1) begin
-              activeSource[j] <= sourceSelect[j];
-              activeSink[j]   <= dests[i].Valid[j];
-            end
+            writeRegList(activeSource, map(readPulse, sourceSelect));
+            writeRegList(activeSink, dests[i].Valid);
             state <= ALLOCATED;
           end
         end else begin // XXX THIS SHOULD NEVER HAPPEN
