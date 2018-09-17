@@ -73,9 +73,17 @@ instance DefaultValue#(AWFlit#(id_, addr_, user_));
     awprot: 0, awqos: 0, awregion: 0, awuser: ?
   };
 endinstance
-instance Routable#(AWFlit#(id_, addr_, user_), Bit#(addr_));
+instance Routable#(
+  AWFlit#(id_, addr_, user_),
+  BFlit#(id_, user_),
+  Bit#(addr_));
   function routingField(x) = x.awaddr;
-  function isLast(x)       = True;
+  function noRouteFound(x) = BFlit {
+    bid: x.awid, bresp: DECERR, buser: x.awuser
+  };
+endinstance
+instance DetectLast#(AWFlit#(id_, addr_, user_));
+  function detectLast(x) = True;
 endinstance
 
 typedef struct {
@@ -84,6 +92,13 @@ typedef struct {
 } AWLiteFlit#(numeric type addr_) deriving (Bits, FShow);
 instance DefaultValue#(AWLiteFlit#(addr_));
   function defaultValue = AWLiteFlit { awaddr: ?, awprot: 0};
+endinstance
+instance Routable#(AWLiteFlit#(addr_), BLiteFlit, Bit#(addr_));
+  function routingField(x) = x.awaddr;
+  function noRouteFound(x) = BLiteFlit { bresp: DECERR };
+endinstance
+instance DetectLast#(AWLiteFlit#(addr_));
+  function detectLast(x) = True;
 endinstance
 
 // Master interface
@@ -194,6 +209,9 @@ typedef struct {
 instance DefaultValue#(WFlit#(data_, user_));
   function defaultValue = WFlit { wdata: ?, wstrb: ~0, wlast: True, wuser: ? };
 endinstance
+instance DetectLast#(WFlit#(data_, user_));
+  function detectLast(x) = x.wlast;
+endinstance
 
 typedef struct {
   Bit#(data_)           wdata;
@@ -201,6 +219,9 @@ typedef struct {
 } WLiteFlit#(numeric type data_) deriving (Bits, FShow);
 instance DefaultValue#(WLiteFlit#(data_));
   function defaultValue = WLiteFlit { wdata: ?, wstrb: ~0};
+endinstance
+instance DetectLast#(WLiteFlit#(data_));
+  function detectLast(x) = True;
 endinstance
 
 // Master interface
@@ -289,9 +310,8 @@ typedef struct {
 instance DefaultValue#(BFlit#(id_, user_));
   function defaultValue = BFlit { bid: 0, bresp: OKAY, buser: ? };
 endinstance
-instance Routable#(BFlit#(id_, user_), Bit#(id_));
-  function routingField(x) = x.bid;
-  function isLast(x)       = True;
+instance DetectLast#(BFlit#(id_, user_));
+  function detectLast(x) = True;
 endinstance
 
 typedef struct {
@@ -299,6 +319,9 @@ typedef struct {
 } BLiteFlit deriving (Bits, FShow);
 instance DefaultValue#(BLiteFlit);
   function defaultValue = BLiteFlit { bresp: OKAY };
+endinstance
+instance DetectLast#(BLiteFlit);
+  function detectLast(x) = True;
 endinstance
 
 // Master interface
@@ -394,9 +417,17 @@ instance DefaultValue#(ARFlit#(id_, addr_, user_));
     arprot: 0, arqos: 0, arregion: 0, aruser: ?
   };
 endinstance
-instance Routable#(ARFlit#(id_, addr_, user_), Bit#(addr_));
+instance Routable#(
+  ARFlit#(id_, addr_, user_),
+  RFlit#(id_, data_, user_),
+  Bit#(addr_));
   function routingField(x) = x.araddr;
-  function isLast(x)       = True;
+  function noRouteFound(x) = RFlit {
+    rid: x.arid, rdata: ?, rresp: DECERR, rlast: True, ruser: x.aruser
+  };
+endinstance
+instance DetectLast#(ARFlit#(id_, addr_, user_));
+  function detectLast(x) = True;
 endinstance
 
 typedef struct {
@@ -405,6 +436,13 @@ typedef struct {
 } ARLiteFlit#(numeric type addr_) deriving (Bits, FShow);
 instance DefaultValue#(ARLiteFlit#(addr_));
   function defaultValue = ARLiteFlit { araddr: ?, arprot: 0};
+endinstance
+instance Routable#(ARLiteFlit#(addr_), RLiteFlit#(data_), Bit#(addr_));
+  function routingField(x) = x.araddr;
+  function noRouteFound(x) = RLiteFlit { rdata: ?, rresp: DECERR };
+endinstance
+instance DetectLast#(ARLiteFlit#(addr_));
+  function detectLast(x) = True;
 endinstance
 
 // Master interface
@@ -519,9 +557,8 @@ instance DefaultValue#(RFlit#(id_, data_, user_));
     rid: 0, rdata: ?, rresp: OKAY, rlast: True, ruser: ?
   };
 endinstance
-instance Routable#(RFlit#(id_, data_, user_), Bit#(id_));
-  function routingField(x) = x.rid;
-  function isLast(x)       = x.rlast;
+instance DetectLast#(RFlit#(id_, data_, user_));
+  function detectLast(x) = x.rlast;
 endinstance
 
 typedef struct {
@@ -530,6 +567,9 @@ typedef struct {
 } RLiteFlit#(numeric type data_) deriving (Bits, FShow);
 instance DefaultValue#(RLiteFlit#(data_));
   function defaultValue = RLiteFlit { rdata: ?, rresp: OKAY };
+endinstance
+instance DetectLast#(RLiteFlit#(data_));
+  function detectLast(x) = True;
 endinstance
 
 // Master interface

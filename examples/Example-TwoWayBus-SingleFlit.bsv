@@ -35,13 +35,7 @@ import MasterSlave :: *;
 
 import FIFOF :: *;
 import Vector :: *;
-
-function Vector#(n, Bool) route (Bit#(a) x);
-  case (firstHotToOneHot(toList(unpack((x))))) matches
-    tagged Valid .dest: return toVector(dest);
-    tagged Invalid: return replicate(False);
-  endcase
-endfunction
+import ConfigReg :: *;
 
 function Bit#(n) firstHot(Bit#(n) x);
   Bit#(n) res = 0;
@@ -53,50 +47,65 @@ function Bit#(n) firstHot(Bit#(n) x);
   return res;
 endfunction
 
-typedef 4 NMasters;
-typedef 3 NSlaves;
+typedef 1 NMasters;
+typedef 1 NSlaves;
 
 typedef struct {
-  Bit#(a) from;
-  Bit#(b) to;
-} Req#(numeric type a, numeric type b) deriving (Bits, FShow);
-instance Routable#(Req#(a,b), Bit#(b));
-  function routingField (x) = x.to;
-  function isLast       (x) = True;
+  Vector#(NSlaves, Bool) to;
+} Req deriving (Bits);
+instance FShow#(Req);
+  function fshow(x) = $format("Req { to:%b }", x.to);
 endinstance
-typedef Req#(a, b) Rsp#(numeric type a, numeric type b);
 
-module mkMaster#(Bit#(a) me) (Master#(Req#(a, b), Rsp#(b, a)));
-  Reg#(Bit#(b)) dest <- mkReg(1);
+typedef enum {OK, KO} RStatus deriving (Bits, Eq, FShow);
+typedef struct {
+  RStatus status;
+} Rsp deriving (Bits, FShow);
+
+instance Routable#(Req, Rsp, Vector#(NSlaves, Bool));
+  function routingField (x) = x.to;
+  function noRouteFound (x) = Rsp { status: KO };
+endinstance
+
+instance DetectLast#(Req); function detectLast = constFn(True); endinstance
+instance DetectLast#(Rsp); function detectLast = constFn(True); endinstance
+
+module mkMaster (Master#(Req, Rsp));
+  Reg#(Vector#(NSlaves, Bool)) dest <- mkConfigReg(cons(True, replicate(False)));
   let ff <- mkFIFOF;
   rule enq;
-    let newDest = dest << 1;
-    if (newDest == 0) newDest = 1;
-    dest <= newDest;
-    ff.enq(Req { from: me, to: dest });
+    dest <= rotate(dest);
+    let req = Req { to: dest };
+    ff.enq(req);
+    $display("%0t -- Master sending ", $time, fshow(req));
   endrule
   interface source = interface Source;
     method get    = actionvalue ff.deq; return ff.first; endactionvalue;
     method peek   = ff.first;
-    method canGet = True;
+    method canGet = ff.notEmpty;
   endinterface;
   interface sink = interface Sink;
-    method put(x) = action $display("%0t -- Master %b received ", $time, me, fshow(x)); endaction;
+    method put(x) = action $display("%0t -- Master received ", $time, fshow(x)); endaction;
     method canPut = True;
   endinterface;
 endmodule
 
-module mkSlave#(Bit#(b) me) (Slave#(Req#(a, b), Rsp#(b, a)));
+module mkSlave (Slave#(Req, Rsp));
   let ff <- mkFIFOF;
   interface sink = interface Sink;
     method put(x) = action
-      $display("%0t -- Slave %b received ", $time, me, fshow(x));
-      ff.enq(Rsp {from: me, to: x.from});
+      $display("%0t -- Slave received ", $time, fshow(x));
+      ff.enq(Rsp { status: OK });
     endaction;
     method canPut = ff.notFull;
   endinterface;
   interface source = interface Source;
-    method get    = actionvalue ff.deq; return ff.first; endactionvalue;
+    method get = actionvalue
+      ff.deq;
+      let rsp = ff.first;
+      $display("%0t -- Slave sending ", $time, fshow(rsp));
+      return rsp;
+    endactionvalue;
     method peek   = ff.first;
     method canGet = ff.notEmpty;
   endinterface;
@@ -104,17 +113,14 @@ endmodule
 
 module top (Empty);
 
-  function Bit#(n) intToOneHot(Integer i) = (1 << i);
-  Vector#(NMasters, Bit#(NMasters)) mIDs = genWith(intToOneHot);
-  Vector#(NSlaves, Bit#(NSlaves))   sIDs = genWith(intToOneHot);
-  Vector#(NMasters, Master#(Req#(NMasters, NSlaves),Rsp#(NSlaves, NMasters))) masters <- mapM(mkMaster, mIDs);
-  Vector#(NSlaves, Slave#(Req#(NMasters, NSlaves),Rsp#(NSlaves, NMasters)))   slaves  <- mapM(mkSlave, sIDs);
+  Vector#(NMasters, Master#(Req, Rsp)) masters <- replicateM(mkMaster);
+  Vector#(NSlaves,  Slave#(Req, Rsp))  slaves  <- replicateM(mkSlave);
 
   let cnt <- mkReg(0);
   rule count; cnt <= cnt + 1; endrule
 
-  mkTwoWayBus(route, route, masters, slaves);
+  mkInOrderTwoWayBus(id, masters, slaves);
 
-  rule terminate(cnt > 200); $finish(0); endrule
+  rule terminate(cnt > 3000); $finish(0); endrule
 
 endmodule

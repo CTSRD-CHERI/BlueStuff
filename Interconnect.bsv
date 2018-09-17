@@ -30,6 +30,8 @@ package Interconnect;
 
 import Printf :: *;
 import Vector :: *;
+import FIFOF :: *;
+import SpecialFIFOs :: *;
 
 import SourceSink :: *;
 import MasterSlave :: *;
@@ -39,37 +41,29 @@ import Routable :: *;
 /////////////////
 // One-way bus //
 ////////////////////////////////////////////////////////////////////////////////
-typedef enum {UNALLOCATED, ALLOCATED} BusState deriving (Bits, Eq, FShow);
+// Simple bus receiving both a flit and a one-hot vector of Bool identifying a
+// unique slave identifying the slave for which the flit is destinned.
+typedef enum {UNALLOCATED, ALLOCATED} BusState deriving (Bits, Eq);
 module mkOneWayBus#(
-    function Vector#(nRoutes, Bool) route (routing_t routing_val),
-    Vector#(nIns, in_t#(flit_t)) ins,
+    Vector#(nIns, Tuple2#(in_t, path_t)) ins,
     Vector#(nOuts, out_t#(flit_t)) outs
   ) (Empty) provisos (
-    Bits#(flit_t, flit_sz),
-    Routable#(flit_t, routing_t),
-    Arbitrable#(in_t#(flit_t)),
-    ToSource#(in_t#(flit_t), flit_t),
+    Bits#(flit_t, flit_sz), DetectLast#(flit_t),
+    ToSource#(in_t, flit_t),
+    ToSource#(path_t, Vector#(nOuts, Bool)),
     ToSink#(out_t#(flit_t), flit_t),
     // assertion on argument sizes
-    Add#(1, a__, nIns), // at least one source is needed
-    Add#(1, b__, nOuts), // at least one sink is needed
-    Add#(nRoutes, 0, nOuts) // there must be as many routes as there are sinks
+    Add#(1, c__, nIns), // at least one source is needed
+    Add#(1, d__, nOuts) // at least one sink is needed
   );
 
-  ////////////////
-  // Assertions //
-  //////////////////////////////////////////////////////////////////////////////
-
   // convert arguments to Source and Sink
-  let sources = map(toSource, ins);
+  let sources = map(toSource, map(tpl_1, ins));
+  let   paths = map(toSource, map(tpl_2, ins));
   let   sinks = map(toSink, outs);
-  // XXX XXX XXX XXX
-  // The routing function must return a one hot encoded List#(Bool) of the same
-  // size as the list of sinks, with True in the selected sink's position. All
-  // False should mean that no route was found.
 
-  //////////////////////////////////////
-  // general helpers, state and rules //
+  /////////////////////////////////
+  // general helpers and signals //
   //////////////////////////////////////////////////////////////////////////////
 
   // helpers
@@ -77,63 +71,78 @@ module mkOneWayBus#(
     action if (c) w <= f; endaction;
   function pulse(c, w) = action if (c) w.send(); endaction;
   function Bool readPulse(PulseWire w) = w._read;
-  function isReady(s)  = s.canPut;
-  // for each source, potential transaction state (as a Maybe one hot dest)
-  Vector#(nIns, Maybe#(Vector#(nOuts, Bool))) dests = replicate(Invalid);
+  function isReady(s)     = s.canPut;
+  function isAvailable(s) = s.canGet;
+  function drainSource(s) = action let _ <- s.get; endaction;
+  // for each source, establish whether a transaction can occur
+  Vector#(nOuts, Bool)       sinksReady  = map(isReady, sinks);
+  Vector#(nIns, Bool)        pathsReqs   = map(isAvailable, paths);
+  Vector#(nIns, Bool)        sourcesReqs = map(isAvailable, sources);
+  Rules craftReqRules = emptyRules;
+  Vector#(nIns, Wire#(Bool)) reqWires    <- replicateM(mkDWire(False));
   for (Integer i = 0; i < valueOf(nIns); i = i + 1) begin
-    if (sources[i].canGet) begin
-      let desiredSink = route(routingField(sources[i].peek));
-      if (\or (zipWith(\&& , desiredSink, map(isReady, sinks))))
-        dests[i] = Valid(desiredSink);
-    end
+    craftReqRules = rJoin(craftReqRules, rules
+      rule craftReq (sources[i].canGet && paths[i].canGet);
+        reqWires[i] <= \or (zipWith(\&& , paths[i].peek, sinksReady));
+      endrule
+    endrules);
   end
+  let reqs = map(readReg, reqWires);
   // internal state
-  let state        <- mkReg(UNALLOCATED);
-  let arbiter      <- mkOneHotArbiter(toList(map(isValid, dests)));
+  let arbiter <- mkOneHotArbiter(toList(reqs));
+  Reg#(BusState)                state        <- mkReg(UNALLOCATED);
   Vector#(nIns, PulseWire)      sourceSelect <- replicateM(mkPulseWire);
   Vector#(nIns, Reg#(Bool))     activeSource <- replicateM(mkReg(False));
   Vector#(nOuts, Wire#(flit_t)) flitToSink   <- replicateM(mkWire);
-  Vector#(nOuts, Reg#(Bool))    activeSink   <- replicateM(mkReg(False));
-  let activeSinkReady =
-    \or (zipWith(\&& , map(readReg, activeSink), map(isReady, sinks)));
+  function activeSinkReady(dest) = \or (zipWith(\&& , dest, sinksReady));
 
   // do arbitration
   rule arbitrate (state == UNALLOCATED);
     let nexts <- arbiter.next;
-    let _ <- zipWithM(pulse, toVector(nexts), sourceSelect);
+    zipWithM_(pulse, toVector(nexts), sourceSelect);
   endrule
 
   //////////////////////
   // source behaviour //
   //////////////////////////////////////////////////////////////////////////////
 
-  // per source rules
+  // per input rules
   Rules sourceRules = emptyRules;
   for (Integer i = 0; i < valueOf(nIns); i = i + 1) begin
     sourceRules = rJoinMutuallyExclusive(sourceRules, rules
+      (* mutually_exclusive = "source_selected, burst" *)
       rule source_selected (state == UNALLOCATED && sourceSelect[i]);
-        if (isValid(dests[i])) begin
+        if (paths[i].canGet) begin
           let flit <- sources[i].get;
-          let _ <- zipWithM(forwardFlit(flit), dests[i].Valid, flitToSink);
-          if (!isLast(flit)) begin
-            writeVReg(activeSource, map(readPulse, sourceSelect));
-            writeVReg(activeSink, dests[i].Valid);
-            state <= ALLOCATED;
+          let dest = paths[i].peek;
+          if (countIf(id, dest) != 1) begin // XXX THIS SHOULD NEVER HAPPEN
+            $display("%0t -- mkOneWayBus error: input %0d was selected but the",
+                     " requested path ", $time, i, fshow(dest),
+                     " is not a valid one-hot path.");
+            $finish(0);
           end
+          zipWithM_(forwardFlit(flit), dest, flitToSink);
+          if (!detectLast(flit)) begin
+            writeVReg(activeSource, map(readPulse, sourceSelect));
+            state <= ALLOCATED;
+          end else drainSource(paths[i]);
         end else begin // XXX THIS SHOULD NEVER HAPPEN
-          $display("mkSimpleBus error: source %0d selected but dests entry"
-                 + "%0d is invalid", i, i);
+          $display("%0t -- mkOneWayBus error: input %0d was selected but there",
+                   " was no requested path.", $time, i);
           $finish(0);
         end
       endrule
-      rule burst (state == ALLOCATED && activeSource[i] && activeSinkReady);
+      rule burst (state == ALLOCATED && activeSource[i] &&
+                  paths[i].canGet && activeSinkReady(paths[i].peek));
         let flit <- sources[i].get;
-        let _ <- zipWithM(forwardFlit(flit), map(readReg, activeSink), flitToSink);
-        if (isLast(flit)) state <= UNALLOCATED;
+        zipWithM_(forwardFlit(flit), paths[i].peek, flitToSink);
+        if (detectLast(flit)) begin
+          state <= UNALLOCATED;
+          drainSource(paths[i]);
+        end
       endrule
     endrules);
   end
-  addRules(sourceRules);
 
   ////////////////////
   // sink behaviour //
@@ -148,33 +157,146 @@ module mkOneWayBus#(
       endrule
     endrules);
   end
-  addRules(sinkRules);
+
+  // add all rules
+  addRules(rJoinExecutionOrder(craftReqRules,
+           rJoinExecutionOrder(sourceRules,
+                               sinkRules)));
 
 endmodule
 
-/////////////////
-// Two-way bus //
+//////////////////////////
+// In Order Two-Way Bus //
 ////////////////////////////////////////////////////////////////////////////////
-
-module mkTwoWayBus#(
-    function Vector#(nRoutesM2S, Bool) routeM2S (route_m2s_t m2s_val),
-    function Vector#(nRoutesS2M, Bool) routeS2M (route_s2m_t s2m_val),
+// type to wrap the route back to the initiating master
+typedef struct {
+  Vector#(n, Bool) path;
+  t flit;
+} UpFlit#(type t, numeric type n) deriving (Bits);
+instance DetectLast#(UpFlit#(t, n)) provisos (DetectLast#(t));
+  function detectLast(x) = detectLast(x.flit);
+endinstance
+// master wrapper state enum
+typedef enum {
+  UNALLOCATED, ALLOCATED, DRAIN
+} MasterWrapperState deriving (Bits, Eq);
+module mkInOrderTwoWayBus#(
+    function Vector#(nRoutes, Bool) route (routing_t val),
     Vector#(nMasters, Master#(m2s_t, s2m_t)) ms,
     Vector#(nSlaves, Slave#(m2s_t, s2m_t)) ss
   ) (Empty) provisos (
-    Bits#(m2s_t, m2s_sz), Routable#(m2s_t, route_m2s_t),
-    Bits#(s2m_t, s2m_sz), Routable#(s2m_t, route_s2m_t),
+    Bits#(m2s_t, m2s_sz), Bits#(s2m_t, s2m_sz),
+    Routable#(m2s_t, s2m_t, routing_t),
+    DetectLast#(m2s_t), DetectLast#(s2m_t),
     // assertion on argument sizes
     Add#(1, a__, nMasters), // at least one Master is needed
     Add#(1, b__, nSlaves), // at least one slave is needed
-    Add#(nRoutesM2S, 0, nSlaves), // nRoutesM2S == nSlaves
-    Add#(nRoutesS2M, 0, nMasters) // nRoutesS2M == nMasters
+    Add#(nRoutes, 0, nSlaves) // nRoutes == nSlaves
   );
 
+  // for each master...
+  //////////////////////////////////////////////////////////////////////////////
+  module wrapMaster#(Master#(m2s_t, s2m_t) m, Vector#(nMasters, Bool) orig)
+    (Tuple3#(
+      Source#(UpFlit#(m2s_t, nMasters)),
+      Source#(Vector#(nSlaves, Bool)),
+      Sink#(s2m_t)
+    ));
+    FIFOF#(UpFlit#(m2s_t, nMasters)) innerReq   <- mkFIFOF;
+    FIFOF#(Vector#(nSlaves, Bool))   innerRoute <- mkFIFOF;
+    FIFOF#(Maybe#(s2m_t))            innerRsp   <- mkFIFOF;
+    Reg#(MasterWrapperState) state <- mkReg(UNALLOCATED);
+    // inner signals
+    Source#(m2s_t) src = m.source;
+    Sink#(s2m_t) snk = m.sink;
+    Vector#(nSlaves, Bool) dest = route(routingField(src.peek));
+    Bool isRoutable = countIf(id, dest) == 1;
+    // consume different kinds of flits
+    (* mutually_exclusive = "firstFlit, followFlits, nonRoutableFlit, drainFlits" *)
+    rule firstFlit (state == UNALLOCATED && src.canGet && isRoutable);
+      let req <- src.get;
+      innerReq.enq(UpFlit {path: orig, flit: req});
+      innerRsp.enq(Invalid);
+      innerRoute.enq(dest);
+      if (!detectLast(req)) state <= ALLOCATED;
+    endrule
+    rule followFlits (state == ALLOCATED && src.canGet);
+      let req <- src.get;
+      innerReq.enq(UpFlit {path: orig, flit: req});
+      if (detectLast(req)) state <= UNALLOCATED;
+    endrule
+    rule nonRoutableFlit (state == UNALLOCATED && src.canGet && !isRoutable);
+      let req <- src.get;
+      innerRsp.enq(Valid(noRouteFound(req)));
+      if (!detectLast(req)) state <= DRAIN;
+    endrule
+    rule drainFlits (state == DRAIN);
+      let req <- src.get;
+      if (detectLast(req)) state <= UNALLOCATED;
+    endrule
+    // sink of responses
+    rule drainInnerResponse (innerRsp.notEmpty && isValid(innerRsp.first) && snk.canPut);
+      innerRsp.deq;
+      snk.put(innerRsp.first.Valid);
+    endrule
+    Sink#(s2m_t) rsps = interface Sink;
+      method canPut   = innerRsp.notEmpty && !isValid(innerRsp.first) && snk.canPut;
+      method put(x) if (innerRsp.notEmpty && !isValid(innerRsp.first) && snk.canPut) = action
+        snk.put(x);
+        if (detectLast(x)) innerRsp.deq;
+      endaction;
+    endinterface;
+    return tuple3(toSource(innerReq), toSource(innerRoute), rsps);
+  endmodule
+  Vector#(nMasters, Source#(UpFlit#(m2s_t, nMasters))) mreqs  = newVector;
+  Vector#(nMasters, Source#(Vector#(nSlaves, Bool)))   mpaths = newVector;
+  Vector#(nMasters, Sink#(s2m_t))                      mrsps  = newVector;
+  for (Integer i = 0; i < valueOf(nMasters); i = i + 1) begin
+    Vector#(nMasters, Bool) orig = replicate(False);
+    orig[i] = True;
+    let ifcs <- wrapMaster(ms[i], orig);
+    match {.req, .path, .rsp} = ifcs;
+    mreqs[i]  = req;
+    mpaths[i] = path;
+    mrsps[i]  = rsp;
+  end
+
+  // for each slave...
+  //////////////////////////////////////////////////////////////////////////////
+  module wrapSlave#(Slave#(m2s_t, s2m_t) s) (Tuple3#(
+      Sink#(UpFlit#(m2s_t,nMasters)),
+      Source#(Vector#(nMasters, Bool)),
+      Source#(s2m_t)
+    ));
+    FIFOF#(Vector#(nMasters, Bool)) routeBack <- mkFIFOF;
+    // split the incomming flit
+    Sink#(UpFlit#(m2s_t, nMasters)) withRouteSnk = interface Sink;
+      method canPut = s.sink.canPut && routeBack.notFull;
+      //method put(x) if (s.sink.canPut && routeBack.notFull) = action
+      method put(x) = action
+        routeBack.enq(x.path);
+        s.sink.put(x.flit);
+      endaction;
+    endinterface;
+    return tuple3(withRouteSnk, toSource(routeBack), s.source);
+  endmodule
+  Vector#(nSlaves, Sink#(UpFlit#(m2s_t, nMasters)))  sreqs  = newVector;
+  Vector#(nSlaves, Source#(Vector#(nMasters, Bool))) spaths = newVector;
+  Vector#(nSlaves, Source#(s2m_t))                   srsps  = newVector;
+  for (Integer i = 0; i < valueOf(nSlaves); i = i + 1) begin
+    let ifcs <- wrapSlave(ss[i]);
+    match {.req, .path, .rsp} = ifcs;
+    sreqs[i]  = req;
+    spaths[i] = path;
+    srsps[i]  = rsp;
+  end
+
   // Master to Slave bus
-  mkOneWayBus(routeM2S, map(getMasterSource, ms), map(getSlaveSink, ss));
+  //////////////////////////////////////////////////////////////////////////////
+  mkOneWayBus(zip(mreqs, mpaths), sreqs);
   // Slave to Master bus
-  mkOneWayBus(routeS2M, map(getSlaveSource, ss), map(getMasterSink, ms));
+  //////////////////////////////////////////////////////////////////////////////
+  mkOneWayBus(zip(srsps, spaths), mrsps);
 
 endmodule
 

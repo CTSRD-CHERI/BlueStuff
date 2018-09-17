@@ -27,23 +27,24 @@
  */
 
 import Routable :: *;
+import SourceSink :: *;
 import Interconnect :: *;
 import ListExtra :: *;
 
 import FIFOF :: *;
 import Vector :: *;
+import ConfigReg :: *;
 
 typedef struct {
   Bit#(i) id;
-  Bit#(o) dest;
+  Vector#(o, Bool) dest;
 } Flit#(numeric type i, numeric type o) deriving (Bits);
 instance FShow#(Flit#(a,b));
   function fshow(x) =
     $format("[id = %0d, dest = %b]", x.id, x.dest);
 endinstance
-instance Routable#(Flit#(x,y), Bit#(y));
-  function routingField (x) = x.dest;
-  function isLast (x) = True;
+instance DetectLast#(Flit#(a,b));
+  function detectLast = constFn(True);
 endinstance
 
 function Vector#(n, Bool) route (Bit#(a) x);
@@ -56,40 +57,35 @@ endfunction
 typedef 4 NIns;
 typedef 3 NOuts;
 
-interface NextDest#(numeric type n);
-  method ActionValue#(Bit#(n)) next;
-endinterface
-module mkNextDest(NextDest#(n));
-  Reg#(Bit#(n)) val <- mkReg(1);
-  method next = actionvalue
-    let newVal = val << 1;
-    if (newVal == 0) newVal = 1;
-    val <= newVal;
-    return val;
-  endactionvalue;
-endmodule
-
 module top (Empty);
 
   Integer nIns  = valueOf(NIns);
   Integer nOuts = valueOf(NOuts);
 
-  Vector#(NIns, NextDest#(NOuts)) destGen <- replicateM(mkNextDest);
 
-  Vector#(NIns, FIFOF#(Flit#(NIns, NOuts)))  ins  <- replicateM(mkFIFOF);
-  Vector#(NOuts, FIFOF#(Flit#(NIns, NOuts))) outs <- replicateM(mkFIFOF);
+  Vector#(NIns, FIFOF#(Flit#(NIns, NOuts)))    ins   <- replicateM(mkFIFOF);
+  Vector#(NIns, Source#(Vector#(NOuts, Bool))) paths = newVector;
+  Vector#(NOuts, FIFOF#(Flit#(NIns, NOuts)))   outs  <- replicateM(mkFIFOF);
 
   let cnt <- mkReg(0);
   rule count; cnt <= cnt + 1; endrule
 
   for (Integer i = 0; i < nIns; i = i + 1) begin
+    Reg#(Vector#(NOuts, Bool)) next <- mkConfigReg(cons(True, replicate(False)));
     rule doEnq;
-      let newDest <- destGen[i].next;
       ins[i].enq(Flit {
         id: fromInteger(i),
-        dest: newDest
+        dest: next
       });
     endrule
+    paths[i] = interface Source;
+      method canGet = True;
+      method peek   = next;
+      method get    = actionvalue
+        next <= rotate(next);
+        return next;
+      endactionvalue;
+    endinterface;
   end
   for (Integer i = 0; i < nOuts; i = i + 1)
     rule doDeq (cnt % fromInteger(i+1) == fromInteger(i));
@@ -97,7 +93,7 @@ module top (Empty);
       $display("%0t -- dest %0d received from id %0d -- ", $time, i, outs[i].first.id, fshow(outs[i].first));
     endrule
     
-  mkOneWayBus(route, ins, outs);
+  mkOneWayBus(zip(ins, paths), outs);
 
   rule terminate(cnt > 200); $finish(0); endrule
 

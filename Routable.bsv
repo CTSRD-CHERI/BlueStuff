@@ -36,9 +36,17 @@ import Dict :: *;
 // Routable typeclass //
 ////////////////////////////////////////////////////////////////////////////////
 
-typeclass Routable#(type a, type b) dependencies(a determines b);
-  function b    routingField (a val);
-  function Bool isLast       (a val);
+typeclass Routable#(type a, type b, type c) dependencies (a determines (b, c));
+  function c    routingField (a val);
+  function b    noRouteFound (a val);
+endtypeclass
+
+//////////////////////////
+// DetectLast typeclass //
+////////////////////////////////////////////////////////////////////////////////
+
+typeclass DetectLast#(type a);
+  function Bool detectLast (a val);
 endtypeclass
 
 ///////////////////////

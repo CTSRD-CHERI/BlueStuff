@@ -38,16 +38,23 @@ import SpecialFIFOs :: *;
 import List :: *;
 import Vector :: *;
 
-typedef 32 ADDR_sz;
+typedef 2 NMASTERS;
+typedef 3 NSLAVES;
+
+typedef 4096 SlaveWidth;
+
+typedef TAdd#(1, TLog#(TMul#(NSLAVES, SlaveWidth))) ADDR_sz;
 typedef 128 DATA_sz;
 
-`define MASTER_T AXIMaster#(0, ADDR_sz, DATA_sz, 0)
-`define SLAVE_T(id) AXISlave#(id, ADDR_sz, DATA_sz, 0)
+`define MASTER_T AXILiteMaster#(ADDR_sz, DATA_sz)
+`define SLAVE_T  AXILiteSlave#(ADDR_sz, DATA_sz)
 
 module axiMaster (`MASTER_T);
 
   // AXI master shim
-  AXIShim#(0, ADDR_sz, DATA_sz, 0) shim <- mkAXIShim;
+  AXILiteShim#(ADDR_sz, DATA_sz) shim <- mkAXILiteShim;
+  // Req addr
+  Reg#(Bit#(ADDR_sz)) nextWriteAddr <- mkReg(0);
 
   // counter
   Reg#(Bit#(DATA_sz)) cnt <- mkReg(0);
@@ -56,12 +63,14 @@ module axiMaster (`MASTER_T);
   // arbitrary work for each channel
   Bool sendWrite = cnt[3:0] == 0;
   rule putAWFlit (sendWrite);
-    AWFlit#(0, ADDR_sz, 0) f = ?;
+    AWLiteFlit#(ADDR_sz) f = ?;
+    f.awaddr = nextWriteAddr;
+    nextWriteAddr <= nextWriteAddr + fromInteger(valueOf(SlaveWidth)) + 1;
     shim.slave.aw.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
   rule putWFlit (sendWrite);
-    WFlit#(DATA_sz, 0) f = WFlit{wdata: cnt, wstrb: ?, wlast: True, wuser: ?};
+    WLiteFlit#(DATA_sz) f = WLiteFlit{wdata: cnt, wstrb: ?};
     shim.slave.w.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
@@ -77,10 +86,10 @@ module axiMaster (`MASTER_T);
 
 endmodule
 
-module axiSlave (`SLAVE_T(id_sz));
+module axiSlave (`SLAVE_T);
 
   // AXI slave shim
-  AXIShim#(id_sz, ADDR_sz, DATA_sz, 0) shim <- mkAXIShim;
+  AXILiteShim#(ADDR_sz, DATA_sz) shim <- mkAXILiteShim;
 
   // arbitrary work for each channel
   FIFOF#(Bit#(0)) writeResp <- mkFIFOF;
@@ -95,7 +104,7 @@ module axiSlave (`SLAVE_T(id_sz));
   endrule
   rule putBFlit;
     writeResp.deq;
-    BFlit#(id_sz, 0) f = ?;
+    BLiteFlit f = ?;
     shim.master.b.put(f);
     $display("%0t - SLAVE - sending ", $time, fshow(f));
   endrule
@@ -107,20 +116,17 @@ module axiSlave (`SLAVE_T(id_sz));
 
 endmodule
 
-typedef 2 NMASTERS;
-typedef 3 NSLAVES;
-
 module exampleBus (Empty);
   Vector#(NMASTERS, `MASTER_T) ms;
-  Vector#(NSLAVES, `SLAVE_T(TLog#(NMASTERS))) ss;
+  Vector#(NSLAVES, `SLAVE_T)   ss;
   for (Integer i = 0; i < valueOf(NMASTERS); i = i + 1)
     ms[i] <- axiMaster;
   MappingTable#(NSLAVES, ADDR_sz) maptab = newVector;
   for (Integer i = 0; i < valueOf(NSLAVES); i = i + 1) begin
-    maptab[i] = Range{base: fromInteger(i*4096), size: 4096};
+    maptab[i] = Range{base: fromInteger(i*valueOf(SlaveWidth)), size: fromInteger(valueOf(SlaveWidth))};
     ss[i] <- axiSlave;
   end
-  mkAXIBus(maptab, ms, ss);
+  mkAXILiteBus(maptab, ms, ss);
 endmodule
 
 `undef MASTER_T
