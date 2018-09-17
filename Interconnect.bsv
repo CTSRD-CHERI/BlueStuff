@@ -75,17 +75,17 @@ module mkOneWayBus#(
   function isAvailable(s) = s.canGet;
   function drainSource(s) = action let _ <- s.get; endaction;
   // for each source, establish whether a transaction can occur
-  Vector#(nOuts, Bool)       sinksReady  = map(isReady, sinks);
+  Vector#(nOuts, Wire#(Bool)) isSinkReady <- replicateM(mkDWire(False));
+  for (Integer i = 0; i < valueOf(nOuts); i = i + 1)
+    rule checkSinkReady; isSinkReady[i] <= isReady(sinks[i]); endrule
+  let sinksReady = map(readReg, isSinkReady);
   Vector#(nIns, Bool)        pathsReqs   = map(isAvailable, paths);
   Vector#(nIns, Bool)        sourcesReqs = map(isAvailable, sources);
-  Rules craftReqRules = emptyRules;
   Vector#(nIns, Wire#(Bool)) reqWires    <- replicateM(mkDWire(False));
   for (Integer i = 0; i < valueOf(nIns); i = i + 1) begin
-    craftReqRules = rJoin(craftReqRules, rules
-      rule craftReq (sources[i].canGet && paths[i].canGet);
-        reqWires[i] <= \or (zipWith(\&& , paths[i].peek, sinksReady));
-      endrule
-    endrules);
+    rule craftReq (sources[i].canGet && paths[i].canGet);
+      reqWires[i] <= \or (zipWith(\&& , paths[i].peek, sinksReady));
+    endrule
   end
   let reqs = map(readReg, reqWires);
   // internal state
@@ -158,10 +158,8 @@ module mkOneWayBus#(
     endrules);
   end
 
-  // add all rules
-  addRules(rJoinExecutionOrder(craftReqRules,
-           rJoinExecutionOrder(sourceRules,
-                               sinkRules)));
+  // add rules
+  addRules(rJoinExecutionOrder(sourceRules, sinkRules));
 
 endmodule
 
