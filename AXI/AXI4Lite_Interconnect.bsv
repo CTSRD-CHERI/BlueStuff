@@ -30,7 +30,7 @@ import List :: *;
 import Vector :: *;
 import Printf :: *;
 
-import AXI4_Types :: *;
+import AXI4Lite_Types :: *;
 import SourceSink :: *;
 import MasterSlave :: *;
 import ListExtra :: *;

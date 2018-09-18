@@ -48,14 +48,6 @@ instance ToAXIAWFlit#(AWFlit#(a, b, c), a, b, c);
   function toAXIAWFlit = id;
 endinstance
 
-typeclass ToAXIAWLiteFlit#(type t, numeric type addr_);
-  function AWLiteFlit#(addr_) toAXIAWLiteFlit (t x);
-endtypeclass
-
-instance ToAXIAWLiteFlit#(AWLiteFlit#(a), a);
-  function toAXIAWLiteFlit = id;
-endinstance
-
 typeclass FromAXIAWFlit#(type t,
 numeric type id_, numeric type addr_, numeric type user_);
   function t fromAXIAWFlit (AWFlit#(id_, addr_, user_) x);
@@ -63,14 +55,6 @@ endtypeclass
 
 instance FromAXIAWFlit#(AWFlit#(a, b, c), a, b, c);
   function fromAXIAWFlit = id;
-endinstance
-
-typeclass FromAXIAWLiteFlit#(type t, numeric type addr_);
-  function t fromAXIAWLiteFlit (AWLiteFlit#(addr_) x);
-endtypeclass
-
-instance FromAXIAWLiteFlit#(AWLiteFlit#(a), a);
-  function fromAXIAWLiteFlit = id;
 endinstance
 
 // typeclass to turn an interface to the Master interface
@@ -127,45 +111,6 @@ instance ToAXIAWMaster#(FIFOF);
     method awregion = flit.awregion;
     method awuser   = flit.awuser;
     method awvalid  = ff.notEmpty;
-    method awready(rdy) = action if (rdy) deqWire.send; endaction;
-
-  endmodule
-endinstance
-
-typeclass ToAXIAWLiteMaster#(type t);
-  module toAXIAWLiteMaster#(t#(x) ifc) (AWLiteMaster#(addr_))
-  provisos (ToAXIAWLiteFlit#(x, addr_));
-endtypeclass
-
-instance ToAXIAWLiteMaster#(Source);
-  module toAXIAWLiteMaster#(Source#(t) src)
-  (AWLiteMaster#(addr_)) provisos (ToAXIAWLiteFlit#(t, addr_));
-
-    Wire#(AWLiteFlit#(addr_)) flit <- mkDWire(?);
-    rule getFlit (src.canGet); flit <= toAXIAWLiteFlit(src.peek); endrule
-    PulseWire getWire <- mkPulseWire;
-    rule doGet (getWire && src.canGet); let _ <- src.get; endrule
-
-    method awaddr  = flit.awaddr;
-    method awprot  = flit.awprot;
-    method awvalid = src.canGet;
-    method awready(rdy) = action if (rdy) getWire.send; endaction;
-
-  endmodule
-endinstance
-
-instance ToAXIAWLiteMaster#(FIFOF);
-  module toAXIAWLiteMaster#(FIFOF#(t) ff)
-  (AWLiteMaster#(addr_)) provisos (ToAXIAWLiteFlit#(t, addr_));
-
-    Wire#(AWLiteFlit#(addr_)) flit <- mkDWire(?);
-    rule getFlit (ff.notEmpty); flit <= toAXIAWLiteFlit(ff.first); endrule
-    PulseWire deqWire <- mkPulseWire;
-    rule doDeq (deqWire && ff.notEmpty); ff.deq; endrule
-
-    method awaddr  = flit.awaddr;
-    method awprot  = flit.awprot;
-    method awvalid = ff.notEmpty;
     method awready(rdy) = action if (rdy) deqWire.send; endaction;
 
   endmodule
@@ -272,55 +217,6 @@ instance ToAXIAWSlave#(FIFOF);
     method awuser(user)     = action w_awuser   <= user; endaction;
     method awvalid(valid)   = action if (valid) enqWire.send; endaction;
     method awready          = ff.notFull;
-
-  endmodule
-endinstance
-
-typeclass ToAXIAWLiteSlave#(type t);
-  module toAXIAWLiteSlave#(t#(x) ifc) (AWLiteSlave#(addr_))
-  provisos (FromAXIAWLiteFlit#(x, addr_));
-endtypeclass
-
-instance ToAXIAWLiteSlave#(Sink);
-  module toAXIAWLiteSlave#(Sink#(t) snk)
-  (AWLiteSlave#(addr_)) provisos (FromAXIAWLiteFlit#(t, addr_));
-
-    let w_awaddr   <- mkDWire(?);
-    let w_awprot   <- mkDWire(?);
-    PulseWire putWire <- mkPulseWire;
-    rule doPut (putWire && snk.canPut);
-      snk.put(fromAXIAWLiteFlit(AWLiteFlit{
-        awaddr:   w_awaddr,
-        awprot:   w_awprot
-      }));
-    endrule
-
-    method awaddr(addr)   = action w_awaddr <= addr; endaction;
-    method awprot(prot)   = action w_awprot <= prot; endaction;
-    method awvalid(valid) = action if (valid) putWire.send; endaction;
-    method awready        = snk.canPut;
-
-  endmodule
-endinstance
-
-instance ToAXIAWLiteSlave#(FIFOF);
-  module toAXIAWLiteSlave#(FIFOF#(t) ff)
-  (AWLiteSlave#(addr_)) provisos (FromAXIAWLiteFlit#(t, addr_));
-
-    let w_awaddr   <- mkDWire(?);
-    let w_awprot   <- mkDWire(?);
-    PulseWire enqWire <- mkPulseWire;
-    rule doEnq (enqWire && ff.notFull);
-      ff.enq(fromAXIAWLiteFlit(AWLiteFlit{
-        awaddr:   w_awaddr,
-        awprot:   w_awprot
-      }));
-    endrule
-
-    method awaddr(addr)   = action w_awaddr <= addr; endaction;
-    method awprot(prot)   = action w_awprot <= prot; endaction;
-    method awvalid(valid) = action if (valid) enqWire.send; endaction;
-    method awready        = ff.notFull;
 
   endmodule
 endinstance

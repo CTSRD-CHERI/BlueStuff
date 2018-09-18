@@ -26,16 +26,9 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
-package AXI;
+package AXI4Lite;
 
 import AXI4_AXI4Lite_Types :: *;
-import AXI4_Types :: *;
-import AXI4_AW_Utils :: *;
-import AXI4_W_Utils :: *;
-import AXI4_B_Utils :: *;
-import AXI4_AR_Utils :: *;
-import AXI4_R_Utils :: *;
-import AXI4_Utils :: *;
 import AXI4Lite_Types :: *;
 import AXI4Lite_AW_Utils :: *;
 import AXI4Lite_W_Utils :: *;
@@ -44,16 +37,8 @@ import AXI4Lite_AR_Utils :: *;
 import AXI4Lite_R_Utils :: *;
 import AXI4Lite_Utils :: *;
 import AXI4Lite_Interconnect :: *;
-import AXI4_AXI4Lite_Bridges :: *;
 
 export AXI4_AXI4Lite_Types :: *;
-export AXI4_Types :: *;
-export AXI4_AW_Utils :: *;
-export AXI4_W_Utils :: *;
-export AXI4_B_Utils :: *;
-export AXI4_AR_Utils :: *;
-export AXI4_R_Utils :: *;
-export AXI4_Utils :: *;
 export AXI4Lite_Types :: *;
 export AXI4Lite_AW_Utils :: *;
 export AXI4Lite_W_Utils :: *;
@@ -62,6 +47,5 @@ export AXI4Lite_AR_Utils :: *;
 export AXI4Lite_R_Utils :: *;
 export AXI4Lite_Utils :: *;
 export AXI4Lite_Interconnect :: *;
-export AXI4_AXI4Lite_Bridges :: *;
 
 endpackage

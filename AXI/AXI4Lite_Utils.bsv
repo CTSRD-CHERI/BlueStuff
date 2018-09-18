@@ -27,12 +27,12 @@
  */
 
 // AXI imports
-import AXI4_Types :: *;
-import AXI4_AW_Utils :: *;
-import AXI4_W_Utils :: *;
-import AXI4_B_Utils :: *;
-import AXI4_AR_Utils :: *;
-import AXI4_R_Utils :: *;
+import AXI4Lite_Types :: *;
+import AXI4Lite_AW_Utils :: *;
+import AXI4Lite_W_Utils :: *;
+import AXI4Lite_B_Utils :: *;
+import AXI4Lite_AR_Utils :: *;
+import AXI4Lite_R_Utils :: *;
 
 // BlueBasics import
 import SourceSink :: *;
@@ -45,20 +45,20 @@ import SpecialFIFOs :: *;
 // AXI Shim Master <-> Slave //
 ////////////////////////////////////////////////////////////////////////////////
 
-module mkAXIShim (AXIShim#(id_, addr_, data_, user_));
+module mkAXILiteShim (AXILiteShim#(addr_, data_));
   let awff <- mkBypassFIFOF;
   let  wff <- mkBypassFIFOF;
   let  bff <- mkBypassFIFOF;
   let arff <- mkBypassFIFOF;
   let  rff <- mkBypassFIFOF;
-  interface master = interface AXIMaster;
+  interface master = interface AXILiteMaster;
     interface aw = toSource(awff);
     interface  w = toSource(wff);
     interface  b = toSink(bff);
     interface ar = toSource(arff);
     interface  r = toSink(rff);
   endinterface;
-  interface slave = interface AXISlave;
+  interface slave = interface AXILiteSlave;
     interface aw = toSink(awff);
     interface  w = toSink(wff);
     interface  b = toSource(bff);
@@ -72,13 +72,13 @@ endmodule
 ////////////////////////////////////////////////////////////////////////////////
 
 // AXI Master
-module toAXIMasterSynth#(AXIMaster#(id_, addr_, data_, user_) master)
-  (AXIMasterSynth#(id_, addr_, data_, user_));
-  let awifc <- toAXIAWMaster(master.aw);
-  let wifc  <- toAXIWMaster(master.w);
-  let bifc  <- toAXIBMaster(master.b);
-  let arifc <- toAXIARMaster(master.ar);
-  let rifc  <- toAXIRMaster(master.r);
+module toAXILiteMasterSynth#(AXILiteMaster#(addr_, data_) master)
+  (AXILiteMasterSynth#(addr_, data_));
+  let awifc <- toAXIAWLiteMaster(master.aw);
+  let wifc  <- toAXIWLiteMaster(master.w);
+  let bifc  <- toAXIBLiteMaster(master.b);
+  let arifc <- toAXIARLiteMaster(master.ar);
+  let rifc  <- toAXIRLiteMaster(master.r);
   interface aw = awifc;
   interface w  = wifc;
   interface b  = bifc;
@@ -87,13 +87,13 @@ module toAXIMasterSynth#(AXIMaster#(id_, addr_, data_, user_) master)
 endmodule
 
 // AXI Slave
-module toAXISlaveSynth#(AXISlave#(id_, addr_, data_, user_) master)
-  (AXISlaveSynth#(id_, addr_, data_, user_));
-  let awifc <- toAXIAWSlave(master.aw);
-  let wifc  <- toAXIWSlave(master.w);
-  let bifc  <- toAXIBSlave(master.b);
-  let arifc <- toAXIARSlave(master.ar);
-  let rifc  <- toAXIRSlave(master.r);
+module toAXILiteSlaveSynth#(AXILiteSlave#(addr_, data_) master)
+  (AXILiteSlaveSynth#(addr_, data_));
+  let awifc <- toAXIAWLiteSlave(master.aw);
+  let wifc  <- toAXIWLiteSlave(master.w);
+  let bifc  <- toAXIBLiteSlave(master.b);
+  let arifc <- toAXIARLiteSlave(master.ar);
+  let rifc  <- toAXIRLiteSlave(master.r);
   interface aw = awifc;
   interface w  = wifc;
   interface b  = bifc;

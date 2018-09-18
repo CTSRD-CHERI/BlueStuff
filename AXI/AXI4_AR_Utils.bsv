@@ -48,14 +48,6 @@ instance ToAXIARFlit#(ARFlit#(a, b, c), a, b, c);
   function toAXIARFlit = id;
 endinstance
 
-typeclass ToAXIARLiteFlit#(type t, numeric type addr_);
-  function ARLiteFlit#(addr_) toAXIARLiteFlit (t x);
-endtypeclass
-
-instance ToAXIARLiteFlit#(ARLiteFlit#(a), a);
-  function toAXIARLiteFlit = id;
-endinstance
-
 typeclass FromAXIARFlit#(type t,
 numeric type id_, numeric type addr_, numeric type user_);
   function t fromAXIARFlit (ARFlit#(id_, addr_, user_) x);
@@ -63,14 +55,6 @@ endtypeclass
 
 instance FromAXIARFlit#(ARFlit#(a, b, c), a, b, c);
   function fromAXIARFlit = id;
-endinstance
-
-typeclass FromAXIARLiteFlit#(type t, numeric type addr_);
-  function t fromAXIARLiteFlit (ARLiteFlit#(addr_) x);
-endtypeclass
-
-instance FromAXIARLiteFlit#(ARLiteFlit#(a), a);
-  function fromAXIARLiteFlit = id;
 endinstance
 
 // typeclass to turn an interface to the Master interface
@@ -126,45 +110,6 @@ instance ToAXIARMaster#(FIFOF);
     method arqos    = flit.arqos;
     method arregion = flit.arregion;
     method aruser   = flit.aruser;
-    method arvalid  = ff.notEmpty;
-    method arready(rdy) = action if (rdy) deqWire.send; endaction;
-
-  endmodule
-endinstance
-
-typeclass ToAXIARLiteMaster#(type t);
-  module toAXIARLiteMaster#(t#(x) ifc) (ARLiteMaster#(addr_))
-  provisos (ToAXIARLiteFlit#(x, addr_));
-endtypeclass
-
-instance ToAXIARLiteMaster#(Source);
-  module toAXIARLiteMaster#(Source#(t) src)
-  (ARLiteMaster#(addr_)) provisos (ToAXIARLiteFlit#(t, addr_));
-
-    Wire#(ARLiteFlit#(addr_)) flit <- mkDWire(?);
-    rule getFlit (src.canGet); flit <= toAXIARLiteFlit(src.peek); endrule
-    PulseWire getWire <- mkPulseWire;
-    rule doGet (getWire && src.canGet); let _ <- src.get; endrule
-
-    method araddr   = flit.araddr;
-    method arprot   = flit.arprot;
-    method arvalid  = src.canGet;
-    method arready(rdy) = action if (rdy) getWire.send; endaction;
-
-  endmodule
-endinstance
-
-instance ToAXIARLiteMaster#(FIFOF);
-  module toAXIARLiteMaster#(FIFOF#(t) ff)
-  (ARLiteMaster#(addr_)) provisos (ToAXIARLiteFlit#(t, addr_));
-
-    Wire#(ARLiteFlit#(addr_)) flit <- mkDWire(?);
-    rule getFlit (ff.notEmpty); flit <= toAXIARLiteFlit(ff.first); endrule
-    PulseWire deqWire <- mkPulseWire;
-    rule doDeq (deqWire && ff.notEmpty); ff.deq; endrule
-
-    method araddr   = flit.araddr;
-    method arprot   = flit.arprot;
     method arvalid  = ff.notEmpty;
     method arready(rdy) = action if (rdy) deqWire.send; endaction;
 
@@ -272,49 +217,6 @@ instance ToAXIARSlave#(FIFOF);
     method aruser(user)     = action w_aruser   <= user; endaction;
     method arvalid(valid)   = action if (valid) enqWire.send; endaction;
     method arready          = ff.notFull;
-
-  endmodule
-endinstance
-
-typeclass ToAXIARLiteSlave#(type t);
-  module toAXIARLiteSlave#(t#(x) ifc) (ARLiteSlave#(addr_))
-  provisos (FromAXIARLiteFlit#(x, addr_));
-endtypeclass
-
-instance ToAXIARLiteSlave#(Sink);
-  module toAXIARLiteSlave#(Sink#(t) snk)
-  (ARLiteSlave#(addr_)) provisos (FromAXIARLiteFlit#(t, addr_));
-
-    let w_araddr   <- mkDWire(?);
-    let w_arprot   <- mkDWire(?);
-    PulseWire putWire <- mkPulseWire;
-    rule doPut (putWire && snk.canPut);
-      snk.put(fromAXIARLiteFlit(ARLiteFlit{araddr: w_araddr, arprot: w_arprot}));
-    endrule
-
-    method araddr(addr)   = action w_araddr <= addr; endaction;
-    method arprot(prot)   = action w_arprot <= prot; endaction;
-    method arvalid(valid) = action if (valid) putWire.send; endaction;
-    method arready        = snk.canPut;
-
-  endmodule
-endinstance
-
-instance ToAXIARLiteSlave#(FIFOF);
-  module toAXIARLiteSlave#(FIFOF#(t) ff)
-  (ARLiteSlave#(addr_)) provisos (FromAXIARLiteFlit#(t, addr_));
-
-    let w_araddr   <- mkDWire(?);
-    let w_arprot   <- mkDWire(?);
-    PulseWire enqWire <- mkPulseWire;
-    rule doEnq (enqWire && ff.notFull);
-      ff.enq(fromAXIARLiteFlit(ARLiteFlit{araddr: w_araddr, arprot: w_arprot}));
-    endrule
-
-    method araddr(addr)   = action w_araddr <= addr; endaction;
-    method arprot(prot)   = action w_arprot <= prot; endaction;
-    method arvalid(valid) = action if (valid) enqWire.send; endaction;
-    method arready        = ff.notFull;
 
   endmodule
 endinstance
