@@ -116,7 +116,7 @@ module axiSlave (`SLAVE_T);
 
 endmodule
 
-module exampleBus (Empty);
+module top (Empty);
   Vector#(NMASTERS, `MASTER_T) ms;
   Vector#(NSLAVES, `SLAVE_T)   ss;
   for (Integer i = 0; i < valueOf(NMASTERS); i = i + 1)

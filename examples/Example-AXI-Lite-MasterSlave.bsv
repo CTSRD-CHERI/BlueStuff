@@ -102,7 +102,7 @@ module axiLiteSlave (AXILiteSlave#(ADDR_sz, DATA_sz));
 
 endmodule
 
-module exampleSim (Empty);
+module top (Empty);
   AXILiteMaster#(ADDR_sz, DATA_sz) master <- axiLiteMaster;
   AXILiteSlave#(ADDR_sz, DATA_sz)  slave  <- axiLiteSlave;
   mkConnection(master, slave);

@@ -29,8 +29,9 @@
 BSC = bsc
 
 BLUESTUFFDIR = .
+AXIDIR = $(BLUESTUFFDIR)/AXI
 BLUEBASICSDIR = $(BLUESTUFFDIR)/BlueBasics
-BSVPATH = +:$(BLUEBASICSDIR)
+BSVPATH = +:$(AXIDIR):$(BLUEBASICSDIR)
 
 BSCFLAGS = -p $(BSVPATH)
 
@@ -42,10 +43,9 @@ SIMDIR = $(BUILDDIR)/simdir
 OUTPUTDIR = output
 
 BSCFLAGS += -bdir $(BDIR)
-BSCFLAGS += -simdir $(SIMDIR)
 
-BSCFLAGS += -show-schedule
 BSCFLAGS += +RTS -K512M -RTS
+BSCFLAGS += -show-schedule
 BSCFLAGS += -sched-dot
 BSCFLAGS += -show-range-conflict
 #BSCFLAGS += -show-rule-rel \* \*
@@ -57,20 +57,37 @@ CC = gcc-4.8
 CXX = g++-4.8
 
 EXAMPLESDIR = examples
-EXAMPLESSRC = $(notdir $(wildcard $(EXAMPLESDIR)/Example*.bsv))
-EXAMPLES = $(addprefix sim, $(basename $(EXAMPLESSRC)))
+SIMEXAMPLESSRC = $(notdir $(wildcard $(EXAMPLESDIR)/Example*.bsv))
+SIMEXAMPLES = $(addprefix sim, $(basename $(SIMEXAMPLESSRC)))
+VERILOGEXAMPLESSRC = $(wildcard $(EXAMPLESDIR)/VerilogExample*.bsv)
+VERILOGEXAMPLES = $(addprefix verilog, $(notdir $(basename $(VERILOGEXAMPLESSRC))))
 
+all: simExamples verilogExamples
 
-all: $(EXAMPLES)
+include .depend
+
+simExamples: $(SIMEXAMPLES)
 
 simExample%: $(EXAMPLESDIR)/Example%.bsv
-	mkdir -p $(OUTPUTDIR)/$@-info $(BDIR) $(SIMDIR) $(OUTPUTDIR)
-	$(BSC) -cpp -Xcpp -I. -info-dir $(OUTPUTDIR)/$@-info $(BSCFLAGS) -sim -g top -u $<
-	CC=$(CC) CXX=$(CXX) $(BSC) $(BSCFLAGS) -sim -e top -o $(OUTPUTDIR)/$@
+	mkdir -p $(OUTPUTDIR)/$@-info $(BDIR) $(SIMDIR)
+	$(BSC) -cpp -Xcpp -I. -info-dir $(OUTPUTDIR)/$@-info -simdir $(SIMDIR) $(BSCFLAGS) -sim -g top -u $<
+	CC=$(CC) CXX=$(CXX) $(BSC) -simdir $(SIMDIR) $(BSCFLAGS) -sim -e top -o $(OUTPUTDIR)/$@
 
-.PHONY: clean mrproper
+verilogExample-%.v:
+	mkdir -p $(OUTPUTDIR)/$@-info $(BDIR)
+	$(BSC) -info-dir $(OUTPUTDIR)/$@-info -vdir $(OUTPUTDIR) -opt-undetermined-vals -unspecified-to X $(BSCFLAGS) -verilog -g $(patsubst verilogExample-%.v, %, $@) -u $<
+
+.depend: $(patsubst %,.gatherdeps-%,$(notdir $(VERILOGEXAMPLESSRC)))
+	cat $^ > $@
+
+.gatherdeps-%: $(EXAMPLESDIR)/%
+	awk '/\<module/ {print "verilogExample-"$$2".v: $(EXAMPLESDIR)/$*"; print "verilogExamples: " "verilogExample-"$$2".v"}' $(EXAMPLESDIR)/$* > $@
+
+.PHONY: clean mrproper verilogExamples simExamples
 
 clean:
+	rm -f .depend
+	rm -f .gatherdeps-*
 	rm -fr $(BUILDDIR)
 
 mrproper: clean
