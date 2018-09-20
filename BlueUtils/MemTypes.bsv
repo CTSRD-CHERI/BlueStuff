@@ -26,17 +26,14 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
-import Printf :: *;
-import List :: *;
-
+import Virtualizable :: *;
 import AXI :: *;
-import BlueBasics :: *;
-import BlueUtilsTypes :: *;
-import SimUtils :: *;
-import ClientServer :: *;
 
-/////////////////////
-// Interface types //
+import ClientServer :: *;
+import Printf :: *;
+
+///////////////////////
+// Bit Plus One type //
 ////////////////////////////////////////////////////////////////////////////////
 
 // Type to hold an n-bit value initialized by a literal starting
@@ -55,7 +52,10 @@ instance Literal#(BitPO#(n));
       return BitPO { val: fromInteger(x) };
     else if (x == valueOf(TExp#(n)))
       return BitPO { val: 0 };
-    else return error(sprintf("Trying to initialize a BitPO#(%0d) with literal %0d. The range of valid values is %0d to %0d.",valueOf(n),x,1,valueOf(TExp#(n))));
+    else return error(sprintf(
+        "Trying to initialize a BitPO#(%0d) with literal %0d. "
+      + "The range of valid values is %0d to %0d.",
+        valueOf(n), x, 1, valueOf(TExp#(n))));
   endfunction
   function Bool inLiteralRange (BitPO#(n) _, Integer x);
     return (x > 0 && x <= valueOf(TExp#(n)));
@@ -71,27 +71,9 @@ endinstance
 // How many bits per byte
 typedef 8 BitsPerByte;
 
-//////////////////////////////////
-// Instruction Stream interface //
-//////////////////////////////////
-
-interface InstStream#(numeric type n);
-  method Bit#(n) peekInst();
-  method Action nextInst();
-endinterface
-
-//////////////////////////////////
-// Instruction memory interface //
-//////////////////////////////////
-
-interface IMem#(type inst_t);
-  method Action reqNext ();
-  method ActionValue#(inst_t) get ();
-endinterface
-
-///////////////////////////
-// Data memory interface //
-///////////////////////////
+//////////////////////
+// memory interface //
+////////////////////////////////////////////////////////////////////////////////
 
 // Mem request
 typedef union tagged {
@@ -105,6 +87,7 @@ typedef union tagged {
     Bit#(`DATA_BYTES) byteEnable;
     content_t data;
   } WriteReq;
+`undef DATA_BYTES
 } MemReq#(type addr_t, type content_t) deriving (Bits, FShow);
 
 instance NeedRsp#(MemReq#(a,b));
@@ -113,21 +96,24 @@ instance NeedRsp#(MemReq#(a,b));
   endfunction
 endinstance
 
-instance ToAXIAWLiteFlit#(MemReq#(addr_t, data_t), addr_sz) provisos (Bits#(addr_t, addr_sz));
+instance ToAXIAWLiteFlit#(MemReq#(addr_t, data_t), addr_sz)
+  provisos (Bits#(addr_t, addr_sz));
   function toAXIAWLiteFlit(x);
     let w = x.WriteReq;
     return AWLiteFlit {awaddr: pack(w.addr), awprot: 0};
   endfunction
 endinstance
 
-instance ToAXIWLiteFlit#(MemReq#(addr_t, data_t), data_sz) provisos (Bits#(data_t, data_sz));
+instance ToAXIWLiteFlit#(MemReq#(addr_t, data_t), data_sz)
+  provisos (Bits#(data_t, data_sz));
   function toAXIWLiteFlit(x);
     let w = x.WriteReq;
     return WLiteFlit {wdata: pack(w.data), wstrb: w.byteEnable};
   endfunction
 endinstance
 
-instance ToAXIARLiteFlit#(MemReq#(addr_t, data_t), addr_sz) provisos (Bits#(addr_t, addr_sz));
+instance ToAXIARLiteFlit#(MemReq#(addr_t, data_t), addr_sz)
+  provisos (Bits#(addr_t, addr_sz));
   function toAXIARLiteFlit(x);
     let r = x.ReadReq;
     return ARLiteFlit {araddr: pack(r.addr), arprot: 0};
@@ -140,7 +126,8 @@ typedef union tagged {
   void Failure;
 } MemRsp#(type content_t) deriving (Bits, FShow);
 
-instance FromAXIRLiteFlit#(MemRsp#(data_t), data_sz) provisos (Bits#(data_t, data_sz));
+instance FromAXIRLiteFlit#(MemRsp#(data_t), data_sz)
+  provisos (Bits#(data_t, data_sz));
   function fromAXIRLiteFlit(x) = ReadRsp(unpack(x.rdata));
 endinstance
 
@@ -149,19 +136,5 @@ instance FromAXIBLiteFlit#(MemRsp#(data_t));
 endinstance
 
 // Mem interface
-typedef Server#(MemReq#(addr_t, content_t), MemRsp#(content_t)) Mem#(type addr_t, type content_t);
-typedef Mem DMem;
-
-interface Mem2#(type addr_t, type t0, type t1);
-  interface Mem#(addr_t, t0) p0;
-  interface Mem#(addr_t, t1) p1;
-endinterface
-
-///////////////////////////
-// Full memory interface //
-///////////////////////////
-
-interface FullMem#(type addr_t, type inst_t, type data_t);
-  interface DMem#(addr_t, data_t) data;
-  interface IMem#(inst_t) inst;
-endinterface
+typedef Server#(MemReq#(addr_t, content_t), MemRsp#(content_t))
+  Mem#(type addr_t, type content_t);

@@ -26,14 +26,30 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
-package BlueUtils;
+import MemTypes :: *;
+import MemBRAM :: *;
+import MemSim :: *;
 
-import SimpleUtils :: *;
-import SimUtils :: *;
-import Mem :: *;
+///////////////////////////
+// 2 ports shared memory //
+////////////////////////////////////////////////////////////////////////////////
 
-export SimpleUtils :: *;
-export SimUtils :: *;
-export Mem :: *;
-
-endpackage
+module mkSharedMem2#(Integer size, String file) (Array#(Mem#(addr_t, data_t)))
+provisos(
+  Bits#(addr_t, addr_sz), Bits#(data_t, data_sz),
+  Add#(idx_sz, TLog#(TDiv#(data_sz, BitsPerByte)), addr_sz),
+  Log#(TAdd#(1, TDiv#(data_sz, 8)), TAdd#(TLog#(TDiv#(data_sz, 8)), 1)),
+  // FShow instances
+  FShow#(addr_t), FShow#(data_t)
+);
+  if (genC) begin
+    Mem#(addr_t, data_t) mem[2] <- mkMemSim(2, size, file);
+    return mem;
+  end else begin
+    BRAM2#(idx_sz, data_sz, idx_sz, data_sz) m <- mkAlteraBRAM2(size, file);
+    Mem#(addr_t, data_t) mem[2];
+    mem[0] <- wrapUnaligned("port0", m.p0);
+    mem[1] <- wrapUnaligned("port1", m.p1);
+    return mem;
+  end
+endmodule

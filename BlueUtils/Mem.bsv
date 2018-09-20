@@ -26,14 +26,16 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
-package BlueUtils;
+package Mem;
 
-import SimpleUtils :: *;
-import SimUtils :: *;
-import Mem :: *;
+import MemBRAM :: *;
+import MemSim :: *;
+import MemTypes :: *;
+import MemUtils :: *;
 
-export SimpleUtils :: *;
-export SimUtils :: *;
-export Mem :: *;
+export MemBRAM :: *;
+export MemSim :: *;
+export MemTypes :: *;
+export MemUtils :: *;
 
 endpackage
