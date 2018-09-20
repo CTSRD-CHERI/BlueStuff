@@ -57,18 +57,17 @@ CC = gcc-4.8
 CXX = g++-4.8
 
 EXAMPLESDIR = examples
-SIMEXAMPLESSRC = $(notdir $(wildcard $(EXAMPLESDIR)/Example*.bsv))
-SIMEXAMPLES = $(addprefix sim, $(basename $(SIMEXAMPLESSRC)))
+SIMEXAMPLESSRC = $(wildcard $(EXAMPLESDIR)/Example-*.bsv)
+SIMEXAMPLES = $(addprefix sim, $notdir($(basename $(SIMEXAMPLESSRC))))
 VERILOGEXAMPLESSRC = $(wildcard $(EXAMPLESDIR)/VerilogExample*.bsv)
 VERILOGEXAMPLES = $(addprefix verilog, $(notdir $(basename $(VERILOGEXAMPLESSRC))))
 
 all: simExamples verilogExamples
 
-include .depend
+include .simExamples
+include .verilogExamples
 
-simExamples: $(SIMEXAMPLES)
-
-simExample%: $(EXAMPLESDIR)/Example%.bsv
+simExample-%: $(EXAMPLESDIR)/Example-%.bsv
 	mkdir -p $(OUTPUTDIR)/$@-info $(BDIR) $(SIMDIR)
 	$(BSC) -cpp -Xcpp -I. -info-dir $(OUTPUTDIR)/$@-info -simdir $(SIMDIR) $(BSCFLAGS) -sim -g top -u $<
 	CC=$(CC) CXX=$(CXX) $(BSC) -simdir $(SIMDIR) $(BSCFLAGS) -sim -e top -o $(OUTPUTDIR)/$@
@@ -77,18 +76,25 @@ verilogExample-%.v:
 	mkdir -p $(OUTPUTDIR)/$@-info $(BDIR)
 	$(BSC) -info-dir $(OUTPUTDIR)/$@-info -vdir $(OUTPUTDIR) -opt-undetermined-vals -unspecified-to X $(BSCFLAGS) -verilog -g $(patsubst verilogExample-%.v, %, $@) -u $<
 
-.depend: $(patsubst %,.gatherdeps-%,$(notdir $(VERILOGEXAMPLESSRC)))
+#.simExamples: $(patsubst Example-%, %, $(notdir $(SIMEXAMPLESSRC)))
+#	echo "simExamples: $^" > .simExamples
+.simExamples: $(SIMEXAMPLESSRC)
+	echo "simExamples: $^" > .simExamples
+	for f in $^; do tmp=`basename $$f .bsv`; echo "simExample-$${tmp#"Example-"}: $$f" >> .simExamples; done
+
+.verilogExamples: $(patsubst %, .gatherModules-%, $(notdir $(VERILOGEXAMPLESSRC)))
 	cat $^ > $@
 
-.gatherdeps-%: $(EXAMPLESDIR)/%
+.gatherModules-%: $(EXAMPLESDIR)/%
 	awk '/\<module/ {print "verilogExample-"$$2".v: $(EXAMPLESDIR)/$*"; print "verilogExamples: " "verilogExample-"$$2".v"}' $(EXAMPLESDIR)/$* > $@
 
 .PHONY: clean mrproper verilogExamples simExamples
 
 clean:
-	rm -f .depend
-	rm -f .gatherdeps-*
-	rm -fr $(BUILDDIR)
+	rm -f .simExamples
+	rm -f .verilogExamples
+	rm -f .gatherModules-*
+	rm -f -r $(BUILDDIR)
 
 mrproper: clean
-	rm -fr $(OUTPUTDIR)
+	rm -f -r $(OUTPUTDIR)
