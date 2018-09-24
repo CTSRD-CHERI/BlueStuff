@@ -49,6 +49,32 @@ endinterface
 /////////////////////////
 // Altera BRAM wrapper //
 ////////////////////////////////////////////////////////////////////////////////
+import "BVI" BlueUtils_BRAM2 =
+module mkAlteraBRAM#(Integer size, String filename)(BRAM#(aw,dw));
+
+  // XXX check  for bytes / bits
+  Integer depth = size/valueOf(TDiv#(dw,8));
+
+  // BVI statements
+  default_clock clk(CLK, (*unused*) clk_gate);
+  default_reset no_reset;
+
+  // parameters
+  parameter widthad_a = log2(depth);
+  parameter width_a = valueOf(dw);
+  parameter numwords_a = depth;
+  parameter width_byteena_a = valueOf(TDiv#(dw,8));
+  parameter init_file = filename;
+
+  method put(wen_a, address_a, data_a) enable (en_a);
+  method q_a peek();
+
+  // schedule
+  schedule (put) CF (peek);
+  schedule (put) C (put);
+  schedule (peek) CF (peek, put);
+
+endmodule
 
 import "BVI" BlueUtils_BRAM2 =
 module mkAlteraBRAM2#(Integer size, String filename)(BRAM2#(a0w,d0w,a1w,d1w));

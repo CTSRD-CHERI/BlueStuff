@@ -35,29 +35,9 @@ import GetPut :: *;
 import ClientServer :: *;
 import FIFOF :: *;
 
-///////////////////////////
-// 2 ports shared memory //
+////////////////////////////
+// Mem to AXILite wrapper //
 ////////////////////////////////////////////////////////////////////////////////
-
-module mkSharedMem2#(Integer size, String file) (Array#(Mem#(addr_t, data_t)))
-provisos(
-  Bits#(addr_t, addr_sz), Bits#(data_t, data_sz),
-  Add#(idx_sz, TLog#(TDiv#(data_sz, 8)), addr_sz),
-  Log#(TAdd#(1, TDiv#(data_sz, 8)), TAdd#(TLog#(TDiv#(data_sz, 8)), 1)),
-  // FShow instances
-  FShow#(addr_t), FShow#(data_t)
-);
-  if (genC) begin
-    Mem#(addr_t, data_t) mem[2] <- mkMemSim(2, size, file);
-    return mem;
-  end else begin
-    BRAM2#(idx_sz, data_sz, idx_sz, data_sz) m <- mkAlteraBRAM2(size, file);
-    Mem#(addr_t, data_t) mem[2];
-    mem[0] <- wrapUnaligned("port0", m.p0);
-    mem[1] <- wrapUnaligned("port1", m.p1);
-    return mem;
-  end
-endmodule
 
 module mkMemToAXILiteSlave#(Mem#(addr_t, data_t) mem)
   (AXILiteSlave#(addr_sz, data_sz))
@@ -90,6 +70,62 @@ module mkMemToAXILiteSlave#(Mem#(addr_t, data_t) mem)
     shim.master.r.put(RLiteFlit{rdata: pack(rsp.ReadRsp), rresp: OKAY});
   endrule
   return shim.slave;
+endmodule
+
+////////////////
+// 1 port Mem //
+////////////////////////////////////////////////////////////////////////////////
+
+module mkMem#(Integer size, String file) (Mem#(addr_t, data_t))
+provisos(
+  Bits#(addr_t, addr_sz), Bits#(data_t, data_sz),
+  Add#(idx_sz, TLog#(TDiv#(data_sz, 8)), addr_sz),
+  Log#(TAdd#(1, TDiv#(data_sz, 8)), TAdd#(TLog#(TDiv#(data_sz, 8)), 1)),
+  // FShow instances
+  FShow#(addr_t), FShow#(data_t)
+);
+  if (genC) begin
+    Mem#(addr_t, data_t) mem[1] <- mkMemSim(1, size, file);
+    return mem[0];
+  end else begin
+    BRAM#(idx_sz, data_sz) m <- mkAlteraBRAM(size, file);
+    Mem#(addr_t, data_t) mem <- wrapUnaligned("port 0", m);
+    return mem;
+  end
+endmodule
+
+module mkAXILiteMem#(Integer size, String file) (AXILiteSlave#(a_sz, d_sz))
+  provisos (
+    Log#(TAdd#(1, TDiv#(d_sz, 8)), TAdd#(TLog#(TDiv#(d_sz, 8)), 1)),
+    Add#(a__, TLog#(TDiv#(d_sz, 8)), a_sz)
+  );
+  Mem#(Bit#(a_sz), Bit#(d_sz)) mem <- mkMem(size, file);
+  let ifc <- mkMemToAXILiteSlave(mem);
+  return ifc;
+endmodule
+
+///////////////////////////
+// 2 ports shared memory //
+////////////////////////////////////////////////////////////////////////////////
+
+module mkSharedMem2#(Integer size, String file) (Array#(Mem#(addr_t, data_t)))
+provisos(
+  Bits#(addr_t, addr_sz), Bits#(data_t, data_sz),
+  Add#(idx_sz, TLog#(TDiv#(data_sz, 8)), addr_sz),
+  Log#(TAdd#(1, TDiv#(data_sz, 8)), TAdd#(TLog#(TDiv#(data_sz, 8)), 1)),
+  // FShow instances
+  FShow#(addr_t), FShow#(data_t)
+);
+  if (genC) begin
+    Mem#(addr_t, data_t) mem[2] <- mkMemSim(2, size, file);
+    return mem;
+  end else begin
+    BRAM2#(idx_sz, data_sz, idx_sz, data_sz) m <- mkAlteraBRAM2(size, file);
+    Mem#(addr_t, data_t) mem[2];
+    mem[0] <- wrapUnaligned("port0", m.p0);
+    mem[1] <- wrapUnaligned("port1", m.p1);
+    return mem;
+  end
 endmodule
 
 module mkAXILiteSharedMem2#(Integer size, String file)
