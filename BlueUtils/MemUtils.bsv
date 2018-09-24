@@ -29,6 +29,11 @@
 import MemTypes :: *;
 import MemBRAM :: *;
 import MemSim :: *;
+import AXI :: *;
+import SourceSink :: *;
+import GetPut :: *;
+import ClientServer :: *;
+import FIFOF :: *;
 
 ///////////////////////////
 // 2 ports shared memory //
@@ -37,7 +42,7 @@ import MemSim :: *;
 module mkSharedMem2#(Integer size, String file) (Array#(Mem#(addr_t, data_t)))
 provisos(
   Bits#(addr_t, addr_sz), Bits#(data_t, data_sz),
-  Add#(idx_sz, TLog#(TDiv#(data_sz, BitsPerByte)), addr_sz),
+  Add#(idx_sz, TLog#(TDiv#(data_sz, 8)), addr_sz),
   Log#(TAdd#(1, TDiv#(data_sz, 8)), TAdd#(TLog#(TDiv#(data_sz, 8)), 1)),
   // FShow instances
   FShow#(addr_t), FShow#(data_t)
@@ -52,4 +57,50 @@ provisos(
     mem[1] <- wrapUnaligned("port1", m.p1);
     return mem;
   end
+endmodule
+
+module mkMemToAXILiteSlave#(Mem#(addr_t, data_t) mem)
+  (AXILiteSlave#(addr_sz, data_sz))
+  provisos (Bits#(addr_t, addr_sz), Bits#(data_t, data_sz));
+  let shim <- mkAXILiteShim;
+  let wRsp <- mkFIFOF;
+  rule writeReq;
+    let awflit <- shim.master.aw.get;
+    let  wflit <- shim.master.w.get;
+    mem.request.put(WriteReq {
+      addr: unpack(awflit.awaddr),
+      byteEnable: unpack(wflit.wstrb),
+      data: unpack(wflit.wdata)
+    });
+    wRsp.enq(BLiteFlit {bresp: OKAY});
+  endrule
+  rule writeRsp;
+    wRsp.deq;
+    shim.master.b.put(wRsp.first);
+  endrule
+  rule readReq;
+    let arflit <- shim.master.ar.get;
+    mem.request.put(ReadReq {
+      addr: unpack(arflit.araddr),
+      numBytes: fromInteger(valueOf(data_sz)/8)}
+    );
+  endrule
+  rule readRsp;
+    let rsp <- mem.response.get;
+    shim.master.r.put(RLiteFlit{rdata: pack(rsp.ReadRsp), rresp: OKAY});
+  endrule
+  return shim.slave;
+endmodule
+
+module mkAXILiteSharedMem2#(Integer size, String file)
+  (Array#(AXILiteSlave#(addr_sz, data_sz)))
+  provisos (
+    Log#(TAdd#(1, TDiv#(data_sz, 8)), TAdd#(TLog#(TDiv#(data_sz, 8)), 1)),
+    Add#(a__, TLog#(TDiv#(data_sz, 8)), addr_sz)
+  );
+  Mem#(Bit#(addr_sz), Bit#(data_sz)) mem[2] <- mkSharedMem2(size, file);
+  AXILiteSlave#(addr_sz, data_sz) ifc[2];
+  ifc[0] <- mkMemToAXILiteSlave(mem[0]);
+  ifc[1] <- mkMemToAXILiteSlave(mem[1]);
+  return ifc;
 endmodule
