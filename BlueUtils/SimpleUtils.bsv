@@ -33,6 +33,32 @@ import Printf :: *;
 // Architectural state helpers
 ////////////////////////////////////////////////////////////////////////////////
 
+// Architectural register with a commit method separate from the write
+interface ArchReg#(type t);
+  method t _read;
+  method Action _write (t x);
+  method Action commit;
+  interface WriteOnly#(t) early;
+  interface Reg#(t) late;
+endinterface
+module mkArchReg#(t resetVal) (ArchReg#(t)) provisos (Bits#(t, n));
+  Reg#(t)         arch   <- mkConfigReg(resetVal);
+  Reg#(Maybe#(t)) tmp[4] <- mkConfigCReg(4, Invalid);
+  method  _read = arch._read;
+  method _write(x) = tmp[1]._write(Valid(x));
+  method Action commit = action if (isValid(tmp[3]._read)) begin
+    arch <= tmp[3]._read.Valid;
+    tmp[3] <= Invalid;
+  end endaction;
+  interface WriteOnly early;
+    method _write(x) = tmp[0]._write(Valid(x));
+  endinterface
+  interface Reg late;
+    method  _read = isValid(tmp[2]._read) ? tmp[2]._read.Valid : arch._read;
+    method _write(x) = tmp[2]._write(Valid(x));
+  endinterface
+endmodule
+
 // Read-only register
 module mkROReg#(parameter a v) (Reg#(a));
   method Action _write (a _) = action endaction;
@@ -100,22 +126,6 @@ module mkConfigCReg#(Integer n, t dflt) (Array#(Reg#(t))) provisos (Bits#(t, tw)
     endinterface;
   end
   return ifc;
-endmodule
-
-// PC register with "beginning of the cycle" + "next" interfaces
-interface PC#(type a);
-  method Action _write(a x);
-  method a _read();
-  interface Reg#(a) next;
-endinterface
-module mkPC#(a startVal) (PC#(a)) provisos(Bits#(a, n));
-  Reg#(a) r[3] <- mkConfigCReg(3,startVal);
-  method  _read = r[0]._read;
-  method _write = r[1]._write;
-  interface next = interface Reg;
-    method     _read = r[2]._read;
-    method _write(x) = r[0]._write(x);
-  endinterface;
 endmodule
 
 // Combinational primitives
