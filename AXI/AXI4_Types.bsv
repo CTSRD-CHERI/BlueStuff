@@ -497,3 +497,76 @@ instance Connectable#(AXISlave#(a, b, c, d), AXIMaster#(a, b, c, d));
     mkConnection(m, s);
   endmodule
 endinstance
+
+///////////////////////////////////
+// AXI write channel helper type //
+////////////////////////////////////////////////////////////////////////////////
+
+typedef union tagged {
+  Tuple2#(AWFlit#(id_, addr_, user_), WFlit#(data_, user_)) FirstFlit;
+  WFlit#(data_, user_) OtherFlit;
+} AXIWriteFlit#(
+  numeric type id_,
+  numeric type addr_,
+  numeric type data_,
+  numeric type user_) deriving (Bits);
+instance Routable#(AXIWriteFlit#(id_, addr_, data_, user_),
+                   BFlit#(id_, user_),
+                   Bit#(addr_));
+  function routingField(x) = case (x) matches
+    tagged FirstFlit {.aw, .w}: routingField(aw);
+    default: ?;
+  endcase;
+  function noRouteFound(x) = case (x) matches
+    tagged FirstFlit {.aw, .w}: noRouteFound(aw);
+    default: ?;
+  endcase;
+endinstance
+instance DetectLast#(AXIWriteFlit#(id_, addr_, data_, user_));
+  function detectLast(x) = case (x) matches
+    tagged FirstFlit {.aw, .w}: detectLast(w);
+    tagged OtherFlit .w: detectLast(w);
+  endcase;
+endinstance
+
+////////////////////////////
+// ExpandReqRsp instances //
+////////////////////////////////////////////////////////////////////////////////
+
+instance ExpandReqRsp#(
+  AXIWriteFlit#(id_, addr_, data_, user_),
+  AXIWriteFlit#(sid_, addr_, data_, user_),
+  BFlit#(sid_, user_),
+  BFlit#(id_, user_),
+  Bit#(n)) provisos (Add#(id_, n, sid_));
+  function expand(r, x) = case (r) matches
+    tagged FirstFlit {.aw, .w}: FirstFlit(tuple2(AWFlit{
+      awid: {x, aw.awid}, awaddr: aw.awaddr, awlen: aw.awlen, awsize: aw.awsize,
+      awburst: aw.awburst, awlock: aw.awlock, awcache: aw.awcache,
+      awprot: aw.awprot, awqos: aw.awqos, awregion: aw.awregion,
+      awuser: aw.awuser
+    }, w));
+    tagged OtherFlit .f: OtherFlit(f);
+  endcase;
+  function shrink(r) = tuple2(BFlit{
+    bid: truncate(r.bid), bresp: r.bresp, buser: r.buser
+  }, truncateLSB(r.bid));
+endinstance
+
+instance ExpandReqRsp#(
+  ARFlit#(id_, addr_, user_),
+  ARFlit#(sid_, addr_, user_),
+  RFlit#(sid_, data_, user_),
+  RFlit#(id_, data_, user_),
+  Bit#(n)) provisos (Add#(id_, n, sid_));
+  function expand(ar, x) = ARFlit{
+    arid: {x, ar.arid}, araddr: ar.araddr, arlen: ar.arlen, arsize: ar.arsize,
+    arburst: ar.arburst, arlock: ar.arlock, arcache: ar.arcache,
+    arprot: ar.arprot, arqos: ar.arqos, arregion: ar.arregion,
+    aruser: ar.aruser
+  };
+  function shrink(r) = tuple2(RFlit{
+    rid: truncate(r.rid), rdata: r.rdata, rresp: r.rresp,
+    rlast: r.rlast, ruser: r.ruser
+  }, truncateLSB(r.rid));
+endinstance

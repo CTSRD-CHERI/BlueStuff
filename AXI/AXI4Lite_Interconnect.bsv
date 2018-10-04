@@ -31,49 +31,12 @@ import Vector :: *;
 import Printf :: *;
 
 import AXI4Lite_Types :: *;
+import AXI4Lite_Utils :: *;
 import SourceSink :: *;
 import MasterSlave :: *;
 import ListExtra :: *;
 import Interconnect :: *;
 import Routable :: *;
-
-///////////////////////////////
-// AXI write channel helpers //
-////////////////////////////////////////////////////////////////////////////////
-
-typedef struct {
-  AWLiteFlit#(addr_) aw;
-  WLiteFlit#(data_)  w;
-} WriteFlit#(numeric type addr_, numeric type data_) deriving (Bits, FShow);
-instance Routable#(WriteFlit#(addr_, data_), BLiteFlit, Bit#(addr_));
-  function routingField(x) = routingField(x.aw);
-  function noRouteFound(x) = noRouteFound(x.aw);
-endinstance
-instance DetectLast#(WriteFlit#(addr_, data_));
-  function detectLast(x) = detectLast(x.w);
-endinstance
-
-function Source#(WriteFlit#(a, b)) mergeWrite(
-  Source#(AWLiteFlit#(a)) aw,
-  Source#(WLiteFlit#(b)) w) = interface Source;
-    method canGet = aw.canGet && w.canGet;
-    method peek   = WriteFlit { aw: aw.peek, w: w.peek };
-    method get    = actionvalue
-      let flit_aw <- aw.get;
-      let flit_w  <- w.get;
-      return WriteFlit { aw: flit_aw, w: flit_w };
-    endactionvalue;
-  endinterface;
-
-function Sink#(WriteFlit#(a, b)) splitWrite(
-  Sink#(AWLiteFlit#(a)) aw,
-  Sink#(WLiteFlit#(b)) w) = interface Sink;
-    method canPut = aw.canPut && w.canPut;
-    method put(x) = action
-      aw.put(x.aw);
-      w.put(x.w);
-    endaction;
-  endinterface;
 
 //////////////////
 // AXI Lite bus //
@@ -91,7 +54,7 @@ module mkAXILiteBus#(
   );
 
   // prepare masters
-  Vector#(nMasters, Master#(WriteFlit#(addr_, data_), BLiteFlit))
+  Vector#(nMasters, Master#(AXILiteWriteFlit#(addr_, data_), BLiteFlit))
     write_masters = newVector;
   Vector#(nMasters, Master#(ARLiteFlit#(addr_), RLiteFlit#(data_)))
     read_masters  = newVector;
@@ -99,7 +62,7 @@ module mkAXILiteBus#(
     Bit#(TLog#(nMasters)) mid = fromInteger(i);
     // merge from write masters
     write_masters[i] = interface Master;
-      interface source = mergeWrite(masters[i].aw, masters[i].w);
+      interface source = mergeLiteWrite(masters[i].aw, masters[i].w);
       interface sink   = masters[i].b;
     endinterface;
     read_masters[i]  = interface Master;
@@ -109,14 +72,14 @@ module mkAXILiteBus#(
   end
 
   // prepare slaves
-  Vector#(nSlaves, Slave#(WriteFlit#(addr_, data_), BLiteFlit))
+  Vector#(nSlaves, Slave#(AXILiteWriteFlit#(addr_, data_), BLiteFlit))
     write_slaves = newVector;
   Vector#(nSlaves, Slave#(ARLiteFlit#(addr_), RLiteFlit#(data_)))
     read_slaves   = newVector;
   for (Integer i = 0; i < valueOf(nSlaves); i = i + 1) begin  
     // split to write slaves
     write_slaves[i] = interface Slave;
-      interface sink   = splitWrite(slaves[i].aw, slaves[i].w);
+      interface sink   = splitLiteWrite(slaves[i].aw, slaves[i].w);
       interface source = slaves[i].b;
     endinterface;
     read_slaves[i]  = interface Slave;

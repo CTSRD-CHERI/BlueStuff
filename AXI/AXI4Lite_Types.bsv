@@ -356,3 +356,20 @@ instance Connectable#(AXILiteSlave#(a, b), AXILiteMaster#(a, b));
     mkConnection(m, s);
   endmodule
 endinstance
+
+///////////////////////
+// AXI write channel //
+////////////////////////////////////////////////////////////////////////////////
+
+typedef struct {
+  AWLiteFlit#(addr_) aw;
+  WLiteFlit#(data_)  w;
+} AXILiteWriteFlit#(numeric type addr_, numeric type data_)
+deriving (Bits, FShow);
+instance Routable#(AXILiteWriteFlit#(addr_, data_), BLiteFlit, Bit#(addr_));
+  function routingField(x) = routingField(x.aw);
+  function noRouteFound(x) = noRouteFound(x.aw);
+endinstance
+instance DetectLast#(AXILiteWriteFlit#(addr_, data_));
+  function detectLast(x) = detectLast(x.w);
+endinstance

@@ -49,6 +49,19 @@ typeclass DetectLast#(type a);
   function Bool detectLast (a val);
 endtypeclass
 
+////////////////////////////
+// ExpandReqRsp typeclass //
+////////////////////////////////////////////////////////////////////////////////
+
+typeclass ExpandReqRsp#(type req_a, type req_b, type rsp_a, type rsp_b, type t)
+  dependencies (
+    (req_a, req_b, t) determines (rsp_a, rsp_b),
+    rsp_a determines (req_a, req_b, rsp_b, t)
+  );
+  function req_b expand(req_a r, t x);
+  function Tuple2#(rsp_b, t) shrink(rsp_a r);
+endtypeclass
+
 ///////////////////////
 // Memory Range type //
 ////////////////////////////////////////////////////////////////////////////////

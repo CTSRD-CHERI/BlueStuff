@@ -100,3 +100,29 @@ module toAXILiteSlaveSynth#(AXILiteSlave#(addr_, data_) master)
   interface ar = arifc;
   interface r  = rifc;
 endmodule
+
+///////////////////////////////
+// AXI Write channel helpers //
+////////////////////////////////////////////////////////////////////////////////
+
+function Source#(AXILiteWriteFlit#(a, b)) mergeLiteWrite(
+  Source#(AWLiteFlit#(a)) aw,
+  Source#(WLiteFlit#(b)) w) = interface Source;
+    method canGet = aw.canGet && w.canGet;
+    method peek   = AXILiteWriteFlit { aw: aw.peek, w: w.peek };
+    method get    = actionvalue
+      let flit_aw <- aw.get;
+      let flit_w  <- w.get;
+      return AXILiteWriteFlit { aw: flit_aw, w: flit_w };
+    endactionvalue;
+  endinterface;
+
+function Sink#(AXILiteWriteFlit#(a, b)) splitLiteWrite(
+  Sink#(AWLiteFlit#(a)) aw,
+  Sink#(WLiteFlit#(b)) w) = interface Sink;
+    method canPut = aw.canPut && w.canPut;
+    method put(x) = action
+      aw.put(x.aw);
+      w.put(x.w);
+    endaction;
+  endinterface;

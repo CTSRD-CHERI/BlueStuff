@@ -42,6 +42,103 @@ import FIFOF :: *;
 import SpecialFIFOs :: *;
 
 ///////////////////////////////
+// AXI Write channel helpers //
+////////////////////////////////////////////////////////////////////////////////
+
+module mergeWrite#(
+  Source#(AWFlit#(id_, addr_, user_)) aw,
+  Source#(WFlit#(data_, user_)) w)
+  (Source#(AXIWriteFlit#(id_, addr_, data_, user_)));
+
+  let flitLeft <- mkReg(0);
+  let doGet    <- mkPulseWire;
+
+  let outflit  = (flitLeft == 0) ?
+    FirstFlit(tuple2(aw.peek, w.peek)) :
+    OtherFlit(w.peek);
+  let canDoGet = (flitLeft == 0) ? aw.canGet && w.canGet : w.canGet;
+
+  rule genFirst (doGet && flitLeft == 0);
+    let awflit <- aw.get;
+    let _      <- w.get;
+    // burst length given by AxLEN + 1
+    flitLeft <= awflit.awlen;
+  endrule
+
+  rule genOther (doGet && flitLeft > 0);
+    let wflit <- w.get;
+    // decrement flit counter
+    flitLeft <= flitLeft - 1;
+    // check for error conditions
+    if (wflit.wlast && flitLeft > 1) begin
+      $display("Expecting more write data flits");
+      $finish(0);
+    end else if (!wflit.wlast && flitLeft == 1) begin
+      $display("Expecting last write data flit");
+      $finish(0);
+    end
+  endrule
+
+  method peek   if (canDoGet) = outflit;
+  method get    if (canDoGet) = actionvalue
+    doGet.send;
+    return outflit;
+  endactionvalue;
+  method canGet = canDoGet;
+endmodule
+
+module splitWrite#(
+  Sink#(AWFlit#(id_, addr_, user_)) aw,
+  Sink#(WFlit#(data_, user_)) w)
+  (Sink#(AXIWriteFlit#(id_, addr_, data_, user_)));
+
+  let flitLeft <- mkReg(0);
+  let doPut <- mkWire;
+  let canDoPut = (flitLeft == 0) ? aw.canPut && w.canPut : w.canPut;
+
+  rule putFirst (flitLeft == 0);
+    case (doPut) matches
+      tagged FirstFlit{.awflit, .wflit}: begin
+        aw.put(awflit);
+        w.put(wflit);
+        // burst length given by AxLEN + 1
+        flitLeft <= awflit.awlen;
+      end
+      default: begin
+        $display("Expecting FirstFlit of merged write");
+        $finish(0);
+      end
+    endcase
+  endrule
+
+  rule putOther (flitLeft > 0);
+    case (doPut) matches
+      tagged OtherFlit .wflit: begin
+        w.put(wflit);
+        // decrement flit counter
+        flitLeft <= flitLeft - 1;
+        // check for error conditions
+        if (wflit.wlast && flitLeft > 1) begin
+          $display("Expecting more write data flits");
+          $finish(0);
+        end else if (!wflit.wlast && flitLeft == 1) begin
+          $display("Expecting last write data flit");
+          $finish(0);
+        end
+      end
+      default: begin
+        $display("Expecting OtherFlit of merged write");
+        $finish(0);
+      end
+    endcase
+  endrule
+
+  method put(x) if (canDoPut) = action doPut <= x; endaction;
+  method canPut = canDoPut;
+
+endmodule
+
+///////////////////////////////
 // AXI Shim Master <-> Slave //
 ////////////////////////////////////////////////////////////////////////////////
 
