@@ -35,10 +35,43 @@ import AXI4Lite :: *;
 import SourceSink :: *;
 import MasterSlave :: *;
 
+// C imports
+import "BDPI" function ActionValue#(Bit#(64)) serv_socket_create(String name, Bit#(32) dflt_port);
+import "BDPI" function Action serv_socket_init(Bit#(64) ptr);
+import "BDPI" function ActionValue#(Bit#(32)) serv_socket_get8(Bit#(64) ptr);
+import "BDPI" function ActionValue#(Bool) serv_socket_put8(Bit#(64) ptr, Bit#(8) b);
+
 // simple Slave interface
 ////////////////////////////////////////////////////////////////////////////////
 
 typedef Slave#(Bit#(8), Bit#(8)) CharIO;
+
+module mkSocketCharIO#(String name, Integer dflt_port) (CharIO);
+  // prepare C socket
+  Reg#(Bool)      is_initialized <- mkReg(False);
+  Reg#(Bit#(64)) serv_socket_ptr <- mkRegU;
+  rule do_init (!is_initialized);
+    let tmp <- serv_socket_create(name, fromInteger(dflt_port));
+    serv_socket_init(tmp);
+    serv_socket_ptr <= tmp;
+    is_initialized  <= True;
+  endrule
+  // output char
+  let outff <- mkBypassFIFOF;
+  rule outputChar (is_initialized);
+    let sent <- serv_socket_put8(serv_socket_ptr, outff.first);
+    if (sent) outff.deq;
+  endrule
+  // input char
+  let inff  <- mkBypassFIFOF;
+  rule inputChar (is_initialized);
+    let tmp <- serv_socket_get8(serv_socket_ptr);
+    if (tmp != -1) inff.enq(truncate(tmp));
+  endrule
+  // interface
+  interface source = toSource(inff);
+  interface sink   = toSink(outff);
+endmodule
 
 module mkFileCharIOCore#(File inf, File outf) (CharIO);
   let inff  <- mkBypassFIFOF;
@@ -111,6 +144,14 @@ module mkAXILiteCharIOCore#(CharIO charIO) (AXILiteSlave#(addr_sz, data_sz))
     rRspFF.deq;
   endrule
   return shim.slave;
+endmodule
+
+module mkAXILiteSocketCharIO#(String name, Integer dflt_port)
+  (AXILiteSlave#(addr_sz, data_sz))
+  provisos (Add#(8, a__, data_sz));
+  let charIO <- mkSocketCharIO(name, dflt_port);
+  let core   <- mkAXILiteCharIOCore(charIO);
+  return core;
 endmodule
 
 module mkAXILiteFileCharIO#(String inf, String outf)

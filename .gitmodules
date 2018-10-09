@@ -1,3 +1,6 @@
 [submodule "BlueBasics"]
 	path = BlueBasics
 	url = https://github.com/CTSRD-CHERI/BlueBasics.git
+[submodule "SocketPacketUtils"]
+	path = SocketPacketUtils
+	url = https://github.com/CTSRD-CHERI/SocketPacketUtils.git
