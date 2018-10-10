@@ -65,7 +65,7 @@ import "BDPI" mem_write  = function Action mem_write(
                                Bits#(bet, bew),
                                Bits#(dt, dw));
 
-module mkMemSim#(Integer n, Integer size, String file)
+module mkMemSimWithOffset#(Integer n, Integer offset, Integer size, String file)
   (Array#(Mem#(addr_t, data_t)))
   provisos (Bits#(addr_t, addr_sz), Bits#(data_t, data_sz));
 
@@ -85,7 +85,7 @@ module mkMemSim#(Integer n, Integer size, String file)
     ifcs[i] = interface Server;
       interface request = interface Put;
         method put (req) if (isInitialized) = action
-          case (req) matches
+          case (offsetMemReq(req, fromInteger(-offset))) matches
             tagged ReadReq .r: begin
               let addr = r.addr;
               let nbytes = readBitPO(r.numBytes);
@@ -112,4 +112,10 @@ module mkMemSim#(Integer n, Integer size, String file)
 
   return ifcs;
 
+endmodule
+module mkMemSim#(Integer n, Integer size, String file)
+  (Array#(Mem#(addr_t, data_t)))
+  provisos (Bits#(addr_t, addr_sz), Bits#(data_t, data_sz));
+  let mem <- mkMemSimWithOffset(n, 0, size, file);
+  return mem;
 endmodule

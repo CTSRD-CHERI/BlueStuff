@@ -90,6 +90,22 @@ typedef union tagged {
 `undef DATA_BYTES
 } MemReq#(type addr_t, type content_t) deriving (Bits, FShow);
 
+function MemReq#(addr_t, content_t) offsetMemReq(
+  MemReq#(addr_t, content_t) r,
+  Int#(addr_sz) o)
+  provisos (Bits#(addr_t, addr_sz), Bits#(content_t, content_sz)) =
+  case (r) matches
+    tagged ReadReq .rr: ReadReq {
+      addr: unpack(pack(unpack(pack(rr.addr)) + o)),
+      numBytes: rr.numBytes
+    };
+    tagged WriteReq .wr: WriteReq {
+      addr: unpack(pack(unpack(pack(wr.addr)) + o)),
+      byteEnable: wr.byteEnable,
+      data: wr.data
+    };
+  endcase;
+
 instance NeedRsp#(MemReq#(a,b));
   function needRsp(r);
     if (r matches tagged ReadReq .*) return True; else return False;
