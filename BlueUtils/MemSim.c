@@ -122,6 +122,7 @@ void load_hex (const char * filename, unsigned char * buff, unsigned long long b
     hexline = parse_hex_line(line);
     width = (hexline) ? div_up(strlen(hexline),2) : 0;
   }
+  fclose(fp);
 }
 
 
