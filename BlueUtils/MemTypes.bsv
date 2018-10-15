@@ -139,16 +139,23 @@ endinstance
 // Mem response
 typedef union tagged {
   content_t ReadRsp;
-  void Failure;
+  void WriteRsp;
+  void BusError;
 } MemRsp#(type content_t) deriving (Bits, FShow);
 
 instance FromAXIRLiteFlit#(MemRsp#(data_t), data_sz)
   provisos (Bits#(data_t, data_sz));
-  function fromAXIRLiteFlit(x) = ReadRsp(unpack(x.rdata));
+  function fromAXIRLiteFlit(x) = case (x.rresp)
+    OKAY: ReadRsp(unpack(x.rdata));
+    default: BusError;
+  endcase;
 endinstance
 
 instance FromAXIBLiteFlit#(MemRsp#(data_t));
-  function fromAXIBLiteFlit(x) = ?;
+  function fromAXIBLiteFlit(x) = case (x.bresp)
+    OKAY: WriteRsp;
+    default: BusError;
+  endcase;
 endinstance
 
 // Mem interface

@@ -99,12 +99,14 @@ module mkMemSimWithOffset#(Integer n, Integer offset, Integer size, String file)
               let res <- mem_read(mem_ptr, addr, nbytes);
               rsp.enq(ReadRsp(res));
             end
-            tagged WriteReq .w: mem_write(
-                                  mem_ptr,
-                                  w.addr,
-                                  fromInteger(valueOf(TDiv#(data_sz, 8))),
-                                  w.byteEnable,
-                                  w.data);
+            tagged WriteReq .w: begin
+              mem_write(mem_ptr,
+                        w.addr,
+                        fromInteger(valueOf(TDiv#(data_sz, 8))),
+                        w.byteEnable,
+                        w.data);
+              rsp.enq(WriteRsp);
+            end
           endcase
         endaction;
       endinterface;
