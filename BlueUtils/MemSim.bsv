@@ -32,6 +32,7 @@ import FIFO :: *;
 import SpecialFIFOs :: *;
 import GetPut :: *;
 import ClientServer :: *;
+import Clocks :: *;
 
 ////////////////////////////////////////
 // Shared data and instruction memory //
@@ -67,15 +68,21 @@ import "BDPI" mem_write  = function Action mem_write(
 
 module mkMemSimWithOffset#(Integer n, Integer offset, Integer size, String file)
   (Array#(Mem#(addr_t, data_t)))
-  provisos (Bits#(addr_t, addr_sz), Bits#(data_t, data_sz));
+  provisos (Bits#(addr_t, addr_sz), Bits#(data_t, data_sz), FShow#(addr_t), FShow#(data_t));
 
+  let clk <- exposeCurrentClock;
+  let rst <- mkReset(0, False, clk);
+  Reg#(Bit#(64))   mem_ptr <- mkRegU;
+  Reg#(Bool)   isAllocated <- mkSyncReg(False, clk, rst.new_rst, clk);
   Reg#(Bool) isInitialized <- mkReg(False);
-  Reg#(Bit#(64)) mem_ptr <- mkRegU;
 
-  rule do_init (!isInitialized);
+  rule do_alloc (!isAllocated);
     let tmp <- mem_create(fromInteger(size));
-    mem_init(tmp, file, fromInteger(0));
     mem_ptr <= tmp;
+    isAllocated <= True;
+  endrule
+  rule do_init (isAllocated && !isInitialized);
+    mem_init(mem_ptr, file, fromInteger(0));
     isInitialized <= True;
   endrule
 
@@ -115,7 +122,7 @@ module mkMemSimWithOffset#(Integer n, Integer offset, Integer size, String file)
 endmodule
 module mkMemSim#(Integer n, Integer size, String file)
   (Array#(Mem#(addr_t, data_t)))
-  provisos (Bits#(addr_t, addr_sz), Bits#(data_t, data_sz));
+  provisos (Bits#(addr_t, addr_sz), Bits#(data_t, data_sz), FShow#(addr_t), FShow#(data_t));
   let mem <- mkMemSimWithOffset(n, 0, size, file);
   return mem;
 endmodule
