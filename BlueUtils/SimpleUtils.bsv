@@ -37,40 +37,83 @@ import Printf :: *;
 interface ArchReg#(type t);
   method t _read;
   method Action _write (t x);
-  method Action commit;
   interface WriteOnly#(t) early;
   interface Reg#(t) late;
+  method Bool needCommit;
+  method t commitVal;
+  method Action commit;
 endinterface
 module mkArchReg#(t resetVal) (ArchReg#(t)) provisos (Bits#(t, n));
   Reg#(t)         arch   <- mkConfigReg(resetVal);
   Reg#(Maybe#(t)) tmp[4] <- mkConfigCReg(4, Invalid);
-  method  _read = arch._read;
+  method     _read = arch._read;
   method _write(x) = tmp[1]._write(Valid(x));
-  method Action commit = action if (isValid(tmp[3]._read)) begin
-    arch <= tmp[3]._read.Valid;
-    tmp[3] <= Invalid;
-  end endaction;
   interface WriteOnly early;
     method _write(x) = tmp[0]._write(Valid(x));
   endinterface
   interface Reg late;
-    method  _read = isValid(tmp[2]._read) ? tmp[2]._read.Valid : arch._read;
+    method     _read = isValid(tmp[2]._read) ? tmp[2]._read.Valid : arch._read;
     method _write(x) = tmp[2]._write(Valid(x));
   endinterface
+  method needCommit = isValid(tmp[3]._read);
+  method  commitVal = isValid(tmp[3]._read) ? tmp[3]._read.Valid : arch._read;
+  method commit = action if (isValid(tmp[3]._read)) begin
+    arch   <= tmp[3]._read.Valid;
+    tmp[3] <= Invalid;
+  end endaction;
+endmodule
+module mkROArchReg#(t resetVal) (ArchReg#(t)) provisos (Bits#(t, n));
+  ArchReg#(t)     arch   <- mkArchReg(resetVal);
+  method  _read = arch._read;
+  method _write = arch._write;
+  interface early = arch.early;
+  interface  late = arch.late;
+  method needCommit = arch.needCommit;
+  method  commitVal = arch.commitVal;
+  method     commit = noAction;
+endmodule
+
+// Architectural register File
+interface ArchRegFile#(numeric type n, type a);
+  interface Vector#(n, ArchReg#(a)) r;
+  method Action commit;
+  //method Bit#(TLog#(n)) rs1_idx;
+  //method Bit#(TLog#(n)) rs2_idx;
+  method Bit#(TLog#(n)) rd_idx;
+  //method a rs1_old_val;
+  //method a rs2_old_val;
+  method a rd_old_val;
+  method a rd_new_val;
+endinterface
+// Register file with read-only 0 register (set to 0)
+module mkRegFileZ (ArchRegFile#(n, a))
+provisos (Bits#(a, a_sz), Literal#(a));
+  // the register file
+  ArchReg#(a) r0 <- mkROArchReg(0);
+  Vector#(TSub#(n, 1), ArchReg#(a)) rx <- replicateM(mkArchReg(0));
+  Vector#(n, ArchReg#(a)) rf = cons(r0, rx);
+  // reporting behaviour
+  Wire#(Bit#(TLog#(n))) rd_idx_w <- mkWire;
+  rule find_rd;
+    Integer tmp = 0;
+    for (Integer i = 0; i < valueOf(n); i = i + 1)
+      if (rf[i].needCommit) tmp = i;
+    rd_idx_w <= fromInteger(tmp);
+  endrule
+  // interface
+  interface r = rf;
+  method commit = action for (Integer i = 0; i < valueOf(n); i = i + 1)
+    rf[i].commit;
+  endaction;
+  method rd_idx = rd_idx_w;
+  method rd_old_val = rf[rd_idx_w]._read;
+  method rd_new_val = rf[rd_idx_w].commitVal;
 endmodule
 
 // Read-only register
 module mkROReg#(parameter a v) (Reg#(a));
   method Action _write (a _) = action endaction;
   method a _read() = v;
-endmodule
-
-// Register file with read-only 0 register (set to 0)
-module mkRegFileZ (Vector#(n, Reg#(a)))
-provisos (Bits#(a, a_sz), Literal#(a));
-  Reg#(a) r0 <- mkROReg(0);
-  Vector#(TSub#(n, 1), Reg#(a)) rf <- replicateM(mkReg(0));
-  return cons(r0,rf);
 endmodule
 
 // Bypassable Register
