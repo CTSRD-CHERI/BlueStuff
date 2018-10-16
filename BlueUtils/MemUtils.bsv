@@ -33,7 +33,7 @@ import AXI :: *;
 import SourceSink :: *;
 import GetPut :: *;
 import ClientServer :: *;
-import FIFOF :: *;
+import FIFO :: *;
 
 ////////////////////////////
 // Mem to AXILite wrapper //
@@ -43,7 +43,9 @@ module mkMemToAXILiteSlave#(Mem#(addr_t, data_t) mem)
   (AXILiteSlave#(addr_sz, data_sz))
   provisos (Bits#(addr_t, addr_sz), Bits#(data_t, data_sz));
   let shim <- mkAXILiteShim;
-  let wRsp <- mkFIFOF;
+  // which response ?
+  let expectWriteRsp <- mkFIFO;
+  (* descending_urgency = "readReq, writeReq" *)
   rule writeReq;
     let awflit <- shim.master.aw.get;
     let  wflit <- shim.master.w.get;
@@ -52,11 +54,12 @@ module mkMemToAXILiteSlave#(Mem#(addr_t, data_t) mem)
       byteEnable: unpack(wflit.wstrb),
       data: unpack(wflit.wdata)
     });
-    wRsp.enq(BLiteFlit {bresp: OKAY});
+    expectWriteRsp.enq(True);
   endrule
-  rule writeRsp;
-    wRsp.deq;
-    shim.master.b.put(wRsp.first);
+  rule writeRsp(expectWriteRsp.first);
+    expectWriteRsp.deq;
+    let _ <- mem.response.get;
+    shim.master.b.put(BLiteFlit{bresp: OKAY});
   endrule
   rule readReq;
     let arflit <- shim.master.ar.get;
@@ -64,8 +67,10 @@ module mkMemToAXILiteSlave#(Mem#(addr_t, data_t) mem)
       addr: unpack(arflit.araddr),
       numBytes: fromInteger(valueOf(data_sz)/8)}
     );
+    expectWriteRsp.enq(False);
   endrule
-  rule readRsp;
+  rule readRsp(!expectWriteRsp.first);
+    expectWriteRsp.deq;
     let rsp <- mem.response.get;
     shim.master.r.put(RLiteFlit{rdata: pack(rsp.ReadRsp), rresp: OKAY});
   endrule
