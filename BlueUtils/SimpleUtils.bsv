@@ -69,7 +69,7 @@ module mkROArchReg#(t resetVal) (ArchReg#(t)) provisos (Bits#(t, n));
   interface early = arch.early;
   interface  late = arch.late;
   method needCommit = arch.needCommit;
-  method  commitVal = arch.commitVal;
+  method  commitVal = resetVal;
   method     commit = noAction;
 endmodule
 
