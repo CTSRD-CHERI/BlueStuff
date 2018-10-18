@@ -150,6 +150,12 @@ void mem_init(unsigned long long mem_ptr, char * hexfile, unsigned long long off
   //print_mem(m->data, 0, 2048, 4);
 }
 
+void mem_zero(unsigned long long mem_ptr)
+{
+  mem_t * m = (mem_t *) mem_ptr;
+  explicit_bzero((void *) m->data, m->size);
+}
+
 void mem_read(unsigned int * ret_data, unsigned long long mem_ptr, unsigned int * addr_ptr, unsigned int * size_ptr)
 {
   mem_t * m = (mem_t *) mem_ptr;

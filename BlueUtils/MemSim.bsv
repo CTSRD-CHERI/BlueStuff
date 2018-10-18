@@ -46,6 +46,7 @@ import "BDPI" mem_init   = function Action mem_init(
                              Bit#(64) m,
                              String f,
                              Bit#(64) o);
+import "BDPI" mem_zero   = function Action mem_zero(Bit#(64) m);
 import "BDPI" mem_read   = function ActionValue#(dt) mem_read(
                              Bit#(64) m,
                              at a,
@@ -66,7 +67,7 @@ import "BDPI" mem_write  = function Action mem_write(
                                Bits#(bet, bew),
                                Bits#(dt, dw));
 
-module mkMemSimWithOffset#(Integer n, Integer offset, Integer size, String file)
+module mkMemSimWithOffset#(Integer n, Integer offset, Integer size, Maybe#(String) file)
   (Array#(Mem#(addr_t, data_t)))
   provisos (Bits#(addr_t, addr_sz), Bits#(data_t, data_sz), FShow#(addr_t), FShow#(data_t));
 
@@ -82,7 +83,10 @@ module mkMemSimWithOffset#(Integer n, Integer offset, Integer size, String file)
     isAllocated <= True;
   endrule
   rule do_init (isAllocated && !isInitialized);
-    mem_init(mem_ptr, file, fromInteger(0));
+    case (file) matches
+      tagged Valid .f: mem_init(mem_ptr, f, fromInteger(0));
+      default: mem_zero(mem_ptr);
+    endcase
     isInitialized <= True;
   endrule
 
@@ -122,7 +126,7 @@ module mkMemSimWithOffset#(Integer n, Integer offset, Integer size, String file)
   return ifcs;
 
 endmodule
-module mkMemSim#(Integer n, Integer size, String file)
+module mkMemSim#(Integer n, Integer size, Maybe#(String) file)
   (Array#(Mem#(addr_t, data_t)))
   provisos (Bits#(addr_t, addr_sz), Bits#(data_t, data_sz), FShow#(addr_t), FShow#(data_t));
   let mem <- mkMemSimWithOffset(n, 0, size, file);
