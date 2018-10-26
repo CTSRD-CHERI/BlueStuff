@@ -30,9 +30,10 @@ import MemTypes :: *;
 
 import FIFO :: *;
 import SpecialFIFOs :: *;
-import GetPut :: *;
-import ClientServer :: *;
 import Clocks :: *;
+
+import MasterSlave :: *;
+import SourceSink :: *;
 
 ////////////////////////////////////////
 // Shared data and instruction memory //
@@ -69,7 +70,10 @@ import "BDPI" mem_write  = function Action mem_write(
 
 module mkMemSimWithOffset#(Integer n, Integer offset, Integer size, Maybe#(String) file)
   (Array#(Mem#(addr_t, data_t)))
-  provisos (Bits#(addr_t, addr_sz), Bits#(data_t, data_sz), FShow#(addr_t), FShow#(data_t));
+  provisos (
+    Bits#(addr_t, addr_sz), Bits#(data_t, data_sz)
+    /*,FShow#(addr_t), FShow#(data_t)*/
+  );
 
   let clk <- exposeCurrentClock;
   let rst <- mkReset(0, False, clk);
@@ -93,8 +97,9 @@ module mkMemSimWithOffset#(Integer n, Integer offset, Integer size, Maybe#(Strin
   Mem#(addr_t, data_t) ifcs[n];
   for (Integer i = 0; i < n; i = i + 1) begin
     FIFO#(MemRsp#(data_t)) rsp <- mkPipelineFIFO;
-    ifcs[i] = interface Server;
-      interface request = interface Put;
+    ifcs[i] = interface Slave;
+      interface sink = interface Sink;
+        method canPut = isInitialized;
         method put (req) if (isInitialized) = action
           case (offsetMemReq(req, fromInteger(-offset))) matches
             tagged ReadReq .r: begin
@@ -114,8 +119,10 @@ module mkMemSimWithOffset#(Integer n, Integer offset, Integer size, Maybe#(Strin
           endcase
         endaction;
       endinterface;
-      interface response = interface Get;
-        method get  if (isInitialized) = actionvalue
+      interface source = interface Source;
+        method canGet = isInitialized;
+        method peek if (isInitialized) = rsp.first;
+        method  get if (isInitialized) = actionvalue
           rsp.deq;
           return rsp.first;
         endactionvalue;
@@ -128,7 +135,10 @@ module mkMemSimWithOffset#(Integer n, Integer offset, Integer size, Maybe#(Strin
 endmodule
 module mkMemSim#(Integer n, Integer size, Maybe#(String) file)
   (Array#(Mem#(addr_t, data_t)))
-  provisos (Bits#(addr_t, addr_sz), Bits#(data_t, data_sz), FShow#(addr_t), FShow#(data_t));
+  provisos (
+    Bits#(addr_t, addr_sz), Bits#(data_t, data_sz)
+    /*,FShow#(addr_t), FShow#(data_t)*/
+  );
   let mem <- mkMemSimWithOffset(n, 0, size, file);
   return mem;
 endmodule

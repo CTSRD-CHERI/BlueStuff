@@ -1,11 +1,16 @@
 /*-
  * Copyright (c) 2014 Jonathan Woodruff
- * Copyright (c) 2017 Alexandre Joannou
+ * Copyright (c) 2017-2018 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
  * Cambridge Computer Laboratory under DARPA/AFRL contract FA8750-10-C-0237
  * ("CTSRD"), as part of the DARPA CRASH research programme.
+ *
+ * This software was developed by SRI International and the University of
+ * Cambridge Computer Laboratory (Department of Computer Science and
+ * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
+ * DARPA SSITH research programme.
  *
  * @BERI_LICENSE_HEADER_START@
  *
@@ -42,9 +47,12 @@ import FIFOF::*;
 import RegFile::*;
 import Vector::*;
 import DReg::*;
-import MEM::*;
 import SpecialFIFOs::*;
 import Assert :: *;
+
+import Mem :: *;
+import MasterSlave :: *;
+import SourceSink :: *;
 
 interface FF#(type data, numeric type depth);
   method Action enq(data x);
@@ -474,8 +482,13 @@ endmodule
 
 // An unguarded circular FIFO with predictable "overfill" behaviour.
 module mkFFCirc(FF#(data, depth))
-provisos(Log#(depth,logDepth),Bits#(data, data_width));
-  MEM#(Bit#(logDepth),data) mem <- mkMEMNoFlow(); // BRAM
+provisos(
+    Log#(depth,logDepth),Bits#(data, data_width),
+    Add#(a__, TLog#(TDiv#(data_width, 8)), logDepth),
+    Log#(TAdd#(1, TDiv#(data_width, 8)), TAdd#(TLog#(TDiv#(data_width, 8)),1))
+  );
+  Mem#(Bit#(logDepth),data) mem <- mkMem(valueOf(depth)*(valueOf(data_width)/8), Invalid); // BRAM
+  Reg#(data) latchMemOut[2] <- mkCRegU(2);
   Reg#(Bit#(TAdd#(logDepth,1))) lhead <- mkConfigRegA(0);
   Reg#(Bit#(TAdd#(logDepth,1))) ltail <- mkConfigRegA(0);
   PulseWire                    doDeqA <- mkPulseWire();
@@ -487,20 +500,34 @@ provisos(Log#(depth,logDepth),Bits#(data, data_width));
   Bit#(logDepth) head = truncate(lhead);
   Bit#(logDepth) tail = truncate(ltail);
   
+  rule drainMemRsp;
+    let rsp <- mem.source.get;
+    case (rsp) matches
+      tagged  ReadRsp .r: latchMemOut[0] <= r;
+    endcase
+  endrule
+
   rule deqRule(doDeqA || doDeqB);
     ltail <= ltail+1;
-    mem.read.put(truncate(ltail+1));
+    mem.sink.put(ReadReq{
+      addr: truncate(ltail+1),
+      numBytes: fromInteger(valueOf(data_width)/8)
+    });
   endrule
   
   method Action enq(data in);
-    mem.write(head,in);
+    mem.sink.put(WriteReq{
+      addr: head,
+      byteEnable: ~0,
+      data: in
+    });
     lhead <= lhead + 1;
     if (full) doDeqB.send();
   endmethod
   method Action deq();
     doDeqA.send();
   endmethod
-  method data first() = mem.read.peek();
+  method data first() = latchMemOut[1];
   method Bool notFull() = !full;
   method Bool notEmpty() = !empty;
   method Action clear() = action ltail <= lhead; endaction;

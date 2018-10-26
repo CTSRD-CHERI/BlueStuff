@@ -29,7 +29,7 @@
 import Virtualizable :: *;
 import AXI :: *;
 
-import ClientServer :: *;
+import MasterSlave :: *;
 import Printf :: *;
 
 ///////////////////////
@@ -159,5 +159,5 @@ instance FromAXIBLiteFlit#(MemRsp#(data_t));
 endinstance
 
 // Mem interface
-typedef Server#(MemReq#(addr_t, content_t), MemRsp#(content_t))
+typedef Slave#(MemReq#(addr_t, content_t), MemRsp#(content_t))
   Mem#(type addr_t, type content_t);

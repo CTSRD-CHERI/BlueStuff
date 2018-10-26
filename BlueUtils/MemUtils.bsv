@@ -31,8 +31,7 @@ import MemBRAM :: *;
 import MemSim :: *;
 import AXI :: *;
 import SourceSink :: *;
-import GetPut :: *;
-import ClientServer :: *;
+import MasterSlave :: *;
 import FIFO :: *;
 
 ////////////////////////////
@@ -49,7 +48,7 @@ module mkMemToAXILiteSlave#(Mem#(addr_t, data_t) mem)
   rule writeReq;
     let awflit <- shim.master.aw.get;
     let  wflit <- shim.master.w.get;
-    mem.request.put(WriteReq {
+    mem.sink.put(WriteReq {
       addr: unpack(awflit.awaddr),
       byteEnable: unpack(wflit.wstrb),
       data: unpack(wflit.wdata)
@@ -58,12 +57,12 @@ module mkMemToAXILiteSlave#(Mem#(addr_t, data_t) mem)
   endrule
   rule writeRsp(expectWriteRsp.first);
     expectWriteRsp.deq;
-    let _ <- mem.response.get;
+    let _ <- mem.source.get;
     shim.master.b.put(BLiteFlit{bresp: OKAY});
   endrule
   rule readReq;
     let arflit <- shim.master.ar.get;
-    mem.request.put(ReadReq {
+    mem.sink.put(ReadReq {
       addr: unpack(arflit.araddr),
       numBytes: fromInteger(valueOf(data_sz)/8)}
     );
@@ -71,7 +70,7 @@ module mkMemToAXILiteSlave#(Mem#(addr_t, data_t) mem)
   endrule
   rule readRsp(!expectWriteRsp.first);
     expectWriteRsp.deq;
-    let rsp <- mem.response.get;
+    let rsp <- mem.source.get;
     shim.master.r.put(RLiteFlit{rdata: pack(rsp.ReadRsp), rresp: OKAY});
   endrule
   return shim.slave;
@@ -85,9 +84,9 @@ module mkMem#(Integer size, Maybe#(String) file) (Mem#(addr_t, data_t))
 provisos(
   Bits#(addr_t, addr_sz), Bits#(data_t, data_sz),
   Add#(idx_sz, TLog#(TDiv#(data_sz, 8)), addr_sz),
-  Log#(TAdd#(1, TDiv#(data_sz, 8)), TAdd#(TLog#(TDiv#(data_sz, 8)), 1)),
+  Log#(TAdd#(1, TDiv#(data_sz, 8)), TAdd#(TLog#(TDiv#(data_sz, 8)), 1))
   // FShow instances
-  FShow#(addr_t), FShow#(data_t)
+  /*,FShow#(addr_t), FShow#(data_t)*/
 );
   if (genC) begin
     Mem#(addr_t, data_t) mem[1] <- mkMemSim(1, size, file);
@@ -119,9 +118,9 @@ module mkSharedMem2#(Integer size, Maybe#(String) file) (Array#(Mem#(addr_t, dat
 provisos(
   Bits#(addr_t, addr_sz), Bits#(data_t, data_sz),
   Add#(idx_sz, TLog#(TDiv#(data_sz, 8)), addr_sz),
-  Log#(TAdd#(1, TDiv#(data_sz, 8)), TAdd#(TLog#(TDiv#(data_sz, 8)), 1)),
+  Log#(TAdd#(1, TDiv#(data_sz, 8)), TAdd#(TLog#(TDiv#(data_sz, 8)), 1))
   // FShow instances
-  FShow#(addr_t), FShow#(data_t)
+  /*,FShow#(addr_t), FShow#(data_t)*/
 );
   if (genC) begin
     Mem#(addr_t, data_t) mem[2] <- mkMemSim(2, size, file);

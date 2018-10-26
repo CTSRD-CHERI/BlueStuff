@@ -31,9 +31,11 @@ package BlueUtils;
 import SimpleUtils :: *;
 import SimUtils :: *;
 import Mem :: *;
+import FF :: *;
 
 export SimpleUtils :: *;
 export SimUtils :: *;
 export Mem :: *;
+export FF :: *;
 
 endpackage
