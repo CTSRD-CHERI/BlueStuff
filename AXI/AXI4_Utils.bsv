@@ -46,9 +46,9 @@ import SpecialFIFOs :: *;
 ////////////////////////////////////////////////////////////////////////////////
 
 module mergeWrite#(
-  Source#(AWFlit#(id_, addr_, user_)) aw,
-  Source#(WFlit#(data_, user_)) w)
-  (Source#(AXIWriteFlit#(id_, addr_, data_, user_)));
+  Source#(AWFlit#(id_, addr_, awuser_)) aw,
+  Source#(WFlit#(data_, wuser_)) w)
+  (Source#(AXIWriteFlit#(id_, addr_, data_, awuser_, wuser_)));
 
   let flitLeft <- mkReg(0);
   let doGet    <- mkPulseWire;
@@ -88,9 +88,9 @@ module mergeWrite#(
 endmodule
 
 module splitWrite#(
-  Sink#(AWFlit#(id_, addr_, user_)) aw,
-  Sink#(WFlit#(data_, user_)) w)
-  (Sink#(AXIWriteFlit#(id_, addr_, data_, user_)));
+  Sink#(AWFlit#(id_, addr_, awuser_)) aw,
+  Sink#(WFlit#(data_, wuser_)) w)
+  (Sink#(AXIWriteFlit#(id_, addr_, data_, awuser_, wuser_)));
 
   let flitLeft <- mkReg(0);
   let doPut <- mkWire;
@@ -142,7 +142,7 @@ endmodule
 // AXI Shim Master <-> Slave //
 ////////////////////////////////////////////////////////////////////////////////
 
-module mkAXIShim (AXIShim#(id_, addr_, data_, user_));
+module mkAXIShim (AXIShim#(a, b, c, d, e, f, g, h));
   let awff <- mkBypassFIFOF;
   let  wff <- mkBypassFIFOF;
   let  bff <- mkBypassFIFOF;
@@ -169,8 +169,8 @@ endmodule
 ////////////////////////////////////////////////////////////////////////////////
 
 // AXI Master
-module toAXIMasterSynth#(AXIMaster#(id_, addr_, data_, user_) master)
-  (AXIMasterSynth#(id_, addr_, data_, user_));
+module toAXIMasterSynth#(AXIMaster#(a, b, c, d, e, f, g, h) master)
+  (AXIMasterSynth#(a, b, c, d, e, f, g, h));
   let awifc <- toAXIAWMaster(master.aw);
   let wifc  <- toAXIWMaster(master.w);
   let bifc  <- toAXIBMaster(master.b);
@@ -184,8 +184,8 @@ module toAXIMasterSynth#(AXIMaster#(id_, addr_, data_, user_) master)
 endmodule
 
 // AXI Slave
-module toAXISlaveSynth#(AXISlave#(id_, addr_, data_, user_) master)
-  (AXISlaveSynth#(id_, addr_, data_, user_));
+module toAXISlaveSynth#(AXISlave#(a, b, c, d, e, f, g, h) master)
+  (AXISlaveSynth#(a, b, c, d, e, f, g, h));
   let awifc <- toAXIAWSlave(master.aw);
   let wifc  <- toAXIWSlave(master.w);
   let bifc  <- toAXIBSlave(master.b);

@@ -80,7 +80,9 @@ verilogExample-%.v:
 #.simExamples: $(patsubst Example-%, %, $(notdir $(SIMEXAMPLESSRC)))
 #	echo "simExamples: $^" > .simExamples
 .simExamples: $(SIMEXAMPLESSRC)
-	echo "simExamples: $^" > .simExamples
+	rm -f .simExamples
+	touch .simExamples
+	for f in $^; do tmp=`basename $$f .bsv`; echo "simExamples: simExample-$${tmp#"Example-"}" >> .simExamples; done
 	for f in $^; do tmp=`basename $$f .bsv`; echo "simExample-$${tmp#"Example-"}: $$f" >> .simExamples; done
 
 .verilogExamples: $(patsubst %, .gatherModules-%, $(notdir $(VERILOGEXAMPLESSRC)))

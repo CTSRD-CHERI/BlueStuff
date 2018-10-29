@@ -45,15 +45,20 @@ typedef 4096 SlaveWidth;
 
 typedef TAdd#(1, TLog#(TMul#(NSLAVES, SlaveWidth))) ADDR_sz;
 typedef 128 DATA_sz;
-typedef 0 USER_sz;
+typedef   0 AWUSER_sz;
+typedef   0 WUSER_sz;
+typedef   0 BUSER_sz;
+typedef   0 ARUSER_sz;
+typedef   0 RUSER_sz;
 
-`define MASTER_T AXILiteMaster#(ADDR_sz, DATA_sz, USER_sz)
-`define SLAVE_T  AXILiteSlave#(ADDR_sz, DATA_sz, USER_sz)
+`define PARAMS ADDR_sz, DATA_sz, AWUSER_sz, WUSER_sz, BUSER_sz, ARUSER_sz, RUSER_sz
+`define MASTER_T AXILiteMaster#(`PARAMS)
+`define SLAVE_T  AXILiteSlave#(`PARAMS)
 
 module axiMaster (`MASTER_T);
 
   // AXI master shim
-  AXILiteShim#(ADDR_sz, DATA_sz, USER_sz) shim <- mkAXILiteShim;
+  AXILiteShim#(`PARAMS) shim <- mkAXILiteShim;
   // Req addr
   Reg#(Bit#(ADDR_sz)) nextWriteAddr <- mkReg(0);
 
@@ -64,14 +69,14 @@ module axiMaster (`MASTER_T);
   // arbitrary work for each channel
   Bool sendWrite = cnt[3:0] == 0;
   rule putAWFlit (sendWrite);
-    AWLiteFlit#(ADDR_sz, USER_sz) f = ?;
+    AWLiteFlit#(ADDR_sz, AWUSER_sz) f = ?;
     f.awaddr = nextWriteAddr;
     nextWriteAddr <= nextWriteAddr + fromInteger(valueOf(SlaveWidth)) + 1;
     shim.slave.aw.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
   rule putWFlit (sendWrite);
-    WLiteFlit#(DATA_sz, USER_sz) f = WLiteFlit{wdata: cnt, wstrb: ?, wuser: ?};
+    WLiteFlit#(DATA_sz, WUSER_sz) f = WLiteFlit{wdata: cnt, wstrb: ?, wuser: ?};
     shim.slave.w.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
@@ -90,7 +95,7 @@ endmodule
 module axiSlave (`SLAVE_T);
 
   // AXI slave shim
-  AXILiteShim#(ADDR_sz, DATA_sz, USER_sz) shim <- mkAXILiteShim;
+  AXILiteShim#(`PARAMS) shim <- mkAXILiteShim;
 
   // arbitrary work for each channel
   FIFOF#(Bit#(0)) writeResp <- mkFIFOF;
@@ -105,7 +110,7 @@ module axiSlave (`SLAVE_T);
   endrule
   rule putBFlit;
     writeResp.deq;
-    BLiteFlit#(USER_sz) f = ?;
+    BLiteFlit#(BUSER_sz) f = ?;
     shim.master.b.put(f);
     $display("%0t - SLAVE - sending ", $time, fshow(f));
   endrule
@@ -130,5 +135,6 @@ module top (Empty);
   mkAXILiteBus(maptab, ms, ss);
 endmodule
 
+`undef PARAMS
 `undef MASTER_T
 `undef SLAVE_T

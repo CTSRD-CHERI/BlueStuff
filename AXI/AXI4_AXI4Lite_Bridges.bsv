@@ -45,12 +45,13 @@ function Action abort(Fmt m) = action $display(m); $finish(0); endaction;
 // from AXI4Lite Master to AXI4 Master //
 ////////////////////////////////////////////////////////////////////////////////
 
-module fromAXILiteMaster#(AXILiteMaster#(addr_, data_, user_) mlite)
-  (AXIMaster#(id_, addr_, data_, user_));
+module fromAXILiteMaster#(
+  AXILiteMaster#(addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_) mlite)
+  (AXIMaster#(id_, addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_));
 
-  module fromAXIAWLiteSource#(Source#(AWLiteFlit#(addr_, user_)) src)
-    (Source#(AWFlit#(id_, addr_, user_)));
-    function AWFlit#(id_, addr_, user_) f(AWLiteFlit#(addr_, user_) x) =
+  module fromAXIAWLiteSource#(Source#(AWLiteFlit#(addr_, awuser_)) src)
+    (Source#(AWFlit#(id_, addr_, awuser_)));
+    function AWFlit#(id_, addr_, awuser_) f(AWLiteFlit#(addr_, awuser_) x) =
     AWFlit {
       awid: 0, awaddr: x.awaddr, awlen: 0,
       awsize: fromInteger(log2(valueOf(data_)/8)),
@@ -63,9 +64,9 @@ module fromAXILiteMaster#(AXILiteMaster#(addr_, data_, user_) mlite)
       actionvalue let flit <- src.get; return f(flit); endactionvalue;
   endmodule
 
-  module fromAXIWLiteSource#(Source#(WLiteFlit#(data_, user_)) src)
-    (Source#(WFlit#(data_, user_)));
-    function WFlit#(data_, user_) f(WLiteFlit#(data_, user_) x) = WFlit {
+  module fromAXIWLiteSource#(Source#(WLiteFlit#(data_, wuser_)) src)
+    (Source#(WFlit#(data_, wuser_)));
+    function WFlit#(data_, wuser_) f(WLiteFlit#(data_, wuser_) x) = WFlit {
       wdata: x.wdata, wstrb: x.wstrb, wlast: True, wuser: x.wuser
     };
     method canGet = src.canGet;
@@ -74,8 +75,8 @@ module fromAXILiteMaster#(AXILiteMaster#(addr_, data_, user_) mlite)
       actionvalue let flit <- src.get; return f(flit); endactionvalue;
   endmodule
 
-  module fromAXIBLiteSink#(Sink#(BLiteFlit#(user_)) snk)
-    (Sink#(BFlit#(id_, user_)));
+  module fromAXIBLiteSink#(Sink#(BLiteFlit#(buser_)) snk)
+    (Sink#(BFlit#(id_, buser_)));
     method canPut = snk.canPut;
     method put(x) = action
       if (x.bid != 0) abort($format("Unsupported bid (0x%0x)", x.bid));
@@ -83,9 +84,9 @@ module fromAXILiteMaster#(AXILiteMaster#(addr_, data_, user_) mlite)
     endaction;
   endmodule
 
-  module fromAXIARLiteSource#(Source#(ARLiteFlit#(addr_, user_)) src)
-    (Source#(ARFlit#(id_, addr_, user_)));
-    function ARFlit#(id_, addr_, user_) f(ARLiteFlit#(addr_, user_) x) =
+  module fromAXIARLiteSource#(Source#(ARLiteFlit#(addr_, aruser_)) src)
+    (Source#(ARFlit#(id_, addr_, aruser_)));
+    function ARFlit#(id_, addr_, aruser_) f(ARLiteFlit#(addr_, aruser_) x) =
     ARFlit {
       arid: 0, araddr: x.araddr, arlen: 0,
       arsize: fromInteger(log2(valueOf(data_)/8)),
@@ -98,8 +99,8 @@ module fromAXILiteMaster#(AXILiteMaster#(addr_, data_, user_) mlite)
       actionvalue let flit <- src.get; return f(flit); endactionvalue;
   endmodule
 
-  module fromAXIRLiteSink#(Sink#(RLiteFlit#(data_, user_)) snk)
-    (Sink#(RFlit#(id_, data_, user_)));
+  module fromAXIRLiteSink#(Sink#(RLiteFlit#(data_, ruser_)) snk)
+    (Sink#(RFlit#(id_, data_, ruser_)));
     method canPut = snk.canPut;
     method put(x) = action
       if (x.rid != 0) abort($format("Unsupported rid (0x%0x)", x.rid));
@@ -126,11 +127,12 @@ endmodule
 // from AXI4Lite Slave to AXI4 Slave //
 ////////////////////////////////////////////////////////////////////////////////
 
-module fromAXILiteSlave#(AXILiteSlave#(addr_, data_, user_) slite)
-  (AXISlave#(id_, addr_, data_, user_));
+module fromAXILiteSlave#(
+  AXILiteSlave#(addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_) slite)
+  (AXISlave#(id_, addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_));
 
-  module fromAXIAWLiteSink#(Sink#(AWLiteFlit#(addr_, user_)) snk)
-    (Sink#(AWFlit#(id_, addr_, user_)));
+  module fromAXIAWLiteSink#(Sink#(AWLiteFlit#(addr_, awuser_)) snk)
+    (Sink#(AWFlit#(id_, addr_, awuser_)));
     method canPut = snk.canPut;
     method put(x) = action
       if (x.awid != 0) abort($format("Unsupported awid (0x%0x)", x.awid));
@@ -152,8 +154,8 @@ module fromAXILiteSlave#(AXILiteSlave#(addr_, data_, user_) slite)
     endaction;
   endmodule
 
-  module fromAXIWLiteSink#(Sink#(WLiteFlit#(data_, user_)) snk)
-    (Sink#(WFlit#(data_, user_)));
+  module fromAXIWLiteSink#(Sink#(WLiteFlit#(data_, wuser_)) snk)
+    (Sink#(WFlit#(data_, wuser_)));
     method canPut = snk.canPut;
     method put(x) = action
       if (x.wlast != True)
@@ -162,9 +164,9 @@ module fromAXILiteSlave#(AXILiteSlave#(addr_, data_, user_) slite)
     endaction;
   endmodule
 
-  module fromAXIBLiteSource#(Source#(BLiteFlit#(user_)) src)
-    (Source#(BFlit#(id_, user_)));
-    function BFlit#(id_, user_) f(BLiteFlit#(user_) x) = BFlit {
+  module fromAXIBLiteSource#(Source#(BLiteFlit#(buser_)) src)
+    (Source#(BFlit#(id_, buser_)));
+    function BFlit#(id_, buser_) f(BLiteFlit#(buser_) x) = BFlit {
       bid: 0, bresp: x.bresp, buser: x.buser
     };
     method canGet = src.canGet;
@@ -173,8 +175,8 @@ module fromAXILiteSlave#(AXILiteSlave#(addr_, data_, user_) slite)
       actionvalue let flit <- src.get; return f(flit); endactionvalue;
   endmodule
 
-  module fromAXIARLiteSink#(Sink#(ARLiteFlit#(addr_, user_)) snk)
-    (Sink#(ARFlit#(id_, addr_, user_)));
+  module fromAXIARLiteSink#(Sink#(ARLiteFlit#(addr_, aruser_)) snk)
+    (Sink#(ARFlit#(id_, addr_, aruser_)));
     method canPut = snk.canPut;
     method put(x) = action
       if (x.arid != 0) abort($format("Unsupported arid (0x%0x)", x.arid));
@@ -196,9 +198,9 @@ module fromAXILiteSlave#(AXILiteSlave#(addr_, data_, user_) slite)
     endaction;
   endmodule
 
-  module fromAXIRLiteSource#(Source#(RLiteFlit#(data_, user_)) src)
-    (Source#(RFlit#(id_, data_, user_)));
-    function RFlit#(id_, data_, user_) f(RLiteFlit#(data_, user_) x) = RFlit {
+  module fromAXIRLiteSource#(Source#(RLiteFlit#(data_, ruser_)) src)
+    (Source#(RFlit#(id_, data_, ruser_)));
+    function RFlit#(id_, data_, ruser_) f(RLiteFlit#(data_, ruser_) x) = RFlit {
       rid: 0, rdata: x.rdata, rresp: x.rresp, rlast: True, ruser: x.ruser
     };
     method canGet = src.canGet;

@@ -42,10 +42,36 @@ import FIFOF :: *;
 import SpecialFIFOs :: *;
 
 ///////////////////////////////
+// AXI Write channel helpers //
+////////////////////////////////////////////////////////////////////////////////
+
+function Source#(AXILiteWriteFlit#(addr_, data_, awu_, wu_)) mergeLiteWrite(
+  Source#(AWLiteFlit#(addr_, awu_)) aw,
+  Source#(WLiteFlit#(data_, wu_)) w) = interface Source;
+    method canGet = aw.canGet && w.canGet;
+    method peek   = AXILiteWriteFlit { aw: aw.peek, w: w.peek };
+    method get    = actionvalue
+      let flit_aw <- aw.get;
+      let flit_w  <- w.get;
+      return AXILiteWriteFlit { aw: flit_aw, w: flit_w };
+    endactionvalue;
+  endinterface;
+
+function Sink#(AXILiteWriteFlit#(addr_, data_, awu_, wu_)) splitLiteWrite(
+  Sink#(AWLiteFlit#(addr_, awu_)) aw,
+  Sink#(WLiteFlit#(data_, wu_)) w) = interface Sink;
+    method canPut = aw.canPut && w.canPut;
+    method put(x) = action
+      aw.put(x.aw);
+      w.put(x.w);
+    endaction;
+  endinterface;
+
+///////////////////////////////
 // AXI Shim Master <-> Slave //
 ////////////////////////////////////////////////////////////////////////////////
 
-module mkAXILiteShim (AXILiteShim#(addr_, data_, user_));
+module mkAXILiteShim (AXILiteShim#(a, b, c, d, e, f, g));
   let awff <- mkBypassFIFOF;
   let  wff <- mkBypassFIFOF;
   let  bff <- mkBypassFIFOF;
@@ -72,8 +98,8 @@ endmodule
 ////////////////////////////////////////////////////////////////////////////////
 
 // AXI Master
-module toAXILiteMasterSynth#(AXILiteMaster#(addr_, data_, user_) master)
-  (AXILiteMasterSynth#(addr_, data_, user_));
+module toAXILiteMasterSynth#(AXILiteMaster#(a, b, c, d, e, f, g) master)
+  (AXILiteMasterSynth#(a, b, c, d, e, f, g));
   let awifc <- toAXIAWLiteMaster(master.aw);
   let wifc  <- toAXIWLiteMaster(master.w);
   let bifc  <- toAXIBLiteMaster(master.b);
@@ -87,8 +113,8 @@ module toAXILiteMasterSynth#(AXILiteMaster#(addr_, data_, user_) master)
 endmodule
 
 // AXI Slave
-module toAXILiteSlaveSynth#(AXILiteSlave#(addr_, data_, user_) master)
-  (AXILiteSlaveSynth#(addr_, data_, user_));
+module toAXILiteSlaveSynth#(AXILiteSlave#(a, b, c, d, e, f, g) master)
+  (AXILiteSlaveSynth#(a, b, c, d, e, f, g));
   let awifc <- toAXIAWLiteSlave(master.aw);
   let wifc  <- toAXIWLiteSlave(master.w);
   let bifc  <- toAXIBLiteSlave(master.b);
@@ -100,29 +126,3 @@ module toAXILiteSlaveSynth#(AXILiteSlave#(addr_, data_, user_) master)
   interface ar = arifc;
   interface r  = rifc;
 endmodule
-
-///////////////////////////////
-// AXI Write channel helpers //
-////////////////////////////////////////////////////////////////////////////////
-
-function Source#(AXILiteWriteFlit#(a, b, c)) mergeLiteWrite(
-  Source#(AWLiteFlit#(a, c)) aw,
-  Source#(WLiteFlit#(b, c)) w) = interface Source;
-    method canGet = aw.canGet && w.canGet;
-    method peek   = AXILiteWriteFlit { aw: aw.peek, w: w.peek };
-    method get    = actionvalue
-      let flit_aw <- aw.get;
-      let flit_w  <- w.get;
-      return AXILiteWriteFlit { aw: flit_aw, w: flit_w };
-    endactionvalue;
-  endinterface;
-
-function Sink#(AXILiteWriteFlit#(a, b, c)) splitLiteWrite(
-  Sink#(AWLiteFlit#(a, c)) aw,
-  Sink#(WLiteFlit#(b, c)) w) = interface Sink;
-    method canPut = aw.canPut && w.canPut;
-    method put(x) = action
-      aw.put(x.aw);
-      w.put(x.w);
-    endaction;
-  endinterface;

@@ -42,23 +42,35 @@ import Routable :: *;
 // AXI bus //
 ////////////////////////////////////////////////////////////////////////////////
 
+`define PARAMS addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_
+`define MPARAMS id_, `PARAMS
+`define SPARAMS sid_, `PARAMS
+
 module mkAXIBus#(
     MappingTable#(nRoutes, addr_) maptab,
-    Vector#(nMasters, AXIMaster#(id_, addr_, data_, user_)) masters,
-    Vector#(nSlaves, AXISlave#(sid_, addr_, data_, user_)) slaves
+    Vector#(nMasters, AXIMaster#(`MPARAMS)) masters,
+    Vector#(nSlaves, AXISlave#(`SPARAMS)) slaves
   ) (Empty) provisos (
     Add#(id_, TLog#(nMasters), sid_),
+    Routable#(
+      AXIWriteFlit#(id_, addr_, data_, awuser_, wuser_),
+      BFlit#(id_, buser_),
+      Bit#(addr_)),
+    Routable#(
+      ARFlit#(id_, addr_, aruser_),
+      RFlit#(id_, data_, ruser_),
+      Bit#(addr_)),
     ExpandReqRsp#(
-      AXIWriteFlit#(id_, addr_, data_, user_),
-      AXIWriteFlit#(sid_, addr_, data_, user_),
-      BFlit#(sid_, user_),
-      BFlit#(id_, user_),
+      AXIWriteFlit#(id_, addr_, data_, awuser_, wuser_),
+      AXIWriteFlit#(sid_, addr_, data_, awuser_, wuser_),
+      BFlit#(sid_, buser_),
+      BFlit#(id_, buser_),
       Bit#(TLog#(nMasters))),
     ExpandReqRsp#(
-      ARFlit#(id_, addr_, user_),
-      ARFlit#(sid_, addr_, user_),
-      RFlit#(sid_, data_, user_),
-      RFlit#(id_, data_, user_),
+      ARFlit#(id_, addr_, aruser_),
+      ARFlit#(sid_, addr_, aruser_),
+      RFlit#(sid_, data_, ruser_),
+      RFlit#(id_, data_, ruser_),
       Bit#(TLog#(nMasters))),
     // assertion on argument sizes
     Add#(1, a__, nMasters), // at least one master is needed
@@ -68,10 +80,11 @@ module mkAXIBus#(
 
   // prepare masters
   Vector#(nMasters,
-    Master#(AXIWriteFlit#(id_, addr_, data_, user_), BFlit#(id_, user_))
+    Master#(AXIWriteFlit#(id_, addr_, data_, awuser_, wuser_),
+            BFlit#(id_, buser_))
   ) write_masters = newVector;
   Vector#(nMasters,
-    Master#(ARFlit#(id_, addr_, user_), RFlit#(id_, data_, user_))
+    Master#(ARFlit#(id_, addr_, aruser_), RFlit#(id_, data_, ruser_))
   ) read_masters = newVector;
   for (Integer i = 0; i < valueOf(nMasters); i = i + 1) begin
     Bit#(TLog#(nMasters)) mid = fromInteger(i);
@@ -89,10 +102,11 @@ module mkAXIBus#(
 
   // prepare slaves
   Vector#(nSlaves,
-    Slave#(AXIWriteFlit#(sid_, addr_, data_, user_), BFlit#(sid_, user_))
+    Slave#(AXIWriteFlit#(sid_, addr_, data_, awuser_, wuser_),
+           BFlit#(sid_, buser_))
   ) write_slaves = newVector;
   Vector#(nSlaves,
-    Slave#(ARFlit#(sid_, addr_, user_), RFlit#(sid_, data_, user_))
+    Slave#(ARFlit#(sid_, addr_, aruser_), RFlit#(sid_, data_, ruser_))
   ) read_slaves = newVector;
   for (Integer i = 0; i < valueOf(nSlaves); i = i + 1) begin  
     // split to write slaves

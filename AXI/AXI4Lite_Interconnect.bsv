@@ -42,11 +42,21 @@ import Routable :: *;
 // AXI Lite bus //
 ////////////////////////////////////////////////////////////////////////////////
 
+`define PARAMS addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_
+
 module mkAXILiteBus#(
     MappingTable#(nRoutes, addr_) maptab,
-    Vector#(nMasters, AXILiteMaster#(addr_, data_, user_)) masters,
-    Vector#(nSlaves, AXILiteSlave#(addr_, data_, user_)) slaves
+    Vector#(nMasters, AXILiteMaster#(`PARAMS)) masters,
+    Vector#(nSlaves, AXILiteSlave#(`PARAMS)) slaves
   ) (Empty) provisos (
+    Routable#(
+      AXILiteWriteFlit#(addr_, data_, awuser_, wuser_),
+      BLiteFlit#(buser_),
+      Bit#(addr_)),
+    Routable#(
+      ARLiteFlit#(addr_, aruser_),
+      RLiteFlit#(data_, ruser_),
+      Bit#(addr_)),
     // assertion on argument sizes
     Add#(1, a__, nMasters), // at least one master is needed
     Add#(1, b__, nSlaves), // at least one slave is needed
@@ -54,9 +64,13 @@ module mkAXILiteBus#(
   );
 
   // prepare masters
-  Vector#(nMasters, Master#(AXILiteWriteFlit#(addr_, data_, user_), BLiteFlit#(user_)))
+  Vector#(nMasters,
+    Master#(AXILiteWriteFlit#(addr_, data_, awuser_, wuser_),
+    BLiteFlit#(buser_)))
     write_masters = newVector;
-  Vector#(nMasters, Master#(ARLiteFlit#(addr_, user_), RLiteFlit#(data_, user_)))
+  Vector#(nMasters,
+    Master#(ARLiteFlit#(addr_, aruser_),
+    RLiteFlit#(data_, ruser_)))
     read_masters  = newVector;
   for (Integer i = 0; i < valueOf(nMasters); i = i + 1) begin
     Bit#(TLog#(nMasters)) mid = fromInteger(i);
@@ -72,9 +86,13 @@ module mkAXILiteBus#(
   end
 
   // prepare slaves
-  Vector#(nSlaves, Slave#(AXILiteWriteFlit#(addr_, data_, user_), BLiteFlit#(user_)))
+  Vector#(nSlaves,
+    Slave#(AXILiteWriteFlit#(addr_, data_, awuser_, wuser_),
+    BLiteFlit#(buser_)))
     write_slaves = newVector;
-  Vector#(nSlaves, Slave#(ARLiteFlit#(addr_, user_), RLiteFlit#(data_, user_)))
+  Vector#(nSlaves,
+    Slave#(ARLiteFlit#(addr_, aruser_),
+    RLiteFlit#(data_, ruser_)))
     read_slaves   = newVector;
   for (Integer i = 0; i < valueOf(nSlaves); i = i + 1) begin  
     // split to write slaves
@@ -93,3 +111,5 @@ module mkAXILiteBus#(
   mkInOrderTwoWayBus(routeFromMappingTable(maptab), read_masters, read_slaves);
 
 endmodule
+
+`undef PARAMS

@@ -38,8 +38,10 @@ import FIFO :: *;
 // Mem to AXILite wrapper //
 ////////////////////////////////////////////////////////////////////////////////
 
+`define PARAMS addr_sz, data_sz, 0, 0, 0, 0, 0
+
 module mkMemToAXILiteSlave#(Mem#(addr_t, data_t) mem)
-  (AXILiteSlave#(addr_sz, data_sz, user_sz))
+  (AXILiteSlave#(`PARAMS))
   provisos (Bits#(addr_t, addr_sz), Bits#(data_t, data_sz));
   let shim <- mkAXILiteShim;
   // which response ?
@@ -102,12 +104,12 @@ provisos(
   end
 endmodule
 
-module mkAXILiteMem#(Integer size, Maybe#(String) file) (AXILiteSlave#(a_sz, d_sz, u_sz))
+module mkAXILiteMem#(Integer size, Maybe#(String) file) (AXILiteSlave#(`PARAMS))
   provisos (
-    Log#(TAdd#(1, TDiv#(d_sz, 8)), TAdd#(TLog#(TDiv#(d_sz, 8)), 1)),
-    Add#(a__, TLog#(TDiv#(d_sz, 8)), a_sz)
+    Log#(TAdd#(1, TDiv#(data_sz, 8)), TAdd#(TLog#(TDiv#(data_sz, 8)), 1)),
+    Add#(a__, TLog#(TDiv#(data_sz, 8)), addr_sz)
   );
-  Mem#(Bit#(a_sz), Bit#(d_sz)) mem <- mkMem(size, file);
+  Mem#(Bit#(addr_sz), Bit#(data_sz)) mem <- mkMem(size, file);
   let ifc <- mkMemToAXILiteSlave(mem);
   return ifc;
 endmodule
@@ -139,14 +141,16 @@ provisos(
 endmodule
 
 module mkAXILiteSharedMem2#(Integer size, Maybe#(String) file)
-  (Array#(AXILiteSlave#(addr_sz, data_sz, user_sz)))
+  (Array#(AXILiteSlave#(`PARAMS)))
   provisos (
     Log#(TAdd#(1, TDiv#(data_sz, 8)), TAdd#(TLog#(TDiv#(data_sz, 8)), 1)),
     Add#(a__, TLog#(TDiv#(data_sz, 8)), addr_sz)
   );
   Mem#(Bit#(addr_sz), Bit#(data_sz)) mem[2] <- mkSharedMem2(size, file);
-  AXILiteSlave#(addr_sz, data_sz, user_sz) ifc[2];
+  AXILiteSlave#(`PARAMS) ifc[2];
   ifc[0] <- mkMemToAXILiteSlave(mem[0]);
   ifc[1] <- mkMemToAXILiteSlave(mem[1]);
   return ifc;
 endmodule
+
+`undef PARAMS

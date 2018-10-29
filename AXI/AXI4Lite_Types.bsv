@@ -317,23 +317,31 @@ endinstance
 interface AXILiteMaster#(
   numeric type addr_,
   numeric type data_,
-  numeric type user_);
-  interface Source#(AWLiteFlit#(addr_, user_)) aw;
-  interface Source#(WLiteFlit#(data_, user_))  w;
-  interface Sink#(BLiteFlit#(user_))           b;
-  interface Source#(ARLiteFlit#(addr_, user_)) ar;
-  interface Sink#(RLiteFlit#(data_, user_))    r;
+  numeric type awuser_,
+  numeric type wuser_,
+  numeric type buser_,
+  numeric type aruser_,
+  numeric type ruser_);
+  interface Source#(AWLiteFlit#(addr_, awuser_)) aw;
+  interface Source#(WLiteFlit#(data_, wuser_))   w;
+  interface Sink#(BLiteFlit#(buser_))            b;
+  interface Source#(ARLiteFlit#(addr_, aruser_)) ar;
+  interface Sink#(RLiteFlit#(data_, ruser_))     r;
 endinterface
 
 interface AXILiteMasterSynth#(
   numeric type addr_,
   numeric type data_,
-  numeric type user_);
-  interface AWLiteMaster#(addr_, user_) aw;
-  interface WLiteMaster#(data_, user_)  w;
-  interface BLiteMaster#(user_)         b;
-  interface ARLiteMaster#(addr_, user_) ar;
-  interface RLiteMaster#(data_, user_)  r;
+  numeric type awuser_,
+  numeric type wuser_,
+  numeric type buser_,
+  numeric type aruser_,
+  numeric type ruser_);
+  interface AWLiteMaster#(addr_, awuser_) aw;
+  interface WLiteMaster#(data_, wuser_)   w;
+  interface BLiteMaster#(buser_)          b;
+  interface ARLiteMaster#(addr_, aruser_) ar;
+  interface RLiteMaster#(data_, ruser_)   r;
 endinterface
 
 ///////////////
@@ -343,23 +351,31 @@ endinterface
 interface AXILiteSlave#(
   numeric type addr_,
   numeric type data_,
-  numeric type user_);
-  interface Sink#(AWLiteFlit#(addr_, user_))  aw;
-  interface Sink#(WLiteFlit#(data_, user_))   w;
-  interface Source#(BLiteFlit#(user_))        b;
-  interface Sink#(ARLiteFlit#(addr_, user_))  ar;
-  interface Source#(RLiteFlit#(data_, user_)) r;
+  numeric type awuser_,
+  numeric type wuser_,
+  numeric type buser_,
+  numeric type aruser_,
+  numeric type ruser_);
+  interface Sink#(AWLiteFlit#(addr_, awuser_)) aw;
+  interface Sink#(WLiteFlit#(data_, wuser_))   w;
+  interface Source#(BLiteFlit#(buser_))        b;
+  interface Sink#(ARLiteFlit#(addr_, aruser_)) ar;
+  interface Source#(RLiteFlit#(data_, ruser_)) r;
 endinterface
 
 interface AXILiteSlaveSynth#(
   numeric type addr_,
   numeric type data_,
-  numeric type user_);
-  interface AWLiteSlave#(addr_, user_) aw;
-  interface WLiteSlave#(data_, user_)  w;
-  interface BLiteSlave#(user_)         b;
-  interface ARLiteSlave#(addr_, user_) ar;
-  interface RLiteSlave#(data_, user_)  r;
+  numeric type awuser_,
+  numeric type wuser_,
+  numeric type buser_,
+  numeric type aruser_,
+  numeric type ruser_);
+  interface AWLiteSlave#(addr_, awuser_) aw;
+  interface WLiteSlave#(data_, wuser_)   w;
+  interface BLiteSlave#(buser_)          b;
+  interface ARLiteSlave#(addr_, aruser_) ar;
+  interface RLiteSlave#(data_, ruser_)   r;
 endinterface
 
 ///////////////////////////////
@@ -369,18 +385,30 @@ endinterface
 interface AXILiteShim#(
   numeric type addr_,
   numeric type data_,
-  numeric type user_);
-  interface AXILiteMaster#(addr_, data_, user_) master;
-  interface AXILiteSlave#(addr_, data_, user_) slave;
+  numeric type awuser_,
+  numeric type wuser_,
+  numeric type buser_,
+  numeric type aruser_,
+  numeric type ruser_);
+  interface AXILiteMaster#(
+    addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_
+  ) master;
+  interface AXILiteSlave#(
+    addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_
+  ) slave;
 endinterface
 
 ///////////////////////////////
 // AXI Connectable instances //
 ////////////////////////////////////////////////////////////////////////////////
 
-instance Connectable#(AXILiteMaster#(a, b, c), AXILiteSlave#(a, b, c));
-  module mkConnection#(AXILiteMaster#(a, b, c) m, AXILiteSlave#(a, b, c) s)
-  (Empty);
+instance Connectable#(
+  AXILiteMaster#(a, b, c, d, e, f, g),
+  AXILiteSlave#(a, b, c, d, e, f, g));
+  module mkConnection#(
+    AXILiteMaster#(a, b, c, d, e, f, g) m,
+    AXILiteSlave#(a, b, c, d, e, f, g) s)
+    (Empty);
     mkConnection(m.aw, s.aw);
     mkConnection(m.w, s.w);
     mkConnection(m.b, s.b);
@@ -388,9 +416,13 @@ instance Connectable#(AXILiteMaster#(a, b, c), AXILiteSlave#(a, b, c));
     mkConnection(m.r, s.r);
   endmodule
 endinstance
-instance Connectable#(AXILiteSlave#(a, b, c), AXILiteMaster#(a, b, c));
-  module mkConnection#(AXILiteSlave#(a, b, c) s, AXILiteMaster#(a, b, c) m)
-  (Empty);
+instance Connectable#(
+  AXILiteSlave#(a, b, c, d, e, f, g),
+  AXILiteMaster#(a, b, c, d, e, f, g));
+  module mkConnection#(
+    AXILiteSlave#(a, b, c, d, e, f, g) s,
+    AXILiteMaster#(a, b, c, d, e, f, g) m)
+    (Empty);
     mkConnection(m, s);
   endmodule
 endinstance
@@ -400,17 +432,22 @@ endinstance
 ////////////////////////////////////////////////////////////////////////////////
 
 typedef struct {
-  AWLiteFlit#(addr_, user_) aw;
-  WLiteFlit#(data_, user_)  w;
-} AXILiteWriteFlit#(numeric type addr_, numeric type data_, numeric type user_)
-deriving (Bits, FShow);
+  AWLiteFlit#(addr_, awuser_) aw;
+  WLiteFlit#(data_, wuser_)  w;
+} AXILiteWriteFlit#(
+  numeric type addr_,
+  numeric type data_,
+  numeric type awuser_,
+  numeric type wuser_) deriving (Bits, FShow);
 instance Routable#(
-  AXILiteWriteFlit#(addr_, data_, user_),
-  BLiteFlit#(user_),
-  Bit#(addr_));
+  AXILiteWriteFlit#(addr_, data_, awuser_, wuser_),
+  BLiteFlit#(buser_),
+  Bit#(addr_)) provisos (
+    Routable#(AWLiteFlit#(addr_, awuser_), BLiteFlit#(buser_), Bit#(addr_))
+  );
   function routingField(x) = routingField(x.aw);
   function noRouteFound(x) = noRouteFound(x.aw);
 endinstance
-instance DetectLast#(AXILiteWriteFlit#(addr_, data_, user_));
+instance DetectLast#(AXILiteWriteFlit#(addr_, data_, awuser_, wuser_));
   function detectLast(x) = detectLast(x.w);
 endinstance

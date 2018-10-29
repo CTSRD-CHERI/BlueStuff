@@ -119,7 +119,9 @@ endmodule
 // AXILite Slave interface
 ////////////////////////////////////////////////////////////////////////////////
 
-module mkAXILiteCharIOCore#(CharIO charIO) (AXILiteSlave#(addr_sz, data_sz, 0))
+`define PARAMS addr_sz, data_sz, 0, 0, 0, 0, 0
+
+module mkAXILiteCharIOCore#(CharIO charIO) (AXILiteSlave#(`PARAMS))
   provisos (Add#(8, a__, data_sz));
   let shim <- mkAXILiteShim;
   let wRspFF <- mkFIFOF;
@@ -147,7 +149,7 @@ module mkAXILiteCharIOCore#(CharIO charIO) (AXILiteSlave#(addr_sz, data_sz, 0))
 endmodule
 
 module mkAXILiteSocketCharIO#(String name, Integer dflt_port)
-  (AXILiteSlave#(addr_sz, data_sz, 0))
+  (AXILiteSlave#(`PARAMS))
   provisos (Add#(8, a__, data_sz));
   let charIO <- mkSocketCharIO(name, dflt_port);
   let core   <- mkAXILiteCharIOCore(charIO);
@@ -155,14 +157,14 @@ module mkAXILiteSocketCharIO#(String name, Integer dflt_port)
 endmodule
 
 module mkAXILiteFileCharIO#(String inf, String outf)
-  (AXILiteSlave#(addr_sz, data_sz, 0))
+  (AXILiteSlave#(`PARAMS))
   provisos (Add#(8, a__, data_sz));
   let charIO <- mkFileCharIO(inf, outf);
   let core   <- mkAXILiteCharIOCore(charIO);
   return core;
 endmodule
 
-module mkAXILiteCharIO (AXILiteSlave#(addr_sz, data_sz, 0))
+module mkAXILiteCharIO (AXILiteSlave#(`PARAMS))
   provisos (Add#(8, a__, data_sz));
   let charIO <- mkCharIO;
   let core   <- mkAXILiteCharIOCore(charIO);
@@ -170,3 +172,5 @@ module mkAXILiteCharIO (AXILiteSlave#(addr_sz, data_sz, 0))
 endmodule
 
 endpackage
+
+`undef PARAMS

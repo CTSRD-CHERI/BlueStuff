@@ -34,15 +34,21 @@ import Connectable :: *;
 import FIFOF :: *;
 import SpecialFIFOs :: *;
 
-typedef 32 ADDR_sz;
+typedef  32 ADDR_sz;
 typedef 128 DATA_sz;
-typedef 0 USER_sz;
+typedef   0 AWUSER_sz;
+typedef   0 WUSER_sz;
+typedef   0 BUSER_sz;
+typedef   0 ARUSER_sz;
+typedef   0 RUSER_sz;
+
+`define PARAMS ADDR_sz, DATA_sz, AWUSER_sz, WUSER_sz, BUSER_sz, ARUSER_sz, RUSER_sz
 
 (* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiLiteMaster (AXILiteMaster#(ADDR_sz, DATA_sz, USER_sz));
+module axiLiteMaster (AXILiteMaster#(`PARAMS));
 
   // AXI master shim
-  AXILiteShim#(ADDR_sz, DATA_sz, USER_sz) shim <- mkAXILiteShim;
+  AXILiteShim#(`PARAMS) shim <- mkAXILiteShim;
 
   // counter
   Reg#(Bit#(DATA_sz)) cnt <- mkReg(0);
@@ -51,12 +57,12 @@ module axiLiteMaster (AXILiteMaster#(ADDR_sz, DATA_sz, USER_sz));
   // arbitrary work for each channel
   Bool sendWrite = cnt[3:0] == 0;
   rule putAWFlit (sendWrite);
-    AWLiteFlit#(ADDR_sz, USER_sz) f = ?;
+    AWLiteFlit#(ADDR_sz, AWUSER_sz) f = ?;
     shim.slave.aw.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
   rule putWFlit (sendWrite);
-    WLiteFlit#(DATA_sz, USER_sz) f = WLiteFlit{wdata: cnt, wstrb: ?, wuser: ?};
+    WLiteFlit#(DATA_sz, WUSER_sz) f = WLiteFlit{wdata: cnt, wstrb: ?, wuser: ?};
     shim.slave.w.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
@@ -73,10 +79,10 @@ module axiLiteMaster (AXILiteMaster#(ADDR_sz, DATA_sz, USER_sz));
 endmodule
 
 (* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiLiteSlave (AXILiteSlave#(ADDR_sz, DATA_sz, USER_sz));
+module axiLiteSlave (AXILiteSlave#(`PARAMS));
 
   // AXI slave shim
-  AXILiteShim#(ADDR_sz, DATA_sz, USER_sz) shim <- mkAXILiteShim;
+  AXILiteShim#(`PARAMS) shim <- mkAXILiteShim;
 
   // arbitrary work for each channel
   FIFOF#(Bit#(0)) writeResp <- mkFIFOF;
@@ -91,7 +97,7 @@ module axiLiteSlave (AXILiteSlave#(ADDR_sz, DATA_sz, USER_sz));
   endrule
   rule putBFlit;
     writeResp.deq;
-    BLiteFlit#(USER_sz) f = ?;
+    BLiteFlit#(BUSER_sz) f = ?;
     shim.master.b.put(f);
     $display("%0t - SLAVE - sending ", $time, fshow(f));
   endrule
@@ -104,7 +110,9 @@ module axiLiteSlave (AXILiteSlave#(ADDR_sz, DATA_sz, USER_sz));
 endmodule
 
 module top (Empty);
-  AXILiteMaster#(ADDR_sz, DATA_sz, USER_sz) master <- axiLiteMaster;
-  AXILiteSlave#(ADDR_sz, DATA_sz, USER_sz)  slave  <- axiLiteSlave;
+  AXILiteMaster#(`PARAMS) master <- axiLiteMaster;
+  AXILiteSlave#(`PARAMS)  slave  <- axiLiteSlave;
   mkConnection(master, slave);
 endmodule
+
+`undef PARAMS

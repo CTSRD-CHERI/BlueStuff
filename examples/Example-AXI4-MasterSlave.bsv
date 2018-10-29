@@ -34,16 +34,22 @@ import Connectable :: *;
 import FIFOF :: *;
 import SpecialFIFOs :: *;
 
-typedef 0 ID_sz;
-typedef 32 ADDR_sz;
+typedef   0 ID_sz;
+typedef  32 ADDR_sz;
 typedef 128 DATA_sz;
-typedef 0 USER_sz;
+typedef   0 AWUSER_sz;
+typedef   0 WUSER_sz;
+typedef   0 BUSER_sz;
+typedef   0 ARUSER_sz;
+typedef   0 RUSER_sz;
+
+`define PARAMS ID_sz, ADDR_sz, DATA_sz, AWUSER_sz, WUSER_sz, BUSER_sz, ARUSER_sz, RUSER_sz
 
 (* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiMaster (AXIMaster#(ID_sz, ADDR_sz, DATA_sz, USER_sz));
+module axiMaster (AXIMaster#(`PARAMS));
 
   // AXI master shim
-  AXIShim#(ID_sz, ADDR_sz, DATA_sz, USER_sz) shim <- mkAXIShim;
+  AXIShim#(`PARAMS) shim <- mkAXIShim;
 
   // counter
   Reg#(Bit#(DATA_sz)) cnt <- mkReg(0);
@@ -52,12 +58,12 @@ module axiMaster (AXIMaster#(ID_sz, ADDR_sz, DATA_sz, USER_sz));
   // arbitrary work for each channel
   Bool sendWrite = cnt[3:0] == 0;
   rule putAWFlit (sendWrite);
-    AWFlit#(ID_sz, ADDR_sz, USER_sz) f = ?;
+    AWFlit#(ID_sz, ADDR_sz, AWUSER_sz) f = ?;
     shim.slave.aw.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
   rule putWFlit (sendWrite);
-    WFlit#(DATA_sz, USER_sz) f = WFlit{
+    WFlit#(DATA_sz, WUSER_sz) f = WFlit{
       wdata: cnt, wstrb: ?, wlast: True, wuser: ?
     };
     shim.slave.w.put(f);
@@ -76,10 +82,10 @@ module axiMaster (AXIMaster#(ID_sz, ADDR_sz, DATA_sz, USER_sz));
 endmodule
 
 (* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiSlave (AXISlave#(ID_sz, ADDR_sz, DATA_sz, USER_sz));
+module axiSlave (AXISlave#(`PARAMS));
 
   // AXI slave shim
-  AXIShim#(ID_sz, ADDR_sz, DATA_sz, USER_sz) shim <- mkAXIShim;
+  AXIShim#(`PARAMS) shim <- mkAXIShim;
 
   // arbitrary work for each channel
   FIFOF#(Bit#(0)) writeResp <- mkFIFOF;
@@ -94,7 +100,7 @@ module axiSlave (AXISlave#(ID_sz, ADDR_sz, DATA_sz, USER_sz));
   endrule
   rule putBFlit;
     writeResp.deq;
-    BFlit#(ID_sz, USER_sz) f = ?;
+    BFlit#(ID_sz, BUSER_sz) f = ?;
     shim.master.b.put(f);
     $display("%0t - SLAVE - sending ", $time, fshow(f));
   endrule
@@ -107,7 +113,9 @@ module axiSlave (AXISlave#(ID_sz, ADDR_sz, DATA_sz, USER_sz));
 endmodule
 
 module top (Empty);
-  AXIMaster#(ID_sz, ADDR_sz, DATA_sz, USER_sz) master <- axiMaster;
-  AXISlave#(ID_sz, ADDR_sz, DATA_sz, USER_sz)  slave  <- axiSlave;
+  AXIMaster#(`PARAMS) master <- axiMaster;
+  AXISlave#(`PARAMS)  slave  <- axiSlave;
   mkConnection(master, slave);
 endmodule
+
+`undef PARAMS

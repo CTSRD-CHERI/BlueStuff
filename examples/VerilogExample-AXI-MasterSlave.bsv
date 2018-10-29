@@ -30,16 +30,23 @@ import AXI :: *;
 
 import SourceSink :: *;
 
-typedef 4 ID_sz;
-typedef 32 ADDR_sz;
+typedef   4 ID_sz;
+typedef  32 ADDR_sz;
 typedef 128 DATA_sz;
-typedef 0 USER_sz;
+typedef   0 AWUSER_sz;
+typedef   0 WUSER_sz;
+typedef   0 BUSER_sz;
+typedef   0 ARUSER_sz;
+typedef   0 RUSER_sz;
+
+`define PARAMS ID_sz, ADDR_sz, DATA_sz, AWUSER_sz, WUSER_sz, BUSER_sz, ARUSER_sz, RUSER_sz
+`define LITEPARAMS ADDR_sz, DATA_sz, AWUSER_sz, WUSER_sz, BUSER_sz, ARUSER_sz, RUSER_sz
 
 (* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiMaster (AXIMasterSynth#(ID_sz, ADDR_sz, DATA_sz, USER_sz));
+module axiMaster (AXIMasterSynth#(`PARAMS));
 
   // AXI master shim
-  AXIShim#(ID_sz, ADDR_sz, DATA_sz, USER_sz) shim <- mkAXIShim;
+  AXIShim#(`PARAMS) shim <- mkAXIShim;
 
   // arbitrary work for each channel
   rule enqAWFlit; shim.slave.aw.put(?); endrule
@@ -55,10 +62,10 @@ module axiMaster (AXIMasterSynth#(ID_sz, ADDR_sz, DATA_sz, USER_sz));
 endmodule
 
 (* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiLiteMaster (AXILiteMasterSynth#(ADDR_sz, DATA_sz, USER_sz));
+module axiLiteMaster (AXILiteMasterSynth#(`LITEPARAMS));
 
   // AXI master shim
-  AXILiteShim#(ADDR_sz, DATA_sz, USER_sz) shim <- mkAXILiteShim;
+  AXILiteShim#(`LITEPARAMS) shim <- mkAXILiteShim;
 
   // arbitrary work for each channel
   rule enqAWFlit; shim.slave.aw.put(?); endrule
@@ -74,10 +81,10 @@ module axiLiteMaster (AXILiteMasterSynth#(ADDR_sz, DATA_sz, USER_sz));
 endmodule
 
 (* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiSlave (AXISlaveSynth#(ID_sz, ADDR_sz, DATA_sz, USER_sz));
+module axiSlave (AXISlaveSynth#(`PARAMS));
 
   // AXI slave shim
-  AXIShim#(ID_sz, ADDR_sz, DATA_sz, USER_sz) shim <- mkAXIShim;
+  AXIShim#(`PARAMS) shim <- mkAXIShim;
 
   // arbitrary work for each channel
   rule deqAWFlit; let _ <- shim.master.aw.get; endrule
@@ -93,10 +100,10 @@ module axiSlave (AXISlaveSynth#(ID_sz, ADDR_sz, DATA_sz, USER_sz));
 endmodule
 
 (* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiLiteSlave (AXILiteSlaveSynth#(ADDR_sz, DATA_sz, USER_sz));
+module axiLiteSlave (AXILiteSlaveSynth#(`LITEPARAMS));
 
   // AXI slave shim
-  AXILiteShim#(ADDR_sz, DATA_sz, USER_sz) shim <- mkAXILiteShim;
+  AXILiteShim#(`LITEPARAMS) shim <- mkAXILiteShim;
 
   // arbitrary work for each channel
   rule deqAWFlit; let _ <- shim.master.aw.get; endrule
@@ -110,3 +117,6 @@ module axiLiteSlave (AXILiteSlaveSynth#(ADDR_sz, DATA_sz, USER_sz));
   return ifcSynth;
 
 endmodule
+
+`undef LITEPARAMS
+`undef PARAMS

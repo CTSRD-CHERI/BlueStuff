@@ -416,24 +416,32 @@ interface AXIMaster#(
   numeric type id_,
   numeric type addr_,
   numeric type data_,
-  numeric type user_);
-  interface Source#(AWFlit#(id_, addr_, user_)) aw;
-  interface Source#(WFlit#(data_, user_))       w;
-  interface Sink#(BFlit#(id_, user_))           b;
-  interface Source#(ARFlit#(id_, addr_, user_)) ar;
-  interface Sink#(RFlit#(id_, data_, user_))    r;
+  numeric type awuser_,
+  numeric type wuser_,
+  numeric type buser_,
+  numeric type aruser_,
+  numeric type ruser_);
+  interface Source#(AWFlit#(id_, addr_, awuser_)) aw;
+  interface Source#(WFlit#(data_, wuser_))        w;
+  interface Sink#(BFlit#(id_, buser_))            b;
+  interface Source#(ARFlit#(id_, addr_, aruser_)) ar;
+  interface Sink#(RFlit#(id_, data_, ruser_))     r;
 endinterface
 
 interface AXIMasterSynth#(
   numeric type id_,
   numeric type addr_,
   numeric type data_,
-  numeric type user_);
-  interface AWMaster#(id_, addr_, user_) aw;
-  interface WMaster#(data_, user_)       w;
-  interface BMaster#(id_, user_)         b;
-  interface ARMaster#(id_, addr_, user_) ar;
-  interface RMaster#(id_, data_, user_)  r;
+  numeric type awuser_,
+  numeric type wuser_,
+  numeric type buser_,
+  numeric type aruser_,
+  numeric type ruser_);
+  interface AWMaster#(id_, addr_, awuser_) aw;
+  interface WMaster#(data_, wuser_)        w;
+  interface BMaster#(id_, buser_)          b;
+  interface ARMaster#(id_, addr_, aruser_) ar;
+  interface RMaster#(id_, data_, ruser_)   r;
 endinterface
 
 ///////////////
@@ -444,24 +452,32 @@ interface AXISlave#(
   numeric type id_,
   numeric type addr_,
   numeric type data_,
-  numeric type user_);
-  interface Sink#(AWFlit#(id_, addr_, user_))  aw;
-  interface Sink#(WFlit#(data_, user_))        w;
-  interface Source#(BFlit#(id_, user_))        b;
-  interface Sink#(ARFlit#(id_, addr_, user_))  ar;
-  interface Source#(RFlit#(id_, data_, user_)) r;
+  numeric type awuser_,
+  numeric type wuser_,
+  numeric type buser_,
+  numeric type aruser_,
+  numeric type ruser_);
+  interface Sink#(AWFlit#(id_, addr_, awuser_)) aw;
+  interface Sink#(WFlit#(data_, wuser_))        w;
+  interface Source#(BFlit#(id_, buser_))        b;
+  interface Sink#(ARFlit#(id_, addr_, aruser_)) ar;
+  interface Source#(RFlit#(id_, data_, ruser_)) r;
 endinterface
 
 interface AXISlaveSynth#(
   numeric type id_,
   numeric type addr_,
   numeric type data_,
-  numeric type user_);
-  interface AWSlave#(id_, addr_, user_) aw;
-  interface WSlave#(data_, user_)       w;
-  interface BSlave#(id_, user_)         b;
-  interface ARSlave#(id_, addr_, user_) ar;
-  interface RSlave#(id_, data_, user_)  r;
+  numeric type awuser_,
+  numeric type wuser_,
+  numeric type buser_,
+  numeric type aruser_,
+  numeric type ruser_);
+  interface AWSlave#(id_, addr_, awuser_) aw;
+  interface WSlave#(data_, wuser_)        w;
+  interface BSlave#(id_, buser_)          b;
+  interface ARSlave#(id_, addr_, aruser_) ar;
+  interface RSlave#(id_, data_, ruser_)   r;
 endinterface
 
 ///////////////////////////////
@@ -472,18 +488,30 @@ interface AXIShim#(
   numeric type id_,
   numeric type addr_,
   numeric type data_,
-  numeric type user_);
-  interface AXIMaster#(id_, addr_, data_, user_) master;
-  interface AXISlave#(id_, addr_, data_, user_) slave;
+  numeric type awuser_,
+  numeric type wuser_,
+  numeric type buser_,
+  numeric type aruser_,
+  numeric type ruser_);
+  interface AXIMaster#(
+    id_, addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_
+  ) master;
+  interface AXISlave#(
+    id_, addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_
+  ) slave;
 endinterface
 
 ///////////////////////////////
 // AXI Connectable instances //
 ////////////////////////////////////////////////////////////////////////////////
 
-instance Connectable#(AXIMaster#(a, b, c, d), AXISlave#(a, b, c, d));
-  module mkConnection#(AXIMaster#(a, b, c, d) m, AXISlave#(a, b, c, d) s)
-  (Empty);
+instance Connectable#(
+  AXIMaster#(a, b, c, d, e, f, g, h),
+  AXISlave#(a, b, c, d, e, f, g, h));
+  module mkConnection#(
+    AXIMaster#(a, b, c, d, e, f, g, h) m,
+    AXISlave#(a, b, c, d, e, f, g, h) s)
+    (Empty);
     mkConnection(m.aw, s.aw);
     mkConnection(m.w, s.w);
     mkConnection(m.b, s.b);
@@ -491,9 +519,13 @@ instance Connectable#(AXIMaster#(a, b, c, d), AXISlave#(a, b, c, d));
     mkConnection(m.r, s.r);
   endmodule
 endinstance
-instance Connectable#(AXISlave#(a, b, c, d), AXIMaster#(a, b, c, d));
-  module mkConnection#(AXISlave#(a, b, c, d) s, AXIMaster#(a, b, c, d) m)
-  (Empty);
+instance Connectable#(
+  AXISlave#(a, b, c, d, e, f, g, h),
+  AXIMaster#(a, b, c, d, e, f, g, h));
+  module mkConnection#(
+    AXISlave#(a, b, c, d, e, f, g, h) s,
+    AXIMaster#(a, b, c, d, e, f, g, h) m)
+    (Empty);
     mkConnection(m, s);
   endmodule
 endinstance
@@ -503,16 +535,20 @@ endinstance
 ////////////////////////////////////////////////////////////////////////////////
 
 typedef union tagged {
-  Tuple2#(AWFlit#(id_, addr_, user_), WFlit#(data_, user_)) FirstFlit;
-  WFlit#(data_, user_) OtherFlit;
+  Tuple2#(AWFlit#(id_, addr_, awuser_), WFlit#(data_, wuser_)) FirstFlit;
+  WFlit#(data_, wuser_) OtherFlit;
 } AXIWriteFlit#(
   numeric type id_,
   numeric type addr_,
   numeric type data_,
-  numeric type user_) deriving (Bits);
-instance Routable#(AXIWriteFlit#(id_, addr_, data_, user_),
-                   BFlit#(id_, user_),
-                   Bit#(addr_));
+  numeric type awuser_,
+  numeric type wuser_) deriving (Bits);
+instance Routable#(
+  AXIWriteFlit#(id_, addr_, data_, awuser_, wuser_),
+  BFlit#(id_, buser_),
+  Bit#(addr_)) provisos (
+    Routable#(AWFlit#(id_, addr_, awuser_), BFlit#(id_, buser_), Bit#(addr_))
+  );
   function routingField(x) = case (x) matches
     tagged FirstFlit {.aw, .w}: routingField(aw);
     default: ?;
@@ -522,7 +558,7 @@ instance Routable#(AXIWriteFlit#(id_, addr_, data_, user_),
     default: ?;
   endcase;
 endinstance
-instance DetectLast#(AXIWriteFlit#(id_, addr_, data_, user_));
+instance DetectLast#(AXIWriteFlit#(id_, addr_, data_, awuser_, wuser_));
   function detectLast(x) = case (x) matches
     tagged FirstFlit {.aw, .w}: detectLast(w);
     tagged OtherFlit .w: detectLast(w);
@@ -534,13 +570,13 @@ endinstance
 ////////////////////////////////////////////////////////////////////////////////
 
 instance ExpandReqRsp#(
-  AXIWriteFlit#(id_, addr_, data_, user_),
-  AXIWriteFlit#(sid_, addr_, data_, user_),
-  BFlit#(sid_, user_),
-  BFlit#(id_, user_),
+  AXIWriteFlit#(id_, addr_, data_, awuser_, wuser_),
+  AXIWriteFlit#(sid_, addr_, data_, awuser_, wuser_),
+  BFlit#(sid_, buser_),
+  BFlit#(id_, buser_),
   Bit#(n)) provisos (Add#(id_, n, sid_));
   function expand(r, x) = case (r) matches
-    tagged FirstFlit {.aw, .w}: FirstFlit(tuple2(AWFlit{
+    tagged FirstFlit {.aw, .w}: FirstFlit(tuple2(AWFlit {
       awid: {x, aw.awid}, awaddr: aw.awaddr, awlen: aw.awlen, awsize: aw.awsize,
       awburst: aw.awburst, awlock: aw.awlock, awcache: aw.awcache,
       awprot: aw.awprot, awqos: aw.awqos, awregion: aw.awregion,
@@ -548,24 +584,24 @@ instance ExpandReqRsp#(
     }, w));
     tagged OtherFlit .f: OtherFlit(f);
   endcase;
-  function shrink(r) = tuple2(BFlit{
+  function shrink(r) = tuple2(BFlit {
     bid: truncate(r.bid), bresp: r.bresp, buser: r.buser
   }, truncateLSB(r.bid));
 endinstance
 
 instance ExpandReqRsp#(
-  ARFlit#(id_, addr_, user_),
-  ARFlit#(sid_, addr_, user_),
-  RFlit#(sid_, data_, user_),
-  RFlit#(id_, data_, user_),
+  ARFlit#(id_, addr_, aruser_),
+  ARFlit#(sid_, addr_, aruser_),
+  RFlit#(sid_, data_, ruser_),
+  RFlit#(id_, data_, ruser_),
   Bit#(n)) provisos (Add#(id_, n, sid_));
-  function expand(ar, x) = ARFlit{
+  function expand(ar, x) = ARFlit {
     arid: {x, ar.arid}, araddr: ar.araddr, arlen: ar.arlen, arsize: ar.arsize,
     arburst: ar.arburst, arlock: ar.arlock, arcache: ar.arcache,
     arprot: ar.arprot, arqos: ar.arqos, arregion: ar.arregion,
     aruser: ar.aruser
   };
-  function shrink(r) = tuple2(RFlit{
+  function shrink(r) = tuple2(RFlit {
     rid: truncate(r.rid), rdata: r.rdata, rresp: r.rresp,
     rlast: r.rlast, ruser: r.ruser
   }, truncateLSB(r.rid));

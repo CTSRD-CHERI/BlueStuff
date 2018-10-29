@@ -47,15 +47,22 @@ typedef 0 MID_sz;
 typedef TAdd#(MID_sz, TLog#(NMASTERS)) SID_sz;
 typedef TAdd#(1, TLog#(TMul#(NSLAVES, SlaveWidth))) ADDR_sz;
 typedef 128 DATA_sz;
-typedef 0 USER_sz;
+typedef   0 AWUSER_sz;
+typedef   0 WUSER_sz;
+typedef   0 BUSER_sz;
+typedef   0 ARUSER_sz;
+typedef   0 RUSER_sz;
 
-`define MASTER_T AXIMaster#(MID_sz, ADDR_sz, DATA_sz, USER_sz)
-`define SLAVE_T  AXISlave#(SID_sz, ADDR_sz, DATA_sz, USER_sz)
+`define PARAMS ADDR_sz, DATA_sz, AWUSER_sz, WUSER_sz, BUSER_sz, ARUSER_sz, RUSER_sz
+`define MPARAMS MID_sz, `PARAMS
+`define SPARAMS SID_sz, `PARAMS
+`define MASTER_T AXIMaster#(`MPARAMS)
+`define SLAVE_T  AXISlave#(`SPARAMS)
 
 module axiMaster (`MASTER_T);
 
   // AXI master shim
-  AXIShim#(MID_sz, ADDR_sz, DATA_sz, USER_sz) shim <- mkAXIShim;
+  AXIShim#(`MPARAMS) shim <- mkAXIShim;
   // Req addr
   Reg#(Bit#(ADDR_sz)) nextWriteAddr <- mkReg(0);
 
@@ -66,7 +73,7 @@ module axiMaster (`MASTER_T);
   // arbitrary work for each channel
   Bool sendWrite = cnt[3:0] == 0;
   rule putAWFlit (sendWrite);
-    AWFlit#(MID_sz, ADDR_sz, USER_sz) f = ?;
+    AWFlit#(MID_sz, ADDR_sz, AWUSER_sz) f = ?;
     f.awaddr = nextWriteAddr;
     f.awlen  = 0;
     nextWriteAddr <= nextWriteAddr + fromInteger(valueOf(SlaveWidth)) + 1;
@@ -74,7 +81,7 @@ module axiMaster (`MASTER_T);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
   rule putWFlit (sendWrite);
-    WFlit#(DATA_sz, USER_sz) f = WFlit{
+    WFlit#(DATA_sz, WUSER_sz) f = WFlit{
       wdata: cnt, wstrb: ?, wlast: True, wuser: ?
     };
     shim.slave.w.put(f);
@@ -95,7 +102,7 @@ endmodule
 module axiSlave (`SLAVE_T);
 
   // AXI slave shim
-  AXIShim#(SID_sz, ADDR_sz, DATA_sz, USER_sz) shim <- mkAXIShim;
+  AXIShim#(`SPARAMS) shim <- mkAXIShim;
 
   // arbitrary work for each channel
   let writeResp <- mkFIFOF;
@@ -145,5 +152,8 @@ module top (Empty);
   mkAXIBus(maptab, ms, ss);
 endmodule
 
+`undef PARAMS
+`undef MPARAMS
+`undef SPARAMS
 `undef MASTER_T
 `undef SLAVE_T
