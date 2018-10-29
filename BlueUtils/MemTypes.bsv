@@ -112,27 +112,27 @@ instance NeedRsp#(MemReq#(a,b));
   endfunction
 endinstance
 
-instance ToAXIAWLiteFlit#(MemReq#(addr_t, data_t), addr_sz)
+instance ToAXIAWLiteFlit#(MemReq#(addr_t, data_t), addr_sz, user_sz)
   provisos (Bits#(addr_t, addr_sz));
   function toAXIAWLiteFlit(x);
     let w = x.WriteReq;
-    return AWLiteFlit {awaddr: pack(w.addr), awprot: 0};
+    return AWLiteFlit {awaddr: pack(w.addr), awprot: 0, awuser: 0};
   endfunction
 endinstance
 
-instance ToAXIWLiteFlit#(MemReq#(addr_t, data_t), data_sz)
+instance ToAXIWLiteFlit#(MemReq#(addr_t, data_t), data_sz, user_sz)
   provisos (Bits#(data_t, data_sz));
   function toAXIWLiteFlit(x);
     let w = x.WriteReq;
-    return WLiteFlit {wdata: pack(w.data), wstrb: w.byteEnable};
+    return WLiteFlit {wdata: pack(w.data), wstrb: w.byteEnable, wuser: 0};
   endfunction
 endinstance
 
-instance ToAXIARLiteFlit#(MemReq#(addr_t, data_t), addr_sz)
+instance ToAXIARLiteFlit#(MemReq#(addr_t, data_t), addr_sz, user_sz)
   provisos (Bits#(addr_t, addr_sz));
   function toAXIARLiteFlit(x);
     let r = x.ReadReq;
-    return ARLiteFlit {araddr: pack(r.addr), arprot: 0};
+    return ARLiteFlit {araddr: pack(r.addr), arprot: 0, aruser: 0};
   endfunction
 endinstance
 
@@ -143,7 +143,7 @@ typedef union tagged {
   void BusError;
 } MemRsp#(type content_t) deriving (Bits, FShow);
 
-instance FromAXIRLiteFlit#(MemRsp#(data_t), data_sz)
+instance FromAXIRLiteFlit#(MemRsp#(data_t), data_sz, user_sz)
   provisos (Bits#(data_t, data_sz));
   function fromAXIRLiteFlit(x) = case (x.rresp)
     OKAY: ReadRsp(unpack(x.rdata));
@@ -151,7 +151,7 @@ instance FromAXIRLiteFlit#(MemRsp#(data_t), data_sz)
   endcase;
 endinstance
 
-instance FromAXIBLiteFlit#(MemRsp#(data_t));
+instance FromAXIBLiteFlit#(MemRsp#(data_t), user_sz);
   function fromAXIBLiteFlit(x) = case (x.bresp)
     OKAY: WriteRsp;
     default: BusError;

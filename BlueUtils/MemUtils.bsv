@@ -39,7 +39,7 @@ import FIFO :: *;
 ////////////////////////////////////////////////////////////////////////////////
 
 module mkMemToAXILiteSlave#(Mem#(addr_t, data_t) mem)
-  (AXILiteSlave#(addr_sz, data_sz))
+  (AXILiteSlave#(addr_sz, data_sz, user_sz))
   provisos (Bits#(addr_t, addr_sz), Bits#(data_t, data_sz));
   let shim <- mkAXILiteShim;
   // which response ?
@@ -58,7 +58,7 @@ module mkMemToAXILiteSlave#(Mem#(addr_t, data_t) mem)
   rule writeRsp(expectWriteRsp.first);
     expectWriteRsp.deq;
     let _ <- mem.source.get;
-    shim.master.b.put(BLiteFlit{bresp: OKAY});
+    shim.master.b.put(BLiteFlit{bresp: OKAY, buser: ?});
   endrule
   rule readReq;
     let arflit <- shim.master.ar.get;
@@ -71,7 +71,9 @@ module mkMemToAXILiteSlave#(Mem#(addr_t, data_t) mem)
   rule readRsp(!expectWriteRsp.first);
     expectWriteRsp.deq;
     let rsp <- mem.source.get;
-    shim.master.r.put(RLiteFlit{rdata: pack(rsp.ReadRsp), rresp: OKAY});
+    shim.master.r.put(RLiteFlit {
+      rdata: pack(rsp.ReadRsp), rresp: OKAY, ruser: ?
+    });
   endrule
   return shim.slave;
 endmodule
@@ -100,7 +102,7 @@ provisos(
   end
 endmodule
 
-module mkAXILiteMem#(Integer size, Maybe#(String) file) (AXILiteSlave#(a_sz, d_sz))
+module mkAXILiteMem#(Integer size, Maybe#(String) file) (AXILiteSlave#(a_sz, d_sz, u_sz))
   provisos (
     Log#(TAdd#(1, TDiv#(d_sz, 8)), TAdd#(TLog#(TDiv#(d_sz, 8)), 1)),
     Add#(a__, TLog#(TDiv#(d_sz, 8)), a_sz)
@@ -137,13 +139,13 @@ provisos(
 endmodule
 
 module mkAXILiteSharedMem2#(Integer size, Maybe#(String) file)
-  (Array#(AXILiteSlave#(addr_sz, data_sz)))
+  (Array#(AXILiteSlave#(addr_sz, data_sz, user_sz)))
   provisos (
     Log#(TAdd#(1, TDiv#(data_sz, 8)), TAdd#(TLog#(TDiv#(data_sz, 8)), 1)),
     Add#(a__, TLog#(TDiv#(data_sz, 8)), addr_sz)
   );
   Mem#(Bit#(addr_sz), Bit#(data_sz)) mem[2] <- mkSharedMem2(size, file);
-  AXILiteSlave#(addr_sz, data_sz) ifc[2];
+  AXILiteSlave#(addr_sz, data_sz, user_sz) ifc[2];
   ifc[0] <- mkMemToAXILiteSlave(mem[0]);
   ifc[1] <- mkMemToAXILiteSlave(mem[1]);
   return ifc;

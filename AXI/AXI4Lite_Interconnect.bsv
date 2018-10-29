@@ -44,8 +44,8 @@ import Routable :: *;
 
 module mkAXILiteBus#(
     MappingTable#(nRoutes, addr_) maptab,
-    Vector#(nMasters, AXILiteMaster#(addr_, data_)) masters,
-    Vector#(nSlaves, AXILiteSlave#(addr_, data_)) slaves
+    Vector#(nMasters, AXILiteMaster#(addr_, data_, user_)) masters,
+    Vector#(nSlaves, AXILiteSlave#(addr_, data_, user_)) slaves
   ) (Empty) provisos (
     // assertion on argument sizes
     Add#(1, a__, nMasters), // at least one master is needed
@@ -54,9 +54,9 @@ module mkAXILiteBus#(
   );
 
   // prepare masters
-  Vector#(nMasters, Master#(AXILiteWriteFlit#(addr_, data_), BLiteFlit))
+  Vector#(nMasters, Master#(AXILiteWriteFlit#(addr_, data_, user_), BLiteFlit#(user_)))
     write_masters = newVector;
-  Vector#(nMasters, Master#(ARLiteFlit#(addr_), RLiteFlit#(data_)))
+  Vector#(nMasters, Master#(ARLiteFlit#(addr_, user_), RLiteFlit#(data_, user_)))
     read_masters  = newVector;
   for (Integer i = 0; i < valueOf(nMasters); i = i + 1) begin
     Bit#(TLog#(nMasters)) mid = fromInteger(i);
@@ -72,9 +72,9 @@ module mkAXILiteBus#(
   end
 
   // prepare slaves
-  Vector#(nSlaves, Slave#(AXILiteWriteFlit#(addr_, data_), BLiteFlit))
+  Vector#(nSlaves, Slave#(AXILiteWriteFlit#(addr_, data_, user_), BLiteFlit#(user_)))
     write_slaves = newVector;
-  Vector#(nSlaves, Slave#(ARLiteFlit#(addr_), RLiteFlit#(data_)))
+  Vector#(nSlaves, Slave#(ARLiteFlit#(addr_, user_), RLiteFlit#(data_, user_)))
     read_slaves   = newVector;
   for (Integer i = 0; i < valueOf(nSlaves); i = i + 1) begin  
     // split to write slaves

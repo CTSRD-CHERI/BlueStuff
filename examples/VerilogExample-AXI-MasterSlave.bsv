@@ -55,10 +55,10 @@ module axiMaster (AXIMasterSynth#(ID_sz, ADDR_sz, DATA_sz, USER_sz));
 endmodule
 
 (* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiLiteMaster (AXILiteMasterSynth#(ADDR_sz, DATA_sz));
+module axiLiteMaster (AXILiteMasterSynth#(ADDR_sz, DATA_sz, USER_sz));
 
   // AXI master shim
-  AXILiteShim#(ADDR_sz, DATA_sz) shim <- mkAXILiteShim;
+  AXILiteShim#(ADDR_sz, DATA_sz, USER_sz) shim <- mkAXILiteShim;
 
   // arbitrary work for each channel
   rule enqAWFlit; shim.slave.aw.put(?); endrule
@@ -93,10 +93,10 @@ module axiSlave (AXISlaveSynth#(ID_sz, ADDR_sz, DATA_sz, USER_sz));
 endmodule
 
 (* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiLiteSlave (AXILiteSlaveSynth#(ADDR_sz, DATA_sz));
+module axiLiteSlave (AXILiteSlaveSynth#(ADDR_sz, DATA_sz, USER_sz));
 
   // AXI slave shim
-  AXILiteShim#(ADDR_sz, DATA_sz) shim <- mkAXILiteShim;
+  AXILiteShim#(ADDR_sz, DATA_sz, USER_sz) shim <- mkAXILiteShim;
 
   // arbitrary work for each channel
   rule deqAWFlit; let _ <- shim.master.aw.get; endrule

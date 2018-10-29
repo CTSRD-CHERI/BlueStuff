@@ -45,7 +45,7 @@ import SpecialFIFOs :: *;
 // AXI Shim Master <-> Slave //
 ////////////////////////////////////////////////////////////////////////////////
 
-module mkAXILiteShim (AXILiteShim#(addr_, data_));
+module mkAXILiteShim (AXILiteShim#(addr_, data_, user_));
   let awff <- mkBypassFIFOF;
   let  wff <- mkBypassFIFOF;
   let  bff <- mkBypassFIFOF;
@@ -72,8 +72,8 @@ endmodule
 ////////////////////////////////////////////////////////////////////////////////
 
 // AXI Master
-module toAXILiteMasterSynth#(AXILiteMaster#(addr_, data_) master)
-  (AXILiteMasterSynth#(addr_, data_));
+module toAXILiteMasterSynth#(AXILiteMaster#(addr_, data_, user_) master)
+  (AXILiteMasterSynth#(addr_, data_, user_));
   let awifc <- toAXIAWLiteMaster(master.aw);
   let wifc  <- toAXIWLiteMaster(master.w);
   let bifc  <- toAXIBLiteMaster(master.b);
@@ -87,8 +87,8 @@ module toAXILiteMasterSynth#(AXILiteMaster#(addr_, data_) master)
 endmodule
 
 // AXI Slave
-module toAXILiteSlaveSynth#(AXILiteSlave#(addr_, data_) master)
-  (AXILiteSlaveSynth#(addr_, data_));
+module toAXILiteSlaveSynth#(AXILiteSlave#(addr_, data_, user_) master)
+  (AXILiteSlaveSynth#(addr_, data_, user_));
   let awifc <- toAXIAWLiteSlave(master.aw);
   let wifc  <- toAXIWLiteSlave(master.w);
   let bifc  <- toAXIBLiteSlave(master.b);
@@ -105,9 +105,9 @@ endmodule
 // AXI Write channel helpers //
 ////////////////////////////////////////////////////////////////////////////////
 
-function Source#(AXILiteWriteFlit#(a, b)) mergeLiteWrite(
-  Source#(AWLiteFlit#(a)) aw,
-  Source#(WLiteFlit#(b)) w) = interface Source;
+function Source#(AXILiteWriteFlit#(a, b, c)) mergeLiteWrite(
+  Source#(AWLiteFlit#(a, c)) aw,
+  Source#(WLiteFlit#(b, c)) w) = interface Source;
     method canGet = aw.canGet && w.canGet;
     method peek   = AXILiteWriteFlit { aw: aw.peek, w: w.peek };
     method get    = actionvalue
@@ -117,9 +117,9 @@ function Source#(AXILiteWriteFlit#(a, b)) mergeLiteWrite(
     endactionvalue;
   endinterface;
 
-function Sink#(AXILiteWriteFlit#(a, b)) splitLiteWrite(
-  Sink#(AWLiteFlit#(a)) aw,
-  Sink#(WLiteFlit#(b)) w) = interface Sink;
+function Sink#(AXILiteWriteFlit#(a, b, c)) splitLiteWrite(
+  Sink#(AWLiteFlit#(a, c)) aw,
+  Sink#(WLiteFlit#(b, c)) w) = interface Sink;
     method canPut = aw.canPut && w.canPut;
     method put(x) = action
       aw.put(x.aw);

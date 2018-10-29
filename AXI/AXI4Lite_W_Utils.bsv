@@ -39,40 +39,41 @@ import SpecialFIFOs :: *;
 
 // typeclasses to convert to/from the flit type
 
-typeclass ToAXIWLiteFlit#(type t, numeric type data_);
-  function WLiteFlit#(data_) toAXIWLiteFlit (t x);
+typeclass ToAXIWLiteFlit#(type t, numeric type data_, numeric type user_);
+  function WLiteFlit#(data_, user_) toAXIWLiteFlit (t x);
 endtypeclass
 
-instance ToAXIWLiteFlit#(WLiteFlit#(a), a);
+instance ToAXIWLiteFlit#(WLiteFlit#(a, b), a, b);
   function toAXIWLiteFlit = id;
 endinstance
 
-typeclass FromAXIWLiteFlit#(type t, numeric type data_);
-  function t fromAXIWLiteFlit (WLiteFlit#(data_) x);
+typeclass FromAXIWLiteFlit#(type t, numeric type data_, numeric type user_);
+  function t fromAXIWLiteFlit (WLiteFlit#(data_, user_) x);
 endtypeclass
 
-instance FromAXIWLiteFlit#(WLiteFlit#(a), a);
+instance FromAXIWLiteFlit#(WLiteFlit#(a, b), a, b);
   function fromAXIWLiteFlit = id;
 endinstance
 
 // typeclass to turn an interface to the Master interface
 
 typeclass ToAXIWLiteMaster#(type t);
-  module toAXIWLiteMaster#(t#(x) ifc) (WLiteMaster#(data_))
-  provisos (ToAXIWLiteFlit#(x, data_));
+  module toAXIWLiteMaster#(t#(x) ifc) (WLiteMaster#(data_, user_))
+  provisos (ToAXIWLiteFlit#(x, data_, user_));
 endtypeclass
 
 instance ToAXIWLiteMaster#(Source);
   module toAXIWLiteMaster#(Source#(t) src)
-  (WLiteMaster#(data_)) provisos (ToAXIWLiteFlit#(t, data_));
+  (WLiteMaster#(data_, user_)) provisos (ToAXIWLiteFlit#(t, data_, user_));
 
-    Wire#(WLiteFlit#(data_)) flit <- mkDWire(?);
+    Wire#(WLiteFlit#(data_, user_)) flit <- mkDWire(?);
     rule getFlit (src.canGet); flit <= toAXIWLiteFlit(src.peek); endrule
     PulseWire getWire <- mkPulseWire;
     rule doGet (getWire && src.canGet); let _ <- src.get; endrule
 
     method wdata  = flit.wdata;
     method wstrb  = flit.wstrb;
+    method wuser  = flit.wuser;
     method wvalid = src.canGet;
     method wready(rdy) = action if (rdy) getWire.send; endaction;
 
@@ -81,15 +82,16 @@ endinstance
 
 instance ToAXIWLiteMaster#(FIFOF);
   module toAXIWLiteMaster#(FIFOF#(t) ff)
-  (WLiteMaster#(data_)) provisos (ToAXIWLiteFlit#(t, data_));
+  (WLiteMaster#(data_, user_)) provisos (ToAXIWLiteFlit#(t, data_, user_));
 
-    Wire#(WLiteFlit#(data_)) flit <- mkDWire(?);
+    Wire#(WLiteFlit#(data_, user_)) flit <- mkDWire(?);
     rule getFlit (ff.notEmpty); flit <= toAXIWLiteFlit(ff.first); endrule
     PulseWire deqWire <- mkPulseWire;
     rule doDeq (deqWire && ff.notEmpty); ff.deq; endrule
 
     method wdata  = flit.wdata;
     method wstrb  = flit.wstrb;
+    method wuser  = flit.wuser;
     method wvalid = ff.notEmpty;
     method wready(rdy) = action if (rdy) deqWire.send; endaction;
 
@@ -99,23 +101,27 @@ endinstance
 // typeclass to turn an interface to the Slave interface
 
 typeclass ToAXIWLiteSlave#(type t);
-  module toAXIWLiteSlave#(t#(x) ifc) (WLiteSlave#(data_))
-  provisos (FromAXIWLiteFlit#(x, data_));
+  module toAXIWLiteSlave#(t#(x) ifc) (WLiteSlave#(data_, user_))
+  provisos (FromAXIWLiteFlit#(x, data_, user_));
 endtypeclass
 
 instance ToAXIWLiteSlave#(Sink);
   module toAXIWLiteSlave#(Sink#(t) snk)
-  (WLiteSlave#(data_)) provisos (FromAXIWLiteFlit#(t, data_));
+  (WLiteSlave#(data_, user_)) provisos (FromAXIWLiteFlit#(t, data_, user_));
 
     let w_wdata <- mkDWire(?);
     let w_wstrb <- mkDWire(?);
+    let w_wuser <- mkDWire(?);
     PulseWire putWire <- mkPulseWire;
     rule doPut (putWire && snk.canPut);
-      snk.put(fromAXIWLiteFlit(WLiteFlit{wdata: w_wdata, wstrb: w_wstrb}));
+      snk.put(fromAXIWLiteFlit(WLiteFlit {
+        wdata: w_wdata, wstrb: w_wstrb, wuser: w_wuser
+      }));
     endrule
 
     method wdata(data)   = action w_wdata <= data; endaction;
     method wstrb(strb)   = action w_wstrb <= strb; endaction;
+    method wuser(user)   = action w_wuser <= user; endaction;
     method wvalid(valid) = action if (valid) putWire.send; endaction;
     method wready        = snk.canPut;
 
@@ -124,17 +130,21 @@ endinstance
 
 instance ToAXIWLiteSlave#(FIFOF);
   module toAXIWLiteSlave#(FIFOF#(t) ff)
-  (WLiteSlave#(data_)) provisos (FromAXIWLiteFlit#(t, data_));
+  (WLiteSlave#(data_, user_)) provisos (FromAXIWLiteFlit#(t, data_, user_));
 
     let w_wdata <- mkDWire(?);
     let w_wstrb <- mkDWire(?);
+    let w_wuser <- mkDWire(?);
     PulseWire enqWire <- mkPulseWire;
     rule doEnq (enqWire && ff.notFull);
-      ff.enq(fromAXIWLiteFlit(WLiteFlit{wdata: w_wdata, wstrb: w_wstrb}));
+      ff.enq(fromAXIWLiteFlit(WLiteFlit {
+        wdata: w_wdata, wstrb: w_wstrb, wuser: w_wuser
+      }));
     endrule
 
     method wdata(data)   = action w_wdata <= data; endaction;
     method wstrb(strb)   = action w_wstrb <= strb; endaction;
+    method wuser(user)   = action w_wuser <= user; endaction;
     method wvalid(valid) = action if (valid) enqWire.send; endaction;
     method wready        = ff.notFull;
 

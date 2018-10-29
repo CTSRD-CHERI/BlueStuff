@@ -39,40 +39,42 @@ import SpecialFIFOs :: *;
 
 // typeclasses to convert to/from the flit type
 
-typeclass ToAXIBLiteFlit#(type t);
-  function BLiteFlit toAXIBLiteFlit (t x);
+typeclass ToAXIBLiteFlit#(type t, numeric type user_);
+  function BLiteFlit#(user_) toAXIBLiteFlit (t x);
 endtypeclass
 
-instance ToAXIBLiteFlit#(BLiteFlit);
+instance ToAXIBLiteFlit#(BLiteFlit#(user_), user_);
   function toAXIBLiteFlit = id;
 endinstance
 
-typeclass FromAXIBLiteFlit#(type t);
-  function t fromAXIBLiteFlit (BLiteFlit x);
+typeclass FromAXIBLiteFlit#(type t, numeric type user_);
+  function t fromAXIBLiteFlit (BLiteFlit#(user_) x);
 endtypeclass
 
-instance FromAXIBLiteFlit#(BLiteFlit);
+instance FromAXIBLiteFlit#(BLiteFlit#(user_), user_);
   function fromAXIBLiteFlit = id;
 endinstance
 
 // typeclass to turn an interface to the Master interface
 
 typeclass ToAXIBLiteMaster#(type t);
-  module toAXIBLiteMaster#(t#(x) ifc) (BLiteMaster)
-  provisos (FromAXIBLiteFlit#(x));
+  module toAXIBLiteMaster#(t#(x) ifc) (BLiteMaster#(user_))
+  provisos (FromAXIBLiteFlit#(x, user_));
 endtypeclass
 
 instance ToAXIBLiteMaster#(Sink);
   module toAXIBLiteMaster#(Sink#(t) snk)
-  (BLiteMaster) provisos (FromAXIBLiteFlit#(t));
+  (BLiteMaster#(user_)) provisos (FromAXIBLiteFlit#(t, user_));
 
     let w_bresp <- mkDWire(?);
+    let w_buser <- mkDWire(?);
     PulseWire putWire <- mkPulseWire;
     rule doPut (putWire && snk.canPut);
-      snk.put(fromAXIBLiteFlit(BLiteFlit{bresp: w_bresp}));
+      snk.put(fromAXIBLiteFlit(BLiteFlit{bresp: w_bresp, buser: w_buser}));
     endrule
 
     method bresp(resp)   = action w_bresp <= resp; endaction;
+    method buser(user)   = action w_buser <= user; endaction;
     method bvalid(valid) = action if (valid) putWire.send; endaction;
     method bready        = snk.canPut;
 
@@ -81,15 +83,17 @@ endinstance
 
 instance ToAXIBLiteMaster#(FIFOF);
   module toAXIBLiteMaster#(FIFOF#(t) ff)
-  (BLiteMaster) provisos (FromAXIBLiteFlit#(t));
+  (BLiteMaster#(user_)) provisos (FromAXIBLiteFlit#(t, user_));
 
     let w_bresp <- mkDWire(?);
+    let w_buser <- mkDWire(?);
     PulseWire enqWire <- mkPulseWire;
     rule doEnq (enqWire && ff.notFull);
-      ff.enq(fromAXIBLiteFlit(BLiteFlit{bresp: w_bresp}));
+      ff.enq(fromAXIBLiteFlit(BLiteFlit{bresp: w_bresp, buser: w_buser}));
     endrule
 
     method bresp(resp)   = action w_bresp <= resp; endaction;
+    method buser(user)   = action w_buser <= user; endaction;
     method bvalid(valid) = action if (valid) enqWire.send; endaction;
     method bready        = ff.notFull;
 
@@ -99,20 +103,21 @@ endinstance
 // typeclass to turn an interface to the Slave interface
 
 typeclass ToAXIBLiteSlave#(type t);
-  module toAXIBLiteSlave#(t#(x) ifc) (BLiteSlave)
-  provisos (ToAXIBLiteFlit#(x));
+  module toAXIBLiteSlave#(t#(x) ifc) (BLiteSlave#(user_))
+  provisos (ToAXIBLiteFlit#(x, user_));
 endtypeclass
 
 instance ToAXIBLiteSlave#(Source);
   module toAXIBLiteSlave#(Source#(t) src)
-  (BLiteSlave) provisos (ToAXIBLiteFlit#(t));
+  (BLiteSlave#(user_)) provisos (ToAXIBLiteFlit#(t, user_));
 
-    Wire#(BLiteFlit) flit <- mkDWire(?);
+    Wire#(BLiteFlit#(user_)) flit <- mkDWire(?);
     rule getFlit (src.canGet); flit <= toAXIBLiteFlit(src.peek); endrule
     PulseWire getWire <- mkPulseWire;
     rule doGet (getWire && src.canGet); let _ <- src.get; endrule
 
     method bresp  = flit.bresp;
+    method buser  = flit.buser;
     method bvalid = src.canGet;
     method bready(rdy) = action if (rdy) getWire.send; endaction;
 
@@ -121,14 +126,15 @@ endinstance
 
 instance ToAXIBLiteSlave#(FIFOF);
   module toAXIBLiteSlave#(FIFOF#(t) ff)
-  (BLiteSlave) provisos (ToAXIBLiteFlit#(t));
+  (BLiteSlave#(user_)) provisos (ToAXIBLiteFlit#(t, user_));
 
-    Wire#(BLiteFlit) flit <- mkDWire(?);
+    Wire#(BLiteFlit#(user_)) flit <- mkDWire(?);
     rule getFlit (ff.notEmpty); flit <= toAXIBLiteFlit(ff.first); endrule
     PulseWire deqWire <- mkPulseWire;
     rule doDeq (deqWire && ff.notEmpty); ff.deq; endrule
 
     method bresp  = flit.bresp;
+    method buser  = flit.buser;
     method bvalid = ff.notEmpty;
     method bready(rdy) = action if (rdy) deqWire.send; endaction;
 

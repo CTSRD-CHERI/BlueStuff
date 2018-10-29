@@ -39,42 +39,46 @@ import SpecialFIFOs :: *;
 
 // typeclasses to convert to/from the flit type
 
-typeclass ToAXIRLiteFlit#(type t, numeric type data_);
-  function RLiteFlit#(data_) toAXIRLiteFlit (t x);
+typeclass ToAXIRLiteFlit#(type t, numeric type data_, numeric type user_);
+  function RLiteFlit#(data_, user_) toAXIRLiteFlit (t x);
 endtypeclass
 
-instance ToAXIRLiteFlit#(RLiteFlit#(a), a);
+instance ToAXIRLiteFlit#(RLiteFlit#(a, b), a, b);
   function toAXIRLiteFlit = id;
 endinstance
 
-typeclass FromAXIRLiteFlit#(type t, numeric type data_);
-  function t fromAXIRLiteFlit (RLiteFlit#(data_) x);
+typeclass FromAXIRLiteFlit#(type t, numeric type data_, numeric type user_);
+  function t fromAXIRLiteFlit (RLiteFlit#(data_, user_) x);
 endtypeclass
 
-instance FromAXIRLiteFlit#(RLiteFlit#(a), a);
+instance FromAXIRLiteFlit#(RLiteFlit#(a, b), a, b);
   function fromAXIRLiteFlit = id;
 endinstance
 
 // typeclass to turn an interface to the Master interface
 
 typeclass ToAXIRLiteMaster#(type t);
-  module toAXIRLiteMaster#(t#(x) ifc) (RLiteMaster#(data_))
-  provisos (FromAXIRLiteFlit#(x, data_));
+  module toAXIRLiteMaster#(t#(x) ifc) (RLiteMaster#(data_, user_))
+  provisos (FromAXIRLiteFlit#(x, data_, user_));
 endtypeclass
 
 instance ToAXIRLiteMaster#(Sink);
   module toAXIRLiteMaster#(Sink#(t) snk)
-  (RLiteMaster#(data_)) provisos (FromAXIRLiteFlit#(t, data_));
+  (RLiteMaster#(data_, user_)) provisos (FromAXIRLiteFlit#(t, data_, user_));
 
     let w_rdata <- mkDWire(?);
     let w_rresp <- mkDWire(?);
+    let w_ruser <- mkDWire(?);
     PulseWire putWire <- mkPulseWire;
     rule doPut (putWire && snk.canPut);
-      snk.put(fromAXIRLiteFlit(RLiteFlit{rdata: w_rdata, rresp: w_rresp}));
+      snk.put(fromAXIRLiteFlit(RLiteFlit {
+        rdata: w_rdata, rresp: w_rresp, ruser: w_ruser
+      }));
     endrule
 
     method rdata(data)   = action w_rdata <= data; endaction;
     method rresp(resp)   = action w_rresp <= resp; endaction;
+    method ruser(user)   = action w_ruser <= user; endaction;
     method rvalid(valid) = action if (valid) putWire.send; endaction;
     method rready        = snk.canPut;
 
@@ -83,17 +87,21 @@ endinstance
 
 instance ToAXIRLiteMaster#(FIFOF);
   module toAXIRLiteMaster#(FIFOF#(t) ff)
-  (RLiteMaster#(data_)) provisos (FromAXIRLiteFlit#(t, data_));
+  (RLiteMaster#(data_, user_)) provisos (FromAXIRLiteFlit#(t, data_, user_));
 
     let w_rdata <- mkDWire(?);
     let w_rresp <- mkDWire(?);
+    let w_ruser <- mkDWire(?);
     PulseWire enqWire <- mkPulseWire;
     rule doEnq (enqWire && ff.notFull);
-      ff.enq(fromAXIRLiteFlit(RLiteFlit{rdata: w_rdata, rresp: w_rresp}));
+      ff.enq(fromAXIRLiteFlit(RLiteFlit {
+        rdata: w_rdata, rresp: w_rresp, ruser: w_ruser
+      }));
     endrule
 
     method rdata(data)   = action w_rdata <= data; endaction;
     method rresp(resp)   = action w_rresp <= resp; endaction;
+    method ruser(user)   = action w_ruser <= user; endaction;
     method rvalid(valid) = action if (valid) enqWire.send; endaction;
     method rready        = ff.notFull;
 
@@ -103,21 +111,22 @@ endinstance
 // typeclass to turn an interface to the Slave interface
 
 typeclass ToAXIRLiteSlave#(type t);
-  module toAXIRLiteSlave#(t#(x) ifc) (RLiteSlave#(data_))
-  provisos (ToAXIRLiteFlit#(x, data_));
+  module toAXIRLiteSlave#(t#(x) ifc) (RLiteSlave#(data_, user_))
+  provisos (ToAXIRLiteFlit#(x, data_, user_));
 endtypeclass
 
 instance ToAXIRLiteSlave#(Source);
   module toAXIRLiteSlave#(Source#(t) src)
-  (RLiteSlave#(data_)) provisos (ToAXIRLiteFlit#(t, data_));
+  (RLiteSlave#(data_, user_)) provisos (ToAXIRLiteFlit#(t, data_, user_));
 
-    Wire#(RLiteFlit#(data_)) flit <- mkDWire(?);
+    Wire#(RLiteFlit#(data_, user_)) flit <- mkDWire(?);
     rule getFlit (src.canGet); flit <= toAXIRLiteFlit(src.peek); endrule
     PulseWire getWire <- mkPulseWire;
     rule doGet (getWire && src.canGet); let _ <- src.get; endrule
 
     method rdata  = flit.rdata;
     method rresp  = flit.rresp;
+    method ruser  = flit.ruser;
     method rvalid = src.canGet;
     method rready(rdy) = action if (rdy) getWire.send; endaction;
 
@@ -126,15 +135,16 @@ endinstance
 
 instance ToAXIRLiteSlave#(FIFOF);
   module toAXIRLiteSlave#(FIFOF#(t) ff)
-  (RLiteSlave#(data_)) provisos (ToAXIRLiteFlit#(t, data_));
+  (RLiteSlave#(data_, user_)) provisos (ToAXIRLiteFlit#(t, data_, user_));
 
-    Wire#(RLiteFlit#(data_)) flit <- mkDWire(?);
+    Wire#(RLiteFlit#(data_, user_)) flit <- mkDWire(?);
     rule getFlit (ff.notEmpty); flit <= toAXIRLiteFlit(ff.first); endrule
     PulseWire deqWire <- mkPulseWire;
     rule doDeq (deqWire && ff.notEmpty); ff.deq; endrule
 
     method rdata  = flit.rdata;
     method rresp  = flit.rresp;
+    method ruser  = flit.ruser;
     method rvalid = ff.notEmpty;
     method rready(rdy) = action if (rdy) deqWire.send; endaction;
 

@@ -119,7 +119,7 @@ endmodule
 // AXILite Slave interface
 ////////////////////////////////////////////////////////////////////////////////
 
-module mkAXILiteCharIOCore#(CharIO charIO) (AXILiteSlave#(addr_sz, data_sz))
+module mkAXILiteCharIOCore#(CharIO charIO) (AXILiteSlave#(addr_sz, data_sz, 0))
   provisos (Add#(8, a__, data_sz));
   let shim <- mkAXILiteShim;
   let wRspFF <- mkFIFOF;
@@ -128,12 +128,12 @@ module mkAXILiteCharIOCore#(CharIO charIO) (AXILiteSlave#(addr_sz, data_sz))
     let awflit <- shim.master.aw.get;
     let wflit  <- shim.master.w.get;
     if (wflit.wstrb[0] == 1) charIO.sink.put(truncate(wflit.wdata));
-    wRspFF.enq(BLiteFlit {bresp: OKAY});
+    wRspFF.enq(BLiteFlit {bresp: OKAY, buser: ?});
   endrule
   rule doRead;
     let arflit <- shim.master.ar.get;
     let c      <- charIO.source.get;
-    rRspFF.enq(RLiteFlit {rdata: zeroExtend(c), rresp: OKAY});
+    rRspFF.enq(RLiteFlit {rdata: zeroExtend(c), rresp: OKAY, ruser: ?});
   endrule
   rule writeRsp;
     shim.master.b.put(wRspFF.first);
@@ -147,7 +147,7 @@ module mkAXILiteCharIOCore#(CharIO charIO) (AXILiteSlave#(addr_sz, data_sz))
 endmodule
 
 module mkAXILiteSocketCharIO#(String name, Integer dflt_port)
-  (AXILiteSlave#(addr_sz, data_sz))
+  (AXILiteSlave#(addr_sz, data_sz, 0))
   provisos (Add#(8, a__, data_sz));
   let charIO <- mkSocketCharIO(name, dflt_port);
   let core   <- mkAXILiteCharIOCore(charIO);
@@ -155,14 +155,14 @@ module mkAXILiteSocketCharIO#(String name, Integer dflt_port)
 endmodule
 
 module mkAXILiteFileCharIO#(String inf, String outf)
-  (AXILiteSlave#(addr_sz, data_sz))
+  (AXILiteSlave#(addr_sz, data_sz, 0))
   provisos (Add#(8, a__, data_sz));
   let charIO <- mkFileCharIO(inf, outf);
   let core   <- mkAXILiteCharIOCore(charIO);
   return core;
 endmodule
 
-module mkAXILiteCharIO (AXILiteSlave#(addr_sz, data_sz))
+module mkAXILiteCharIO (AXILiteSlave#(addr_sz, data_sz, 0))
   provisos (Add#(8, a__, data_sz));
   let charIO <- mkCharIO;
   let core   <- mkAXILiteCharIOCore(charIO);
