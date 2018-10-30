@@ -58,7 +58,7 @@ deriving (Bits, FShow);
 instance DefaultValue#(AWFlit#(id_, addr_, user_));
   function defaultValue = AWFlit {
     awid: 0, awaddr: ?, awlen: 0, awsize: 0,
-    awburst: FIXED, awlock: False, awcache: 0,
+    awburst: INCR, awlock: False, awcache: 0,
     awprot: 0, awqos: 0, awregion: 0, awuser: ?
   };
 endinstance
@@ -267,7 +267,7 @@ deriving (Bits, FShow);
 instance DefaultValue#(ARFlit#(id_, addr_, user_));
   function defaultValue = ARFlit {
     arid: 0, araddr: ?, arlen: 0, arsize: 0,
-    arburst: FIXED, arlock: False, arcache: 0,
+    arburst: INCR, arlock: False, arcache: 0,
     arprot: 0, arqos: 0, arregion: 0, aruser: ?
   };
 endinstance
