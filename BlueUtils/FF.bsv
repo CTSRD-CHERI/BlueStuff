@@ -89,8 +89,12 @@ provisos(Log#(depth,logDepth),Bits#(data, data_width));
   Bit#(logDepth) head = truncate(lhead);
   Bit#(logDepth) tail = truncate(ltail);
   
+  PulseWire displayPanic <- mkPulseWire;
+  rule doDisplayPanic (displayPanic);
+    $display("Panic!  Enqing to a full UGFF!");
+  endrule
   method Action enq(data in);
-    if (full) $display("Panic!  Enqing to a full UGFF!"); 
+    if (full) displayPanic.send; 
     rf.upd(head,in);
     lhead <= lhead + 1;
   endmethod
@@ -564,12 +568,20 @@ module mkUGFFDebug#(String name)(FF#(data, depth))
   provisos(Log#(depth,logDepth),Bits#(data, data_width));
   FF#(data, depth) ff <- mkUGFF();
   
+  PulseWire enqPanic <- mkPulseWire;
+  PulseWire deqPanic <- mkPulseWire;
+  rule displayEnqPanic (enqPanic);
+    $display("Panic!  Enqing to a full UGFF %s", name);
+  endrule
+  rule displayDeqPanic (deqPanic);
+    $display("Panic!  Dequing from an empty UGFF %s", name); 
+  endrule
   method Action enq(data in);
-    if (!ff.notFull) $display("Panic!  Enqing to a full UGFF %s", name); 
+    if (!ff.notFull) enqPanic.send;
     ff.enq(in);
   endmethod
   method Action deq();
-    if (!ff.notEmpty) $display("Panic!  Dequing from an empty UGFF %s", name); 
+    if (!ff.notEmpty) deqPanic.send;
     ff.deq();
   endmethod
   method data first() = ff.first();
