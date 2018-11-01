@@ -67,6 +67,34 @@ function Sink#(AXILiteWriteFlit#(addr_, data_, awu_, wu_)) splitLiteWrite(
     endaction;
   endinterface;
 
+////////////////////////////
+// Address offset helpers //
+////////////////////////////////////////////////////////////////////////////////
+
+function AWLiteFlit#(a, b) offsetAWFlit(AWLiteFlit#(a, b) f, Int#(a) o) =
+  AWLiteFlit {
+    awaddr: pack(unpack(f.awaddr) + o), awprot: f.awprot, awuser: f.awuser
+  };
+function ARLiteFlit#(a, b) offsetARFlit(ARLiteFlit#(a, b) f, Int#(a) o) =
+  ARLiteFlit {
+    araddr: pack(unpack(f.araddr) + o), arprot: f.arprot, aruser: f.aruser
+  };
+function AXILiteSlave#(a, b, c, d, e, f, g) offsetSlave(
+  AXILiteSlave#(a, b, c, d, e, f, g) s, Integer offset) =
+  interface AXILiteSlave;
+    interface aw = interface Sink;
+      method canPut = s.aw.canPut;
+      method put(x) = s.aw.put(offsetAWFlit(x, fromInteger(-offset)));
+    endinterface;
+    interface w  = s.w;
+    interface b  = s.b;
+    interface ar = interface Sink;
+      method canPut = s.ar.canPut;
+      method put(x) = s.ar.put(offsetARFlit(x, fromInteger(-offset)));
+    endinterface;
+    interface r  = s.r;
+  endinterface;
+
 ///////////////////////////////
 // AXI Shim Master <-> Slave //
 ////////////////////////////////////////////////////////////////////////////////
