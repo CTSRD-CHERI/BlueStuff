@@ -63,12 +63,12 @@ instance DefaultValue#(AWFlit#(id_, addr_, user_));
   };
 endinstance
 instance Routable#(
-  AWFlit#(id_, addr_, user_),
-  BFlit#(id_, user_),
+  AWFlit#(id_, addr_, awuser_),
+  BFlit#(id_, buser_),
   Bit#(addr_));
   function routingField(x) = x.awaddr;
   function noRouteFound(x) = BFlit {
-    bid: x.awid, bresp: DECERR, buser: x.awuser
+    bid: x.awid, bresp: DECERR, buser: ?
   };
 endinstance
 instance DetectLast#(AWFlit#(id_, addr_, user_));
@@ -272,12 +272,12 @@ instance DefaultValue#(ARFlit#(id_, addr_, user_));
   };
 endinstance
 instance Routable#(
-  ARFlit#(id_, addr_, user_),
-  RFlit#(id_, data_, user_),
+  ARFlit#(id_, addr_, aruser_),
+  RFlit#(id_, data_, ruser_),
   Bit#(addr_));
   function routingField(x) = x.araddr;
   function noRouteFound(x) = RFlit {
-    rid: x.arid, rdata: ?, rresp: DECERR, rlast: True, ruser: x.aruser
+    rid: x.arid, rdata: ?, rresp: DECERR, rlast: True, ruser: ?
   };
 endinstance
 instance DetectLast#(ARFlit#(id_, addr_, user_));
@@ -550,7 +550,7 @@ instance Routable#(
     Routable#(AWFlit#(id_, addr_, awuser_), BFlit#(id_, buser_), Bit#(addr_))
   );
   function routingField(x) = case (x) matches
-    tagged FirstFlit {.aw, .w}: routingField(aw);
+    tagged FirstFlit {.aw, .w}: aw.awaddr; // XXX routingField(aw); XXX THIS SHOULD JUST WORK BUT DOESN'T ?!
     default: ?;
   endcase;
   function noRouteFound(x) = case (x) matches

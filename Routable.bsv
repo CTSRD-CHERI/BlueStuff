@@ -37,8 +37,8 @@ import Dict :: *;
 ////////////////////////////////////////////////////////////////////////////////
 
 typeclass Routable#(type a, type b, type c) dependencies (a determines (b, c));
-  function c    routingField (a val);
-  function b    noRouteFound (a val);
+  function c routingField (a val);
+  function b noRouteFound (a val);
 endtypeclass
 
 //////////////////////////

@@ -139,6 +139,52 @@ module splitWrite#(
 endmodule
 
 ///////////////////////////////
+// AXI Slave addr width shim //
+////////////////////////////////////////////////////////////////////////////////
+
+function AXISlave#(a, addr_out, c, d, e, f, g, h) expandAXISlaveAddr
+  (AXISlave#(a, addr_in, c, d, e, f, g, h) s)
+  provisos (Add#(a__, addr_in, addr_out)); // addr_out >= addr_in
+  return interface AXISlave;
+    interface aw = interface Sink;
+      method canPut = s.aw.canPut;
+      method put(x) = s.aw.put(AWFlit{
+        awid: x.awid,
+        awaddr: truncate(x.awaddr),
+        awlen: x.awlen,
+        awsize: x.awsize,
+        awburst: x.awburst,
+        awlock: x.awlock,
+        awcache: x.awcache,
+        awprot: x.awprot,
+        awqos: x.awqos,
+        awregion: x.awregion,
+        awuser: x.awuser
+      });
+    endinterface;
+    interface  w = s.w;
+    interface  b = s.b;
+    interface ar = interface Sink;
+      method canPut = s.ar.canPut;
+      method put(x) = s.ar.put(ARFlit{
+        arid: x.arid,
+        araddr: truncate(x.araddr),
+        arlen: x.arlen,
+        arsize: x.arsize,
+        arburst: x.arburst,
+        arlock: x.arlock,
+        arcache: x.arcache,
+        arprot: x.arprot,
+        arqos: x.arqos,
+        arregion: x.arregion,
+        aruser: x.aruser
+      });
+    endinterface;
+    interface  r = s.r;
+  endinterface;
+endfunction
+
+///////////////////////////////
 // AXI Shim Master <-> Slave //
 ////////////////////////////////////////////////////////////////////////////////
 

@@ -95,6 +95,58 @@ function AXILiteSlave#(a, b, c, d, e, f, g) offsetSlave(
     interface r  = s.r;
   endinterface;
 
+//////////////////////////////
+// drop user fields helpers //
+////////////////////////////////////////////////////////////////////////////////
+
+function AXILiteSlave#(a, b, c, d, e, f, g) dropUserFields(
+  AXILiteSlave#(a, b, 0, 0, 0, 0, 0) s) = interface AXILiteSlave;
+    interface aw = interface Sink;
+      method canPut = s.aw.canPut;
+      method put(x) = s.aw.put(AWLiteFlit {
+        awaddr: x.awaddr, awprot: x.awprot, awuser: ?
+      });
+    endinterface;
+    interface w = interface Sink;
+      method canPut = s.w.canPut;
+      method put(x) = s.w.put(WLiteFlit {
+        wdata: x.wdata, wstrb: x.wstrb, wuser: ?
+      });
+    endinterface;
+    interface b = interface Source;
+      method canGet = s.b.canGet;
+      method peek;
+        let bflit = s.b.peek;
+        return BLiteFlit { bresp: bflit.bresp, buser: unpack(0) };
+      endmethod
+      method get = actionvalue
+        let bflit <- s.b.get;
+        return BLiteFlit { bresp: bflit.bresp, buser: unpack(0) };
+      endactionvalue;
+    endinterface;
+    interface ar = interface Sink;
+      method canPut = s.ar.canPut;
+      method put(x) = s.ar.put(ARLiteFlit {
+        araddr: x.araddr, arprot: x.arprot, aruser: ?
+      });
+    endinterface;
+    interface r = interface Source;
+      method canGet = s.r.canGet;
+      method peek;
+        let rflit = s.r.peek;
+        return RLiteFlit {
+          rdata: rflit.rdata, rresp: rflit.rresp, ruser: unpack(0)
+        };
+      endmethod
+      method get = actionvalue
+        let rflit <- s.r.get;
+        return RLiteFlit {
+          rdata: rflit.rdata, rresp: rflit.rresp, ruser: unpack(0)
+        };
+      endactionvalue;
+    endinterface;
+  endinterface;
+
 ///////////////////////////////
 // AXI Shim Master <-> Slave //
 ////////////////////////////////////////////////////////////////////////////////
