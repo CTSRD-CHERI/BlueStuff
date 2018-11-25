@@ -85,12 +85,13 @@ interface ArchRegFile#(numeric type n, type a);
   method a rd_old_val;
   method a rd_new_val;
 endinterface
-// Register file with read-only 0 register (set to 0)
-module mkRegFileZ (ArchRegFile#(n, a))
-provisos (Bits#(a, a_sz), Literal#(a));
+// Register file with read-only 0 register
+module mkRegFileInitZ#(a zeroVal, a initVal)(ArchRegFile#(n, a)) provisos (
+    Bits#(a, a_sz)
+  );
   // the register file
-  ArchReg#(a) r0 <- mkROArchReg(0);
-  Vector#(TSub#(n, 1), ArchReg#(a)) rx <- replicateM(mkArchReg(0));
+  ArchReg#(a) r0 <- mkROArchReg(zeroVal);
+  Vector#(TSub#(n, 1), ArchReg#(a)) rx <- replicateM(mkArchReg(initVal));
   Vector#(n, ArchReg#(a)) rf = cons(r0, rx);
   // reporting behaviour
   Wire#(Bit#(TLog#(n))) rd_idx_w <- mkWire;
@@ -108,6 +109,10 @@ provisos (Bits#(a, a_sz), Literal#(a));
   method rd_idx = rd_idx_w;
   method rd_old_val = rf[rd_idx_w]._read;
   method rd_new_val = rf[rd_idx_w].commitVal;
+endmodule
+module mkRegFileZ (ArchRegFile#(n, a)) provisos (Bits#(a, a_sz), Literal#(a));
+  let rf <- mkRegFileInitZ(0,0);
+  return rf;
 endmodule
 
 // Read-only register
