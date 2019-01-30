@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -38,7 +38,7 @@ module top (Empty);
   let ff <- mkBypassFIFO;
 
   rule read;
-    let c <- charIO.source.get;
+    let c <- get(charIO.source);
     if (c == 113) $finish(0); // terminate with letter q
     let echoChar = !((c == 10) || (c == 113));
     if (echoChar) ff.enq(c);

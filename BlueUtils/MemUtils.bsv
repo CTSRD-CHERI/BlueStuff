@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -52,8 +52,8 @@ module mkMemToAXILiteSlave#(Mem#(addr_t, data_t) mem)
   let readLowAddr <- mkFIFO;
   (* descending_urgency = "readReq, writeReq" *)
   rule writeReq;
-    let awflit <- shim.master.aw.get;
-    let  wflit <- shim.master.w.get;
+    let awflit <- get(shim.master.aw);
+    let  wflit <- get(shim.master.w);
     Bit#(lowIdx) lowAddr = awflit.awaddr[valueOf(lowIdx)-1:0];
     Bit#(data_sz) shiftAmount = zeroExtend(lowAddr) << 3;
     mem.sink.put(WriteReq {
@@ -65,11 +65,11 @@ module mkMemToAXILiteSlave#(Mem#(addr_t, data_t) mem)
   endrule
   rule writeRsp(expectWriteRsp.first);
     expectWriteRsp.deq;
-    let _ <- mem.source.get;
+    mem.source.drop;
     shim.master.b.put(BLiteFlit{bresp: OKAY, buser: ?});
   endrule
   rule readReq;
-    let arflit <- shim.master.ar.get;
+    let arflit <- get(shim.master.ar);
     mem.sink.put(ReadReq {
       addr: unpack(arflit.araddr),
       numBytes: fromInteger(valueOf(data_sz)/8)}
@@ -81,7 +81,7 @@ module mkMemToAXILiteSlave#(Mem#(addr_t, data_t) mem)
   rule readRsp(!expectWriteRsp.first);
     expectWriteRsp.deq;
     readLowAddr.deq;
-    let rsp <- mem.source.get;
+    let rsp <- get(mem.source);
     Bit#(data_sz) shiftAmount = zeroExtend(readLowAddr.first) << 3;
     shim.master.r.put(RLiteFlit {
       rdata: pack(rsp.ReadRsp) << shiftAmount, rresp: OKAY, ruser: ?

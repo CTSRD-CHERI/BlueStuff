@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -79,12 +79,9 @@ module top (Empty);
       });
     endrule
     paths[i] = interface Source;
-      method canGet = True;
-      method peek   = next;
-      method get    = actionvalue
-        next <= rotate(next);
-        return next;
-      endactionvalue;
+      method canPeek = True;
+      method peek    = next;
+      method drop    = action next <= rotate(next); endaction;
     endinterface;
   end
   for (Integer i = 0; i < nOuts; i = i + 1)

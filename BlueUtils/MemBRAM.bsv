@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -309,9 +309,9 @@ module wrapUnaligned#(
     endmethod
   endinterface;
   interface source = interface Source;
-    method Bool canGet = canGetRsp;
+    method Bool canPeek = canGetRsp;
     method MemRsp#(content_t) peek if (canGetRsp) = buildResponse;
-    method ActionValue#(MemRsp#(content_t)) get if (canGetRsp);
+    method Action drop if (canGetRsp);
       // Reset cross_boundary to allow sendReq to fire again
       if (cross_boundary[0]) cross_boundary[0] <= False;
       // Update prev_lookup
@@ -319,7 +319,6 @@ module wrapUnaligned#(
       prevLookupUpdt <= tuple2((cross_boundary[0]) ? idx + 1 : idx, mem.peek);
       // Retire request
       pendingReq.deq;
-      return buildResponse;
     endmethod
   endinterface;
 

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -48,13 +48,9 @@ import SpecialFIFOs :: *;
 function Source#(AXILiteWriteFlit#(addr_, data_, awu_, wu_)) mergeLiteWrite(
   Source#(AWLiteFlit#(addr_, awu_)) aw,
   Source#(WLiteFlit#(data_, wu_)) w) = interface Source;
-    method canGet = aw.canGet && w.canGet;
-    method peek   = AXILiteWriteFlit { aw: aw.peek, w: w.peek };
-    method get    = actionvalue
-      let flit_aw <- aw.get;
-      let flit_w  <- w.get;
-      return AXILiteWriteFlit { aw: flit_aw, w: flit_w };
-    endactionvalue;
+    method canPeek = aw.canPeek && w.canPeek;
+    method peek    = AXILiteWriteFlit { aw: aw.peek, w: w.peek };
+    method drop    = action aw.drop; w.drop; endaction;
   endinterface;
 
 function Sink#(AXILiteWriteFlit#(addr_, data_, awu_, wu_)) splitLiteWrite(
@@ -114,15 +110,9 @@ function AXILiteSlave#(a, b, c, d, e, f, g) dropUserFields(
       });
     endinterface;
     interface b = interface Source;
-      method canGet = s.b.canGet;
-      method peek;
-        let bflit = s.b.peek;
-        return BLiteFlit { bresp: bflit.bresp, buser: unpack(0) };
-      endmethod
-      method get = actionvalue
-        let bflit <- s.b.get;
-        return BLiteFlit { bresp: bflit.bresp, buser: unpack(0) };
-      endactionvalue;
+      method canPeek = s.b.canPeek;
+      method peek    = BLiteFlit { bresp: s.b.peek.bresp, buser: unpack(0) };
+      method drop    = s.b.drop;
     endinterface;
     interface ar = interface Sink;
       method canPut = s.ar.canPut;
@@ -131,19 +121,14 @@ function AXILiteSlave#(a, b, c, d, e, f, g) dropUserFields(
       });
     endinterface;
     interface r = interface Source;
-      method canGet = s.r.canGet;
+      method canPeek = s.r.canPeek;
       method peek;
         let rflit = s.r.peek;
         return RLiteFlit {
           rdata: rflit.rdata, rresp: rflit.rresp, ruser: unpack(0)
         };
       endmethod
-      method get = actionvalue
-        let rflit <- s.r.get;
-        return RLiteFlit {
-          rdata: rflit.rdata, rresp: rflit.rresp, ruser: unpack(0)
-        };
-      endactionvalue;
+      method drop = s.r.drop;
     endinterface;
   endinterface;
 

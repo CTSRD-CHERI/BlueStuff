@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -70,11 +70,11 @@ module axiMaster (AXIMaster#(`PARAMS));
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
   rule getBFlit;
-    let rsp <- shim.slave.b.get;
+    let rsp <- get(shim.slave.b);
     $display("%0t - MASTER - received ", $time, fshow(rsp));
   endrule
   rule putARFlit; shim.slave.ar.put(?); endrule
-  rule getRFlit; let _ <- shim.slave.r.get; endrule
+  rule dropRFlit; shim.slave.r.drop; endrule
 
   // return AXI interface
   return shim.master;
@@ -90,11 +90,11 @@ module axiSlave (AXISlave#(`PARAMS));
   // arbitrary work for each channel
   FIFOF#(Bit#(0)) writeResp <- mkFIFOF;
   rule getAWFlit;
-    let req <- shim.master.aw.get;
+    let req <- get(shim.master.aw);
     $display("%0t - SLAVE - received ", $time, fshow(req));
   endrule
   rule getWFlit;
-    let req <- shim.master.w.get;
+    let req <- get(shim.master.w);
     $display("%0t - SLAVE - received ", $time, fshow(req));
     writeResp.enq(?);
   endrule
@@ -104,7 +104,7 @@ module axiSlave (AXISlave#(`PARAMS));
     shim.master.b.put(f);
     $display("%0t - SLAVE - sending ", $time, fshow(f));
   endrule
-  rule getARFlit; let _ <- shim.master.ar.get; endrule
+  rule dropARFlit; shim.master.ar.drop; endrule
   rule putRFlit; shim.master.r.put(?); endrule
 
   // return AXI interface

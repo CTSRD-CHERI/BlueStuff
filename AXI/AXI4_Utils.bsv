@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -51,22 +51,23 @@ module mergeWrite#(
   (Source#(AXIWriteFlit#(id_, addr_, data_, awuser_, wuser_)));
 
   let flitLeft <- mkReg(0);
-  let doGet    <- mkPulseWire;
+  let doDrop   <- mkPulseWire;
 
   let outflit  = (flitLeft == 0) ?
     FirstFlit(tuple2(aw.peek, w.peek)) :
     OtherFlit(w.peek);
-  let canDoGet = (flitLeft == 0) ? aw.canGet && w.canGet : w.canGet;
+  let newCanPeek = (flitLeft == 0) ? aw.canPeek && w.canPeek : w.canPeek;
 
-  rule genFirst (doGet && flitLeft == 0);
-    let awflit <- aw.get;
-    let _      <- w.get;
+  rule genFirst (doDrop && flitLeft == 0);
+    aw.drop;
+    w.drop;
     // burst length given by AxLEN + 1
-    flitLeft <= awflit.awlen;
+    flitLeft <= aw.peek.awlen;
   endrule
 
-  rule genOther (doGet && flitLeft > 0);
-    let wflit <- w.get;
+  rule genOther (doDrop && flitLeft > 0);
+    let wflit = w.peek;
+    w.drop;
     // decrement flit counter
     flitLeft <= flitLeft - 1;
     // check for error conditions
@@ -79,12 +80,9 @@ module mergeWrite#(
     end
   endrule
 
-  method peek   if (canDoGet) = outflit;
-  method get    if (canDoGet) = actionvalue
-    doGet.send;
-    return outflit;
-  endactionvalue;
-  method canGet = canDoGet;
+  method canPeek = newCanPeek;
+  method peek if (newCanPeek) = outflit;
+  method drop if (newCanPeek) = doDrop.send;
 endmodule
 
 module splitWrite#(

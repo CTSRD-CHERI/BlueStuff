@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -77,11 +77,11 @@ module axiMaster (`MASTER_T);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
   rule getBFlit;
-    let rsp <- shim.slave.b.get;
+    let rsp <- get(shim.slave.b);
     $display("%0t - MASTER - received ", $time, fshow(rsp));
   endrule
   rule putARFlit; shim.slave.ar.put(?); endrule
-  rule getRFlit; let _ <- shim.slave.r.get; endrule
+  rule dropRFlit; shim.slave.r.drop; endrule
 
   // return AXI interface
   return shim.master;
@@ -116,11 +116,11 @@ module axiMasterLite (`MASTER_LITE_T);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
   rule getBFlit;
-    let rsp <- shim.slave.b.get;
+    let rsp <- get(shim.slave.b);
     $display("%0t - MASTER - received ", $time, fshow(rsp));
   endrule
   rule putARFlit; shim.slave.ar.put(?); endrule
-  rule getRFlit; let _ <- shim.slave.r.get; endrule
+  rule dropRFlit; shim.slave.r.drop; endrule
 
   // return AXI interface
   return shim.master;
@@ -135,14 +135,14 @@ module axiSlave (`SLAVE_T);
   // arbitrary work for each channel
   let writeResp <- mkFIFOF;
   rule getAWFlit;
-    let req <- shim.master.aw.get;
+    let req <- get(shim.master.aw);
     writeResp.enq(BFlit {
       bid: req.awid, bresp: OKAY, buser: ?
     });
     $display("%0t - SLAVE - received ", $time, fshow(req));
   endrule
   rule getWFlit;
-    let req <- shim.master.w.get;
+    let req <- get(shim.master.w);
     $display("%0t - SLAVE - received ", $time, fshow(req));
   endrule
   rule putBFlit;
@@ -152,7 +152,7 @@ module axiSlave (`SLAVE_T);
   endrule
   let readResp <- mkFIFOF;
   rule getARFlit;
-    let req <- shim.master.ar.get;
+    let req <- get(shim.master.ar);
     readResp.enq(RFlit {
       rid: req.arid, rdata: ?, rresp: SLVERR, rlast: True, ruser: ?
     });
@@ -175,14 +175,14 @@ module axiSlaveLite (`SLAVE_LITE_T);
   // arbitrary work for each channel
   let writeResp <- mkFIFOF;
   rule getAWFlit;
-    let req <- shim.master.aw.get;
+    let req <- get(shim.master.aw);
     writeResp.enq(BLiteFlit {
       bresp: OKAY, buser: ?
     });
     $display("%0t - SLAVE - received ", $time, fshow(req));
   endrule
   rule getWFlit;
-    let req <- shim.master.w.get;
+    let req <- get(shim.master.w);
     $display("%0t - SLAVE - received ", $time, fshow(req));
   endrule
   rule putBFlit;
@@ -192,7 +192,7 @@ module axiSlaveLite (`SLAVE_LITE_T);
   endrule
   let readResp <- mkFIFOF;
   rule getARFlit;
-    let req <- shim.master.ar.get;
+    let req <- get(shim.master.ar);
     readResp.enq(RLiteFlit {
       rdata: ?, rresp: SLVERR, ruser: ?
     });

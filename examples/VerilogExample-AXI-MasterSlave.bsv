@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -49,11 +49,11 @@ module axiMaster (AXIMasterSynth#(`PARAMS));
   AXIShim#(`PARAMS) shim <- mkAXIShim;
 
   // arbitrary work for each channel
-  rule enqAWFlit; shim.slave.aw.put(?); endrule
-  rule enqWFlit;  shim.slave.w.put(?);  endrule
-  rule enqARFlit; shim.slave.ar.put(?); endrule
-  rule deqBFlit; let _ <- shim.slave.b.get; endrule
-  rule deqRFlit; let _ <- shim.slave.r.get; endrule
+  rule putAWFlit; shim.slave.aw.put(?); endrule
+  rule putWFlit;  shim.slave.w.put(?);  endrule
+  rule putARFlit; shim.slave.ar.put(?); endrule
+  rule dropBFlit; shim.slave.b.drop; endrule
+  rule dropRFlit; shim.slave.r.drop; endrule
 
   // return AXI interface
   let ifcSynth <- toAXIMasterSynth(shim.master);
@@ -68,11 +68,11 @@ module axiLiteMaster (AXILiteMasterSynth#(`LITEPARAMS));
   AXILiteShim#(`LITEPARAMS) shim <- mkAXILiteShim;
 
   // arbitrary work for each channel
-  rule enqAWFlit; shim.slave.aw.put(?); endrule
-  rule enqWFlit;  shim.slave.w.put(?);  endrule
-  rule enqARFlit; shim.slave.ar.put(?); endrule
-  rule deqBFlit; let _ <- shim.slave.b.get; endrule
-  rule deqRFlit; let _ <- shim.slave.r.get; endrule
+  rule putAWFlit; shim.slave.aw.put(?); endrule
+  rule putWFlit;  shim.slave.w.put(?);  endrule
+  rule putARFlit; shim.slave.ar.put(?); endrule
+  rule dropBFlit; shim.slave.b.drop; endrule
+  rule dropRFlit; shim.slave.r.drop; endrule
 
   // return AXI interface
   let ifcSynth <- toAXILiteMasterSynth(shim.master);
@@ -87,11 +87,11 @@ module axiSlave (AXISlaveSynth#(`PARAMS));
   AXIShim#(`PARAMS) shim <- mkAXIShim;
 
   // arbitrary work for each channel
-  rule deqAWFlit; let _ <- shim.master.aw.get; endrule
-  rule deqWFlit;  let _ <- shim.master.w.get;  endrule
-  rule deqARFlit; let _ <- shim.master.ar.get; endrule
-  rule enqBFlit; shim.master.b.put(?); endrule
-  rule enqRFlit; shim.master.r.put(?); endrule
+  rule dropAWFlit; shim.master.aw.drop; endrule
+  rule dropWFlit;  shim.master.w.drop;  endrule
+  rule dropARFlit; shim.master.ar.drop; endrule
+  rule putBFlit; shim.master.b.put(?); endrule
+  rule putRFlit; shim.master.r.put(?); endrule
 
   // return AXI interface
   let ifcSynth <- toAXISlaveSynth(shim.slave);
@@ -106,11 +106,11 @@ module axiLiteSlave (AXILiteSlaveSynth#(`LITEPARAMS));
   AXILiteShim#(`LITEPARAMS) shim <- mkAXILiteShim;
 
   // arbitrary work for each channel
-  rule deqAWFlit; let _ <- shim.master.aw.get; endrule
-  rule deqWFlit;  let _ <- shim.master.w.get;  endrule
-  rule deqARFlit; let _ <- shim.master.ar.get; endrule
-  rule enqBFlit; shim.master.b.put(?); endrule
-  rule enqRFlit; shim.master.r.put(?); endrule
+  rule dropAWFlit; shim.master.aw.drop; endrule
+  rule dropWFlit;  shim.master.w.drop;  endrule
+  rule dropARFlit; shim.master.ar.drop; endrule
+  rule putBFlit; shim.master.b.put(?); endrule
+  rule putRFlit; shim.master.r.put(?); endrule
 
   // return AXI interface
   let ifcSynth <- toAXILiteSlaveSynth(shim.slave);

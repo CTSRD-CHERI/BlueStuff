@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -49,7 +49,7 @@ instance Arbitrable#(FIFOF#(t));
 endinstance
 
 instance Arbitrable#(Source#(t));
-  function isRequesting(x) = x.canGet;
+  function isRequesting(x) = x.canPeek;
 endinstance
 
 // Arbiter interface

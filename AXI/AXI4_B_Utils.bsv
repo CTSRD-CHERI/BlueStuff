@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -116,15 +116,15 @@ instance ToAXIBSlave#(Source);
   (BSlave#(id_, user_)) provisos (ToAXIBFlit#(t, id_, user_));
 
     Wire#(BFlit#(id_, user_)) flit <- mkDWire(?);
-    rule getFlit (src.canGet); flit <= toAXIBFlit(src.peek); endrule
-    PulseWire getWire <- mkPulseWire;
-    rule doGet (getWire && src.canGet); let _ <- src.get; endrule
+    rule peekFlit (src.canPeek); flit <= toAXIBFlit(src.peek); endrule
+    PulseWire dropWire <- mkPulseWire;
+    rule doDrop (dropWire && src.canPeek); src.drop; endrule
 
     method bid    = flit.bid;
     method bresp  = flit.bresp;
     method buser  = flit.buser;
-    method bvalid = src.canGet;
-    method bready(rdy) = action if (rdy) getWire.send; endaction;
+    method bvalid = src.canPeek;
+    method bready(rdy) = action if (rdy) dropWire.send; endaction;
 
   endmodule
 endinstance
@@ -134,7 +134,7 @@ instance ToAXIBSlave#(FIFOF);
   (BSlave#(id_, user_)) provisos (ToAXIBFlit#(t, id_, user_));
 
     Wire#(BFlit#(id_, user_)) flit <- mkDWire(?);
-    rule getFlit (ff.notEmpty); flit <= toAXIBFlit(ff.first); endrule
+    rule peekFlit (ff.notEmpty); flit <= toAXIBFlit(ff.first); endrule
     PulseWire deqWire <- mkPulseWire;
     rule doDeq (deqWire && ff.notEmpty); ff.deq; endrule
 

@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 2014 Jonathan Woodruff
- * Copyright (c) 2017-2018 Alexandre Joannou
+ * Copyright (c) 2017-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -505,7 +505,7 @@ provisos(
   Bit#(logDepth) tail = truncate(ltail);
   
   rule drainMemRsp;
-    let rsp <- mem.source.get;
+    let rsp <- get(mem.source);
     case (rsp) matches
       tagged  ReadRsp .r: latchMemOut[0] <= r;
     endcase

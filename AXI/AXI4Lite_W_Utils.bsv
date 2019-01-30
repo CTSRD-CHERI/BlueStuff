@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -67,15 +67,15 @@ instance ToAXIWLiteMaster#(Source);
   (WLiteMaster#(data_, user_)) provisos (ToAXIWLiteFlit#(t, data_, user_));
 
     Wire#(WLiteFlit#(data_, user_)) flit <- mkDWire(?);
-    rule getFlit (src.canGet); flit <= toAXIWLiteFlit(src.peek); endrule
-    PulseWire getWire <- mkPulseWire;
-    rule doGet (getWire && src.canGet); let _ <- src.get; endrule
+    rule peekFlit (src.canPeek); flit <= toAXIWLiteFlit(src.peek); endrule
+    PulseWire dropWire <- mkPulseWire;
+    rule doDrop (dropWire && src.canPeek); src.drop; endrule
 
     method wdata  = flit.wdata;
     method wstrb  = flit.wstrb;
     method wuser  = flit.wuser;
-    method wvalid = src.canGet;
-    method wready(rdy) = action if (rdy) getWire.send; endaction;
+    method wvalid = src.canPeek;
+    method wready(rdy) = action if (rdy) dropWire.send; endaction;
 
   endmodule
 endinstance
@@ -85,7 +85,7 @@ instance ToAXIWLiteMaster#(FIFOF);
   (WLiteMaster#(data_, user_)) provisos (ToAXIWLiteFlit#(t, data_, user_));
 
     Wire#(WLiteFlit#(data_, user_)) flit <- mkDWire(?);
-    rule getFlit (ff.notEmpty); flit <= toAXIWLiteFlit(ff.first); endrule
+    rule peekFlit (ff.notEmpty); flit <= toAXIWLiteFlit(ff.first); endrule
     PulseWire deqWire <- mkPulseWire;
     rule doDeq (deqWire && ff.notEmpty); ff.deq; endrule
 

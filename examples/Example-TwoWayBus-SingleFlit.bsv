@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -79,11 +79,7 @@ module mkMaster (Master#(Req, Rsp));
     ff.enq(req);
     $display("%0t -- Master sending ", $time, fshow(req));
   endrule
-  interface source = interface Source;
-    method get    = actionvalue ff.deq; return ff.first; endactionvalue;
-    method peek   = ff.first;
-    method canGet = ff.notEmpty;
-  endinterface;
+  interface source = toSource(ff);
   interface sink = interface Sink;
     method put(x) = action $display("%0t -- Master received ", $time, fshow(x)); endaction;
     method canPut = True;
@@ -99,16 +95,7 @@ module mkSlave (Slave#(Req, Rsp));
     endaction;
     method canPut = ff.notFull;
   endinterface;
-  interface source = interface Source;
-    method get = actionvalue
-      ff.deq;
-      let rsp = ff.first;
-      $display("%0t -- Slave sending ", $time, fshow(rsp));
-      return rsp;
-    endactionvalue;
-    method peek   = ff.first;
-    method canGet = ff.notEmpty;
-  endinterface;
+  interface source = toSource(ff);
 endmodule
 
 module top (Empty);

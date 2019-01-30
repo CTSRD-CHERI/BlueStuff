@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -72,8 +72,8 @@ module mkOneWayBus#(
   function pulse(c, w) = action if (c) w.send(); endaction;
   function Bool readPulse(PulseWire w) = w._read;
   function isReady(s)     = s.canPut;
-  function isAvailable(s) = s.canGet;
-  function drainSource(s) = action let _ <- s.get; endaction;
+  function isAvailable(s) = s.canPeek;
+  function drainSource(s) = s.drop;
   // for each source, establish whether a transaction can occur
   Vector#(nOuts, Wire#(Bool)) isSinkReady <- replicateM(mkDWire(False));
   for (Integer i = 0; i < valueOf(nOuts); i = i + 1)
@@ -83,7 +83,7 @@ module mkOneWayBus#(
   Vector#(nIns, Bool)        sourcesReqs = map(isAvailable, sources);
   Vector#(nIns, Wire#(Bool)) reqWires    <- replicateM(mkDWire(False));
   for (Integer i = 0; i < valueOf(nIns); i = i + 1) begin
-    rule craftReq (sources[i].canGet && paths[i].canGet);
+    rule craftReq (sources[i].canPeek && paths[i].canPeek);
       reqWires[i] <= \or (zipWith(\&& , paths[i].peek, sinksReady));
     endrule
   end
@@ -112,8 +112,8 @@ module mkOneWayBus#(
     sourceRules = rJoinMutuallyExclusive(sourceRules, rules
       (* mutually_exclusive = "source_selected, burst" *)
       rule source_selected (state == UNALLOCATED && sourceSelect[i]);
-        if (paths[i].canGet) begin
-          let flit <- sources[i].get;
+        if (paths[i].canPeek) begin
+          let flit <- get(sources[i]);
           let dest = paths[i].peek;
           if (countIf(id, dest) != 1) begin // XXX THIS SHOULD NEVER HAPPEN
             $display("%0t -- mkOneWayBus error: input %0d was selected but the",
@@ -133,8 +133,8 @@ module mkOneWayBus#(
         end
       endrule
       rule burst (state == ALLOCATED && activeSource[i] &&
-                  paths[i].canGet && activeSinkReady(paths[i].peek));
-        let flit <- sources[i].get;
+                  paths[i].canPeek && activeSinkReady(paths[i].peek));
+        let flit <- get(sources[i]);
         zipWithM_(forwardFlit(flit), paths[i].peek, flitToSink);
         if (detectLast(flit)) begin
           state <= UNALLOCATED;
@@ -213,24 +213,24 @@ module mkTwoWayBus#(
     Bool isRoutable = countIf(id, dest) == 1;
     // consume different kinds of flits
     (* mutually_exclusive = "firstFlit, followFlits, nonRoutableFlit, drainFlits" *)
-    rule firstFlit (state == UNALLOCATED && src.canGet && isRoutable);
-      let _ <- src.get;
+    rule firstFlit (state == UNALLOCATED && src.canPeek && isRoutable);
+      src.drop;
       innerReq.enq(fatReq);
       innerRoute.enq(dest);
       if (!detectLast(fatReq)) state <= ALLOCATED;
     endrule
-    rule followFlits (state == ALLOCATED && src.canGet);
-      let _ <- src.get;
+    rule followFlits (state == ALLOCATED && src.canPeek);
+      src.drop;
       innerReq.enq(fatReq);
       if (detectLast(fatReq)) state <= UNALLOCATED;
     endrule
-    rule nonRoutableFlit (state == UNALLOCATED && src.canGet && !isRoutable);
-      let _ <- src.get;
+    rule nonRoutableFlit (state == UNALLOCATED && src.canPeek && !isRoutable);
+      src.drop;
       noRouteRsp.enq(noRouteFound(req));
       if (!detectLast(fatReq)) state <= DRAIN;
     endrule
     rule drainFlits (state == DRAIN);
-      let _ <- src.get;
+      src.drop;
       if (detectLast(fatReq)) state <= UNALLOCATED;
     endrule
     // sink of responses
@@ -273,15 +273,15 @@ module mkTwoWayBus#(
     Reg#(SlaveWrapperState) state <- mkReg(UNALLOCATED);
     // consume different kinds of flits
     (* mutually_exclusive = "firstFlit, followFlits" *)
-    rule firstFlit (state == UNALLOCATED && src.canGet);
-      s2m_a rspFat <- src.get;
+    rule firstFlit (state == UNALLOCATED && src.canPeek);
+      s2m_a rspFat <- get(src);
       match {.rsp, .dest} = shrink(rspFat);
       rspBack.enq(rsp);
       routeBack.enq(unpack(1 << dest));
       if (!detectLast(rsp)) state <= ALLOCATED;
     endrule
-    rule followFlits (state == ALLOCATED && src.canGet);
-      s2m_a rspFat <- src.get;
+    rule followFlits (state == ALLOCATED && src.canPeek);
+      s2m_a rspFat <- get(src);
       match {.rsp, .dest} = shrink(rspFat);
       rspBack.enq(rsp);
       if (detectLast(rsp)) state <= UNALLOCATED;
@@ -352,25 +352,25 @@ module mkInOrderTwoWayBus#(
     Bool isRoutable = countIf(id, dest) == 1;
     // consume different kinds of flits
     (* mutually_exclusive = "firstFlit, followFlits, nonRoutableFlit, drainFlits" *)
-    rule firstFlit (state == UNALLOCATED && src.canGet && isRoutable);
-      let req <- src.get;
+    rule firstFlit (state == UNALLOCATED && src.canPeek && isRoutable);
+      let req <- get(src);
       innerReq.enq(UpFlit {path: orig, flit: req});
       innerRsp.enq(Invalid);
       innerRoute.enq(dest);
       if (!detectLast(req)) state <= ALLOCATED;
     endrule
-    rule followFlits (state == ALLOCATED && src.canGet);
-      let req <- src.get;
+    rule followFlits (state == ALLOCATED && src.canPeek);
+      let req <- get(src);
       innerReq.enq(UpFlit {path: orig, flit: req});
       if (detectLast(req)) state <= UNALLOCATED;
     endrule
-    rule nonRoutableFlit (state == UNALLOCATED && src.canGet && !isRoutable);
-      let req <- src.get;
+    rule nonRoutableFlit (state == UNALLOCATED && src.canPeek && !isRoutable);
+      let req <- get(src);
       innerRsp.enq(Valid(noRouteFound(req)));
       if (!detectLast(req)) state <= DRAIN;
     endrule
     rule drainFlits (state == DRAIN);
-      let req <- src.get;
+      let req <- get(src);
       if (detectLast(req)) state <= UNALLOCATED;
     endrule
     // sink of responses

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -58,10 +58,9 @@ module fromAXILiteMaster#(
       awburst: FIXED, awlock: False, awcache: 0,
       awprot: x.awprot, awqos: 0, awregion: 0, awuser: x.awuser
     };
-    method canGet = src.canGet;
-    method peek = f(src.peek);
-    method get  =
-      actionvalue let flit <- src.get; return f(flit); endactionvalue;
+    method canPeek = src.canPeek;
+    method peek    = f(src.peek);
+    method drop    = src.drop;
   endmodule
 
   module fromAXIWLiteSource#(Source#(WLiteFlit#(data_, wuser_)) src)
@@ -69,10 +68,9 @@ module fromAXILiteMaster#(
     function WFlit#(data_, wuser_) f(WLiteFlit#(data_, wuser_) x) = WFlit {
       wdata: x.wdata, wstrb: x.wstrb, wlast: True, wuser: x.wuser
     };
-    method canGet = src.canGet;
-    method peek = f(src.peek);
-    method get  =
-      actionvalue let flit <- src.get; return f(flit); endactionvalue;
+    method canPeek = src.canPeek;
+    method peek    = f(src.peek);
+    method drop    = src.drop;
   endmodule
 
   module fromAXIBLiteSink#(Sink#(BLiteFlit#(buser_)) snk)
@@ -93,10 +91,9 @@ module fromAXILiteMaster#(
       arburst: FIXED, arlock: False, arcache: 0,
       arprot: x.arprot, arqos: 0, arregion: 0, aruser: x.aruser
     };
-    method canGet = src.canGet;
-    method peek = f(src.peek);
-    method get  =
-      actionvalue let flit <- src.get; return f(flit); endactionvalue;
+    method canPeek = src.canPeek;
+    method peek    = f(src.peek);
+    method drop    = src.drop;
   endmodule
 
   module fromAXIRLiteSink#(Sink#(RLiteFlit#(data_, ruser_)) snk)
@@ -169,10 +166,9 @@ module fromAXILiteSlave#(
     function BFlit#(id_, buser_) f(BLiteFlit#(buser_) x) = BFlit {
       bid: 0, bresp: x.bresp, buser: x.buser
     };
-    method canGet = src.canGet;
-    method peek = f(src.peek);
-    method get  =
-      actionvalue let flit <- src.get; return f(flit); endactionvalue;
+    method canPeek = src.canPeek;
+    method peek    = f(src.peek);
+    method drop    = src.drop;
   endmodule
 
   module fromAXIARLiteSink#(Sink#(ARLiteFlit#(addr_, aruser_)) snk)
@@ -203,10 +199,9 @@ module fromAXILiteSlave#(
     function RFlit#(id_, data_, ruser_) f(RLiteFlit#(data_, ruser_) x) = RFlit {
       rid: 0, rdata: x.rdata, rresp: x.rresp, rlast: True, ruser: x.ruser
     };
-    method canGet = src.canGet;
+    method canPeek = src.canPeek;
     method peek = f(src.peek);
-    method get  =
-      actionvalue let flit <- src.get; return f(flit); endactionvalue;
+    method drop = src.drop;
   endmodule
 
   let  awsink <- fromAXIAWLiteSink(slite.aw);

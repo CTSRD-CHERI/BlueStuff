@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -120,12 +120,9 @@ module mkMemSimWithOffset#(Integer n, Integer offset, Integer size, Maybe#(Strin
         endaction;
       endinterface;
       interface source = interface Source;
-        method canGet = isInitialized;
+        method canPeek = isInitialized;
         method peek if (isInitialized) = rsp.first;
-        method  get if (isInitialized) = actionvalue
-          rsp.deq;
-          return rsp.first;
-        endactionvalue;
+        method drop if (isInitialized) = rsp.deq;
       endinterface;
     endinterface;
   end

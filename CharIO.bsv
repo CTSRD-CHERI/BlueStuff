@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -127,14 +127,14 @@ module mkAXILiteCharIOCore#(CharIO charIO) (AXILiteSlave#(`PARAMS))
   let wRspFF <- mkFIFOF;
   let rRspFF <- mkFIFOF;
   rule doWrite;
-    let awflit <- shim.master.aw.get;
-    let wflit  <- shim.master.w.get;
+    shim.master.aw.drop;
+    let wflit  <- get(shim.master.w);
     if (wflit.wstrb[0] == 1) charIO.sink.put(truncate(wflit.wdata));
     wRspFF.enq(BLiteFlit {bresp: OKAY, buser: ?});
   endrule
   rule doRead;
-    let arflit <- shim.master.ar.get;
-    let c      <- charIO.source.get;
+    shim.master.ar.drop;
+    let c <- get(charIO.source);
     rRspFF.enq(RLiteFlit {rdata: zeroExtend(c), rresp: OKAY, ruser: ?});
   endrule
   rule writeRsp;

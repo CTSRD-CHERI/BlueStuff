@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -69,9 +69,9 @@ instance ToAXIAWMaster#(Source);
   (AWMaster#(id_, addr_, user_)) provisos (ToAXIAWFlit#(t, id_, addr_, user_));
 
     Wire#(AWFlit#(id_, addr_, user_)) flit <- mkDWire(?);
-    rule getFlit (src.canGet); flit <= toAXIAWFlit(src.peek); endrule
-    PulseWire getWire <- mkPulseWire;
-    rule doGet (getWire && src.canGet); let _ <- src.get; endrule
+    rule peekFlit (src.canPeek); flit <= toAXIAWFlit(src.peek); endrule
+    PulseWire dropWire <- mkPulseWire;
+    rule doDrop (dropWire && src.canPeek); src.drop; endrule
 
     method awid     = flit.awid;
     method awaddr   = flit.awaddr;
@@ -84,8 +84,8 @@ instance ToAXIAWMaster#(Source);
     method awqos    = flit.awqos;
     method awregion = flit.awregion;
     method awuser   = flit.awuser;
-    method awvalid  = src.canGet;
-    method awready(rdy) = action if (rdy) getWire.send; endaction;
+    method awvalid  = src.canPeek;
+    method awready(rdy) = action if (rdy) dropWire.send; endaction;
 
   endmodule
 endinstance
@@ -95,7 +95,7 @@ instance ToAXIAWMaster#(FIFOF);
   (AWMaster#(id_, addr_, user_)) provisos (ToAXIAWFlit#(t, id_, addr_, user_));
 
     Wire#(AWFlit#(id_, addr_, user_)) flit <- mkDWire(?);
-    rule getFlit (ff.notEmpty); flit <= toAXIAWFlit(ff.first); endrule
+    rule peekFlit (ff.notEmpty); flit <= toAXIAWFlit(ff.first); endrule
     PulseWire deqWire <- mkPulseWire;
     rule doDeq (deqWire && ff.notEmpty); ff.deq; endrule
 
