@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -29,8 +29,6 @@
 package Routable;
 
 import Vector :: *;
-
-import Dict :: *;
 
 ////////////////////////
 // Routable typeclass //
