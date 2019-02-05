@@ -36,6 +36,15 @@ import SourceSink :: *;
 
 import AXI4_AXI4Lite_Types :: *;
 
+//////////////////
+// helper types //
+////////////////////////////////////////////////////////////////////////////////
+
+// return an interface acting as a dead end
+typeclass CulDeSac#(type t);
+  function t culDeSac;
+endtypeclass
+
 ////////////////////////////////
 // AXI4 Address Write Channel //
 ////////////////////////////////////////////////////////////////////////////////
@@ -95,6 +104,25 @@ interface AXI4_AW_Master_Synth#(numeric type id_,
   (* prefix="" *) method Action awready(Bool awready);
 endinterface
 
+instance CulDeSac#(AXI4_AW_Master_Synth#(id_, addr_, user_));
+  function culDeSac = interface AXI4_AW_Master_Synth;
+    method awid       = ?;
+    method awaddr     = ?;
+    method awlen      = ?;
+    method awsize     = ?;
+    method awburst    = ?;
+    method awlock     = ?;
+    method awcache    = ?;
+    method awprot     = ?;
+    method awqos      = ?;
+    method awregion   = ?;
+    method awuser     = ?;
+    method awvalid    = False;
+    method awready(_) = noAction;
+  endinterface;
+endinstance
+
+/*
 interface AXI4_AW_Master_Xactor#(numeric type id_,
                                  numeric type addr_,
                                  numeric type user_);
@@ -102,6 +130,7 @@ interface AXI4_AW_Master_Xactor#(numeric type id_,
   interface Sink#(AXI4_AWFlit#(id_, addr_, user_))   sink;
   interface AXI4_AW_Master_Synth#(id_, addr_, user_) masterSynth;
 endinterface
+*/
 
 // Slave interfaces
 (* always_ready, always_enabled *)
@@ -123,6 +152,25 @@ interface AXI4_AW_Slave_Synth#(numeric type id_,
   method Bool awready;
 endinterface
 
+instance CulDeSac#(AXI4_AW_Slave_Synth#(id_, addr_, user_));
+  function culDeSac = interface AXI4_AW_Slave_Synth;
+    method awid    (_) = noAction;
+    method awaddr  (_) = noAction;
+    method awlen   (_) = noAction;
+    method awsize  (_) = noAction;
+    method awburst (_) = noAction;
+    method awlock  (_) = noAction;
+    method awcache (_) = noAction;
+    method awprot  (_) = noAction;
+    method awqos   (_) = noAction;
+    method awregion(_) = noAction;
+    method awuser  (_) = noAction;
+    method awvalid (_) = noAction;
+    method awready     = False;
+  endinterface;
+endinstance
+
+/*
 interface AXI4_AW_Slave_Xactor#(numeric type id_,
                                 numeric type addr_,
                                 numeric type user_);
@@ -130,6 +178,7 @@ interface AXI4_AW_Slave_Xactor#(numeric type id_,
   interface Source#(AXI4_AWFlit#(id_, addr_, user_)) source;
   interface AXI4_AW_Slave_Synth#(id_, addr_, user_)  slaveSynth;
 endinterface
+*/
 
 // connectable instances
 instance Connectable#(AXI4_AW_Master_Synth#(a, b, c),
@@ -190,12 +239,25 @@ interface AXI4_W_Master_Synth#(numeric type data_, numeric type user_);
   (* prefix="" *) method Action wready(Bool wready);
 endinterface
 
+instance CulDeSac#(AXI4_W_Master_Synth#(data_, user_));
+  function culDeSac = interface AXI4_W_Master_Synth;
+    method wdata     = ?;
+    method wstrb     = ?;
+    method wlast     = ?;
+    method wuser     = ?;
+    method wvalid    = False;
+    method wready(_) = noAction;
+  endinterface;
+endinstance
+
+/*
 interface AXI4_W_Master_Xactor#(numeric type data_,
                                 numeric type user_);
   method Action reset;
   interface Sink#(AXI4_WFlit#(data_, user_))   sink;
   interface AXI4_W_Master_Synth#(data_, user_) masterSynth;
 endinterface
+*/
 
 // Slave interfaces
 (* always_ready, always_enabled *)
@@ -208,12 +270,25 @@ interface AXI4_W_Slave_Synth#(numeric type data_, numeric type user_);
   method Bool wready;
 endinterface
 
+instance CulDeSac#(AXI4_W_Slave_Synth#(data_, user_));
+  function culDeSac = interface AXI4_W_Slave_Synth;
+    method wdata (_) = noAction;
+    method wstrb (_) = noAction;
+    method wlast (_) = noAction;
+    method wuser (_) = noAction;
+    method wvalid(_) = noAction;
+    method wready    = False;
+  endinterface;
+endinstance
+
+/*
 interface AXI4_W_Slave_Xactor#(numeric type data_,
                                numeric type user_);
   method Action reset;
   interface Source#(AXI4_WFlit#(data_, user_)) source;
   interface AXI4_W_Slave_Synth#(data_, user_)  slaveSynth;
 endinterface
+*/
 
 // connectable instances
 instance Connectable#(AXI4_W_Master_Synth#(a, b), AXI4_W_Slave_Synth#(a, b));
@@ -261,12 +336,24 @@ interface AXI4_B_Master_Synth#(numeric type id_, numeric type user_);
   method Bool bready;
 endinterface
 
+instance CulDeSac#(AXI4_B_Master_Synth#(id_, user_));
+  function culDeSac = interface AXI4_B_Master_Synth;
+    method bid   (_) = noAction;
+    method bresp (_) = noAction;
+    method buser (_) = noAction;
+    method bvalid(_) = noAction;
+    method bready    = False;
+  endinterface;
+endinstance
+
+/*
 interface AXI4_B_Master_Xactor#(numeric type id_,
                                 numeric type user_);
   method Action reset;
   interface Source#(AXI4_BFlit#(id_, user_)) source;
   interface AXI4_B_Master_Synth#(id_, user_) masterSynth;
 endinterface
+*/
 
 // Slave interfaces
 (* always_ready, always_enabled *)
@@ -278,12 +365,24 @@ interface AXI4_B_Slave_Synth#(numeric type id_, numeric type user_);
   (* prefix="" *) method Action bready(Bool bready);
 endinterface
 
+instance CulDeSac#(AXI4_B_Slave_Synth#(id_, user_));
+  function culDeSac = interface AXI4_B_Slave_Synth;
+    method bid       = ?;
+    method bresp     = ?;
+    method buser     = ?;
+    method bvalid    = False;
+    method bready(_) = noAction;
+  endinterface;
+endinstance
+
+/*
 interface AXI4_B_Slave_Xactor#(numeric type id_,
                                numeric type user_);
   method Action reset;
   interface Sink#(AXI4_BFlit#(id_, user_))  sink;
   interface AXI4_B_Slave_Synth#(id_, user_) slaveSynth;
 endinterface
+*/
 
 // connectable instances
 instance Connectable#(AXI4_B_Master_Synth#(a, b), AXI4_B_Slave_Synth#(a, b));
@@ -362,6 +461,25 @@ interface AXI4_AR_Master_Synth#(numeric type id_,
   (* prefix="" *) method Action arready(Bool arready);
 endinterface
 
+instance CulDeSac#(AXI4_AR_Master_Synth#(id_, addr_, user_));
+  function culDeSac = interface AXI4_AR_Master_Synth;
+    method arid       = ?;
+    method araddr     = ?;
+    method arlen      = ?;
+    method arsize     = ?;
+    method arburst    = ?;
+    method arlock     = ?;
+    method arcache    = ?;
+    method arprot     = ?;
+    method arqos      = ?;
+    method arregion   = ?;
+    method aruser     = ?;
+    method arvalid    = False;
+    method arready(_) = noAction;
+  endinterface;
+endinstance
+
+/*
 interface AXI4_AR_Master_Xactor#(numeric type id_,
                                  numeric type addr_,
                                  numeric type user_);
@@ -369,6 +487,7 @@ interface AXI4_AR_Master_Xactor#(numeric type id_,
   interface Source#(AXI4_ARFlit#(id_, addr_, user_)) source;
   interface AXI4_AR_Master_Synth#(id_, addr_, user_) masterSynth;
 endinterface
+*/
 
 // Slave interfaces
 (* always_ready, always_enabled *)
@@ -390,6 +509,25 @@ interface AXI4_AR_Slave_Synth#(numeric type id_,
   method Bool arready;
 endinterface
 
+instance CulDeSac#(AXI4_AR_Slave_Synth#(id_, addr_, user_));
+  function culDeSac = interface AXI4_AR_Slave_Synth;
+    method arid    (_) = noAction;
+    method araddr  (_) = noAction;
+    method arlen   (_) = noAction;
+    method arsize  (_) = noAction;
+    method arburst (_) = noAction;
+    method arlock  (_) = noAction;
+    method arcache (_) = noAction;
+    method arprot  (_) = noAction;
+    method arqos   (_) = noAction;
+    method arregion(_) = noAction;
+    method aruser  (_) = noAction;
+    method arvalid (_) = noAction;
+    method arready     = False;
+  endinterface;
+endinstance
+
+/*
 interface AXI4_AR_Slave_Xactor#(numeric type id_,
                                 numeric type addr_,
                                 numeric type user_);
@@ -397,6 +535,7 @@ interface AXI4_AR_Slave_Xactor#(numeric type id_,
   interface Sink#(AXI4_ARFlit#(id_, addr_, user_))  sink;
   interface AXI4_AR_Slave_Synth#(id_, addr_, user_) slaveSynth;
 endinterface
+*/
 
 // connectable instances
 instance Connectable#(AXI4_AR_Master_Synth#(a, b, c),
@@ -462,6 +601,19 @@ interface AXI4_R_Master_Synth#(numeric type id_,
   method Bool rready;
 endinterface
 
+instance CulDeSac#(AXI4_R_Master_Synth#(id_, data_, user_));
+  function culDeSac = interface AXI4_R_Master_Synth;
+    method rid   (_) = noAction;
+    method rdata (_) = noAction;
+    method rresp (_) = noAction;
+    method rlast (_) = noAction;
+    method ruser (_) = noAction;
+    method rvalid(_) = noAction;
+    method rready    = False;
+  endinterface;
+endinstance
+
+/*
 interface AXI4_R_Master_Xactor#(numeric type id_,
                                 numeric type data_,
                                 numeric type user_);
@@ -469,6 +621,7 @@ interface AXI4_R_Master_Xactor#(numeric type id_,
   interface Source#(AXI4_RFlit#(id_, data_, user_)) source;
   interface AXI4_R_Master_Synth#(id_, data_, user_) masterSynth;
 endinterface
+*/
 
 // Slave interfaces
 (* always_ready, always_enabled *)
@@ -484,6 +637,19 @@ interface AXI4_R_Slave_Synth#(numeric type id_,
   (* prefix="" *) method Action rready(Bool rready);
 endinterface
 
+instance CulDeSac#(AXI4_R_Slave_Synth#(id_, data_, user_));
+  function culDeSac = interface AXI4_R_Slave_Synth;
+    method rid       = ?;
+    method rdata     = ?;
+    method rresp     = ?;
+    method rlast     = ?;
+    method ruser     = ?;
+    method rvalid    = False;
+    method rready(_) = noAction;
+  endinterface;
+endinstance
+
+/*
 interface AXI4_R_Slave_Xactor#(numeric type id_,
                                numeric type data_,
                                numeric type user_);
@@ -491,6 +657,7 @@ interface AXI4_R_Slave_Xactor#(numeric type id_,
   interface Sink#(AXI4_RFlit#(id_, data_, user_))  sink;
   interface AXI4_R_Slave_Synth#(id_, data_, user_) slaveSynth;
 endinterface
+*/
 
 // connectable instances
 instance Connectable#(AXI4_R_Master_Synth#(a, b, c),
@@ -549,6 +716,30 @@ interface AXI4_Master_Synth#(
   interface AXI4_AR_Master_Synth#(id_, addr_, aruser_) ar;
   interface AXI4_R_Master_Synth#(id_, data_, ruser_)   r;
 endinterface
+
+instance CulDeSac#(AXI4_Master_Synth#(id_,
+                                      addr_,
+                                      data_,
+                                      awuser_,
+                                      wuser_,
+                                      buser_,
+                                      aruser_,
+                                      ruser_))
+  provisos (
+    CulDeSac#(AXI4_AW_Master_Synth#(id_, addr_, awuser_)),
+    CulDeSac#(AXI4_W_Master_Synth#(data_, wuser_)),
+    CulDeSac#(AXI4_B_Master_Synth#(id_, buser_)),
+    CulDeSac#(AXI4_AR_Master_Synth#(id_, addr_, aruser_)),
+    CulDeSac#(AXI4_R_Master_Synth#(id_, data_, ruser_))
+  );
+  function culDeSac = interface AXI4_Master_Synth;
+    interface aw = culDeSac;
+    interface  w = culDeSac;
+    interface  b = culDeSac;
+    interface ar = culDeSac;
+    interface  r = culDeSac;
+  endinterface;
+endinstance
 
 interface AXI4_Master_Xactor#(
   numeric type id_,
@@ -613,6 +804,30 @@ interface AXI4_Slave_Synth#(
   interface AXI4_AR_Slave_Synth#(id_, addr_, aruser_) ar;
   interface AXI4_R_Slave_Synth#(id_, data_, ruser_)   r;
 endinterface
+
+instance CulDeSac#(AXI4_Slave_Synth#(id_,
+                                     addr_,
+                                     data_,
+                                     awuser_,
+                                     wuser_,
+                                     buser_,
+                                     aruser_,
+                                     ruser_))
+  provisos (
+    CulDeSac#(AXI4_AW_Slave_Synth#(id_, addr_, awuser_)),
+    CulDeSac#(AXI4_W_Slave_Synth#(data_, wuser_)),
+    CulDeSac#(AXI4_B_Slave_Synth#(id_, buser_)),
+    CulDeSac#(AXI4_AR_Slave_Synth#(id_, addr_, aruser_)),
+    CulDeSac#(AXI4_R_Slave_Synth#(id_, data_, ruser_))
+  );
+  function culDeSac = interface AXI4_Slave_Synth;
+    interface aw = culDeSac;
+    interface  w = culDeSac;
+    interface  b = culDeSac;
+    interface ar = culDeSac;
+    interface  r = culDeSac;
+  endinterface;
+endinstance
 
 interface AXI4_Slave_Xactor#(
   numeric type id_,
