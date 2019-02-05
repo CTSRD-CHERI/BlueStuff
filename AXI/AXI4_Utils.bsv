@@ -186,26 +186,45 @@ endfunction
 // AXI4 Shim Master <-> Slave //
 ////////////////////////////////////////////////////////////////////////////////
 
+// XXX
+// Macro to work around the fact that we cannot pass FIFOF module constructor
+// and use it for different channels with different types (need Rank2Types)...?
+`define defAXI4ShimFIFOF (name, mkFF)\
+module mkAXI4Shim``name (AXI4_Shim#(a, b, c, d, e, f, g, h));\
+  let awff <- mkFF;\
+  let  wff <- mkFF;\
+  let  bff <- mkFF;\
+  let arff <- mkFF;\
+  let  rff <- mkFF;\
+  method clear = action\
+    awff.clear;\
+    wff.clear;\
+    bff.clear;\
+    arff.clear;\
+    rff.clear;\
+  endaction;\
+  interface master = interface AXI4_Master;\
+    interface aw = toSource(awff);\
+    interface  w = toSource(wff);\
+    interface  b = toSink(bff);\
+    interface ar = toSource(arff);\
+    interface  r = toSink(rff);\
+  endinterface;\
+  interface slave = interface AXI4_Slave;\
+    interface aw = toSink(awff);\
+    interface  w = toSink(wff);\
+    interface  b = toSource(bff);\
+    interface ar = toSink(arff);\
+    interface  r = toSource(rff);\
+  endinterface;\
+endmodule
+
+`defAXI4ShimFIFOF(BypassFIFOF, mkBypassFIFOF)
+`defAXI4ShimFIFOF(SizedFIFOF4, mkSizedFIFOF(4))
+
 module mkAXI4Shim (AXI4_Shim#(a, b, c, d, e, f, g, h));
-  let awff <- mkBypassFIFOF;
-  let  wff <- mkBypassFIFOF;
-  let  bff <- mkBypassFIFOF;
-  let arff <- mkBypassFIFOF;
-  let  rff <- mkBypassFIFOF;
-  interface master = interface AXI4_Master;
-    interface aw = toSource(awff);
-    interface  w = toSource(wff);
-    interface  b = toSink(bff);
-    interface ar = toSource(arff);
-    interface  r = toSink(rff);
-  endinterface;
-  interface slave = interface AXI4_Slave;
-    interface aw = toSink(awff);
-    interface  w = toSink(wff);
-    interface  b = toSource(bff);
-    interface ar = toSink(arff);
-    interface  r = toSource(rff);
-  endinterface;
+  AXI4_Shim#(a, b, c, d, e, f, g, h) shim <- mkAXI4ShimBypassFIFOF;
+  return shim;
 endmodule
 
 /////////////////////////////////////////
@@ -227,17 +246,34 @@ module toAXI4_Master_Synth#(AXI4_Master#(a, b, c, d, e, f, g, h) master)
   interface r  = rifc;
 endmodule
 
+module mkAXI4_Master_Xactor (AXI4_Master_Xactor#(a, b, c, d, e, f, g, h));
+  let  shim <- mkAXI4ShimSizedFIFOF4;
+  let synth <- toAXI4_Master_Synth(shim.master);
+  //method clear = shim.clear;
+  method clear = noAction;
+  interface slave = shim.slave;
+  interface masterSynth = synth;
+endmodule
+
 // AXI4 Slave
-module toAXI4_Slave_Synth#(AXI4_Slave#(a, b, c, d, e, f, g, h) master)
+module toAXI4_Slave_Synth#(AXI4_Slave#(a, b, c, d, e, f, g, h) slave)
   (AXI4_Slave_Synth#(a, b, c, d, e, f, g, h));
-  let awifc <- toAXI4_AW_Slave_Synth(master.aw);
-  let wifc  <- toAXI4_W_Slave_Synth(master.w);
-  let bifc  <- toAXI4_B_Slave_Synth(master.b);
-  let arifc <- toAXI4_AR_Slave_Synth(master.ar);
-  let rifc  <- toAXI4_R_Slave_Synth(master.r);
+  let awifc <- toAXI4_AW_Slave_Synth(slave.aw);
+  let wifc  <- toAXI4_W_Slave_Synth(slave.w);
+  let bifc  <- toAXI4_B_Slave_Synth(slave.b);
+  let arifc <- toAXI4_AR_Slave_Synth(slave.ar);
+  let rifc  <- toAXI4_R_Slave_Synth(slave.r);
   interface aw = awifc;
   interface w  = wifc;
   interface b  = bifc;
   interface ar = arifc;
   interface r  = rifc;
+endmodule
+
+module mkAXI4_Slave_Xactor (AXI4_Slave_Xactor#(a, b, c, d, e, f, g, h));
+  let  shim <- mkAXI4ShimSizedFIFOF4;
+  let synth <- toAXI4_Slave_Synth(shim.slave);
+  method clear = shim.clear;
+  interface master = shim.master;
+  interface slaveSynth = synth;
 endmodule

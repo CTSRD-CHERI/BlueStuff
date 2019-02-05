@@ -750,15 +750,15 @@ interface AXI4_Master_Xactor#(
   numeric type buser_,
   numeric type aruser_,
   numeric type ruser_);
-  method Action reset;
-  interface AXI4_Master#(id_,
-                         addr_,
-                         data_,
-                         awuser_,
-                         wuser_,
-                         buser_,
-                         aruser_,
-                         ruser_)       master;
+  method Action clear;
+  interface AXI4_Slave#(id_,
+                        addr_,
+                        data_,
+                        awuser_,
+                        wuser_,
+                        buser_,
+                        aruser_,
+                        ruser_)        slave;
   interface AXI4_Master_Synth#(id_,
                                addr_,
                                data_,
@@ -838,15 +838,15 @@ interface AXI4_Slave_Xactor#(
   numeric type buser_,
   numeric type aruser_,
   numeric type ruser_);
-  method Action reset;
-  interface AXI4_Slave#(id_,
-                        addr_,
-                        data_,
-                        awuser_,
-                        wuser_,
-                        buser_,
-                        aruser_,
-                        ruser_)       slave;
+  method Action clear;
+  interface AXI4_Master#(id_,
+                         addr_,
+                         data_,
+                         awuser_,
+                         wuser_,
+                         buser_,
+                         aruser_,
+                         ruser_)      master;
   interface AXI4_Slave_Synth#(id_,
                               addr_,
                               data_,
@@ -870,6 +870,7 @@ interface AXI4_Shim#(
   numeric type buser_,
   numeric type aruser_,
   numeric type ruser_);
+  method Action clear;
   interface AXI4_Master#(
     id_, addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_
   ) master;
