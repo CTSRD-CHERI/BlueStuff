@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -36,84 +36,106 @@ import SourceSink :: *;
 
 import AXI4_AXI4Lite_Types :: *;
 
-///////////////////////////////
-// AXI Address Write Channel //
+////////////////////////////////
+// AXI4 Address Write Channel //
 ////////////////////////////////////////////////////////////////////////////////
 
 // Flit type
 typedef struct {
   Bit#(id_)   awid;
   Bit#(addr_) awaddr;
-  Bit#(8)     awlen;
-  Bit#(3)     awsize;
-  AXIBurst    awburst;
-  Bool        awlock;
-  Bit#(4)     awcache;
-  Bit#(3)     awprot;
-  Bit#(4)     awqos;
-  Bit#(4)     awregion;
+  AXI4_Len    awlen;
+  AXI4_Size   awsize;
+  AXI4_Burst  awburst;
+  AXI4_Lock   awlock;
+  AXI4_Cache  awcache;
+  AXI4_Prot   awprot;
+  AXI4_QoS    awqos;
+  AXI4_Region awregion;
   Bit#(user_) awuser;
-} AWFlit#(numeric type id_, numeric type addr_, numeric type user_)
+} AXI4_AWFlit#(numeric type id_, numeric type addr_, numeric type user_)
 deriving (Bits, FShow);
-instance DefaultValue#(AWFlit#(id_, addr_, user_));
-  function defaultValue = AWFlit {
+instance DefaultValue#(AXI4_AWFlit#(id_, addr_, user_));
+  function defaultValue = AXI4_AWFlit {
     awid: 0, awaddr: ?, awlen: 0, awsize: 0,
-    awburst: INCR, awlock: False, awcache: 0,
+    awburst: INCR, awlock: NORMAL, awcache: 0,
     awprot: 0, awqos: 0, awregion: 0, awuser: ?
   };
 endinstance
 instance Routable#(
-  AWFlit#(id_, addr_, awuser_),
-  BFlit#(id_, buser_),
+  AXI4_AWFlit#(id_, addr_, awuser_),
+  AXI4_BFlit#(id_, buser_),
   Bit#(addr_));
   function routingField(x) = x.awaddr;
-  function noRouteFound(x) = BFlit {
+  function noRouteFound(x) = AXI4_BFlit {
     bid: x.awid, bresp: DECERR, buser: ?
   };
 endinstance
-instance DetectLast#(AWFlit#(id_, addr_, user_));
+instance DetectLast#(AXI4_AWFlit#(id_, addr_, user_));
   function detectLast(x) = True;
 endinstance
 
-// Master interface
+// Master interfaces
 (* always_ready, always_enabled *)
-interface AWMaster#(numeric type id_, numeric type addr_, numeric type user_);
+interface AXI4_AW_Master_Synth#(numeric type id_,
+                                numeric type addr_,
+                                numeric type user_);
   method Bit#(id_)   awid;
   method Bit#(addr_) awaddr;
-  method Bit#(8)     awlen;
-  method Bit#(3)     awsize;
-  method AXIBurst    awburst;
-  method Bool        awlock;
-  method Bit#(4)     awcache;
-  method Bit#(3)     awprot;
-  method Bit#(4)     awqos;
-  method Bit#(4)     awregion;
+  method AXI4_Len    awlen;
+  method AXI4_Size   awsize;
+  method AXI4_Burst  awburst;
+  method AXI4_Lock   awlock;
+  method AXI4_Cache  awcache;
+  method AXI4_Prot   awprot;
+  method AXI4_QoS    awqos;
+  method AXI4_Region awregion;
   method Bit#(user_) awuser;
   method Bool        awvalid;
   (* prefix="" *) method Action awready(Bool awready);
 endinterface
 
-// Slave interface
+interface AXI4_AW_Master_Xactor#(numeric type id_,
+                                 numeric type addr_,
+                                 numeric type user_);
+  method Action reset;
+  interface Sink#(AXI4_AWFlit#(id_, addr_, user_))   sink;
+  interface AXI4_AW_Master_Synth#(id_, addr_, user_) masterSynth;
+endinterface
+
+// Slave interfaces
 (* always_ready, always_enabled *)
-interface AWSlave#(numeric type id_, numeric type addr_, numeric type user_);
+interface AXI4_AW_Slave_Synth#(numeric type id_,
+                               numeric type addr_,
+                               numeric type user_);
   (* prefix="" *) method Action awid    (Bit#(id_)   awid);
   (* prefix="" *) method Action awaddr  (Bit#(addr_) awaddr);
-  (* prefix="" *) method Action awlen   (Bit#(8)     awlen);
-  (* prefix="" *) method Action awsize  (Bit#(3)     awsize);
-  (* prefix="" *) method Action awburst (AXIBurst    awburst);
-  (* prefix="" *) method Action awlock  (Bool        awlock);
-  (* prefix="" *) method Action awcache (Bit#(4)     awcache);
-  (* prefix="" *) method Action awprot  (Bit#(3)     awprot);
-  (* prefix="" *) method Action awqos   (Bit#(4)     awqos);
-  (* prefix="" *) method Action awregion(Bit#(4)     awregion);
+  (* prefix="" *) method Action awlen   (AXI4_Len    awlen);
+  (* prefix="" *) method Action awsize  (AXI4_Size   awsize);
+  (* prefix="" *) method Action awburst (AXI4_Burst  awburst);
+  (* prefix="" *) method Action awlock  (AXI4_Lock   awlock);
+  (* prefix="" *) method Action awcache (AXI4_Cache  awcache);
+  (* prefix="" *) method Action awprot  (AXI4_Prot   awprot);
+  (* prefix="" *) method Action awqos   (AXI4_QoS    awqos);
+  (* prefix="" *) method Action awregion(AXI4_Region awregion);
   (* prefix="" *) method Action awuser  (Bit#(user_) awuser);
   (* prefix="" *) method Action awvalid (Bool        awvalid);
   method Bool awready;
 endinterface
 
+interface AXI4_AW_Slave_Xactor#(numeric type id_,
+                                numeric type addr_,
+                                numeric type user_);
+  method Action reset;
+  interface Source#(AXI4_AWFlit#(id_, addr_, user_)) source;
+  interface AXI4_AW_Slave_Synth#(id_, addr_, user_)  slaveSynth;
+endinterface
+
 // connectable instances
-instance Connectable#(AWMaster#(a, b, c), AWSlave#(a, b, c));
-  module mkConnection#(AWMaster#(a, b, c) m, AWSlave#(a, b, c) s)(Empty);
+instance Connectable#(AXI4_AW_Master_Synth#(a, b, c),
+                      AXI4_AW_Slave_Synth#(a, b, c));
+  module mkConnection#(AXI4_AW_Master_Synth#(a, b, c) m,
+                       AXI4_AW_Slave_Synth#(a, b, c) s) (Empty);
     rule connect_awid;     s.awid(m.awid);         endrule
     rule connect_awaddr;   s.awaddr(m.awaddr);     endrule
     rule connect_awlen;    s.awlen(m.awlen);       endrule
@@ -129,14 +151,16 @@ instance Connectable#(AWMaster#(a, b, c), AWSlave#(a, b, c));
     rule connect_awready;  m.awready(s.awready);   endrule
   endmodule
 endinstance
-instance Connectable#(AWSlave#(a, b, c), AWMaster#(a, b, c));
-  module mkConnection#(AWSlave#(a, b, c) s, AWMaster#(a, b, c) m)(Empty);
+instance Connectable#(AXI4_AW_Slave_Synth#(a, b, c),
+                      AXI4_AW_Master_Synth#(a, b, c));
+  module mkConnection#(AXI4_AW_Slave_Synth#(a, b, c) s,
+                       AXI4_AW_Master_Synth#(a, b, c) m) (Empty);
     mkConnection(m, s);
   endmodule
 endinstance
 
-////////////////////////////
-// AXI Write Data Channel //
+/////////////////////////////
+// AXI4 Write Data Channel //
 ////////////////////////////////////////////////////////////////////////////////
 
 // Flit type
@@ -145,17 +169,19 @@ typedef struct {
   Bit#(TDiv#(data_, 8)) wstrb;
   Bool                  wlast;
   Bit#(user_)           wuser;
-} WFlit#(numeric type data_, numeric type user_) deriving (Bits, FShow);
-instance DefaultValue#(WFlit#(data_, user_));
-  function defaultValue = WFlit { wdata: ?, wstrb: ~0, wlast: True, wuser: ? };
+} AXI4_WFlit#(numeric type data_, numeric type user_) deriving (Bits, FShow);
+instance DefaultValue#(AXI4_WFlit#(data_, user_));
+  function defaultValue = AXI4_WFlit {
+    wdata: ?, wstrb: ~0, wlast: True, wuser: ?
+  };
 endinstance
-instance DetectLast#(WFlit#(data_, user_));
+instance DetectLast#(AXI4_WFlit#(data_, user_));
   function detectLast(x) = x.wlast;
 endinstance
 
-// Master interface
+// Master interfaces
 (* always_ready, always_enabled *)
-interface WMaster#(numeric type data_, numeric type user_);
+interface AXI4_W_Master_Synth#(numeric type data_, numeric type user_);
   method Bit#(data_)           wdata;
   method Bit#(TDiv#(data_, 8)) wstrb;
   method Bool                  wlast;
@@ -164,9 +190,16 @@ interface WMaster#(numeric type data_, numeric type user_);
   (* prefix="" *) method Action wready(Bool wready);
 endinterface
 
-// Slave interface
+interface AXI4_W_Master_Xactor#(numeric type data_,
+                                numeric type user_);
+  method Action reset;
+  interface Sink#(AXI4_WFlit#(data_, user_))   sink;
+  interface AXI4_W_Master_Synth#(data_, user_) masterSynth;
+endinterface
+
+// Slave interfaces
 (* always_ready, always_enabled *)
-interface WSlave#(numeric type data_, numeric type user_);
+interface AXI4_W_Slave_Synth#(numeric type data_, numeric type user_);
   (* prefix="" *) method Action wdata (Bit#(data_)            wdata);
   (* prefix="" *) method Action wstrb (Bit#(TDiv#(data_,  8)) wstrb);
   (* prefix="" *) method Action wlast (Bool                   wlast);
@@ -175,9 +208,17 @@ interface WSlave#(numeric type data_, numeric type user_);
   method Bool wready;
 endinterface
 
+interface AXI4_W_Slave_Xactor#(numeric type data_,
+                               numeric type user_);
+  method Action reset;
+  interface Source#(AXI4_WFlit#(data_, user_)) source;
+  interface AXI4_W_Slave_Synth#(data_, user_)  slaveSynth;
+endinterface
+
 // connectable instances
-instance Connectable#(WMaster#(a, b), WSlave#(a, b));
-  module mkConnection#(WMaster#(a, b) m, WSlave#(a, b) s)(Empty);
+instance Connectable#(AXI4_W_Master_Synth#(a, b), AXI4_W_Slave_Synth#(a, b));
+  module mkConnection#(AXI4_W_Master_Synth#(a, b) m,
+                       AXI4_W_Slave_Synth#(a, b) s)(Empty);
     rule connect_wdata;  s.wdata(m.wdata);   endrule
     rule connect_wstrb;  s.wstrb(m.wstrb);   endrule
     rule connect_wlast;  s.wlast(m.wlast);   endrule
@@ -186,52 +227,68 @@ instance Connectable#(WMaster#(a, b), WSlave#(a, b));
     rule connect_wready; m.wready(s.wready); endrule
   endmodule
 endinstance
-instance Connectable#(WSlave#(a, b), WMaster#(a, b));
-  module mkConnection#(WSlave#(a, b) s, WMaster#(a, b) m)(Empty);
+instance Connectable#(AXI4_W_Slave_Synth#(a, b), AXI4_W_Master_Synth#(a, b));
+  module mkConnection#(AXI4_W_Slave_Synth#(a, b) s,
+                       AXI4_W_Master_Synth#(a, b) m)(Empty);
     mkConnection(m, s);
   endmodule
 endinstance
 
-////////////////////////////////
-// AXI Write Response Channel //
+/////////////////////////////////
+// AXI4 Write Response Channel //
 ////////////////////////////////////////////////////////////////////////////////
 
 // Flit type
 typedef struct {
   Bit#(id_)   bid;
-  AXIResp     bresp;
+  AXI4_Resp   bresp;
   Bit#(user_) buser;
-} BFlit#(numeric type id_, numeric type user_) deriving (Bits, FShow);
-instance DefaultValue#(BFlit#(id_, user_));
-  function defaultValue = BFlit { bid: 0, bresp: OKAY, buser: ? };
+} AXI4_BFlit#(numeric type id_, numeric type user_) deriving (Bits, FShow);
+instance DefaultValue#(AXI4_BFlit#(id_, user_));
+  function defaultValue = AXI4_BFlit { bid: 0, bresp: OKAY, buser: ? };
 endinstance
-instance DetectLast#(BFlit#(id_, user_));
+instance DetectLast#(AXI4_BFlit#(id_, user_));
   function detectLast(x) = True;
 endinstance
 
-// Master interface
+// Master interfaces
 (* always_ready, always_enabled *)
-interface BMaster#(numeric type id_, numeric type user_);
+interface AXI4_B_Master_Synth#(numeric type id_, numeric type user_);
   (* prefix="" *) method Action bid   (Bit#(id_)   bid);
-  (* prefix="" *) method Action bresp (AXIResp     bresp);
+  (* prefix="" *) method Action bresp (AXI4_Resp   bresp);
   (* prefix="" *) method Action buser (Bit#(user_) buser);
   (* prefix="" *) method Action bvalid(Bool        bvalid);
   method Bool bready;
 endinterface
 
-// Slave interface
+interface AXI4_B_Master_Xactor#(numeric type id_,
+                                numeric type user_);
+  method Action reset;
+  interface Source#(AXI4_BFlit#(id_, user_)) source;
+  interface AXI4_B_Master_Synth#(id_, user_) masterSynth;
+endinterface
+
+// Slave interfaces
 (* always_ready, always_enabled *)
-interface BSlave#(numeric type id_, numeric type user_);
+interface AXI4_B_Slave_Synth#(numeric type id_, numeric type user_);
   method Bit#(id_)   bid;
-  method AXIResp     bresp;
+  method AXI4_Resp   bresp;
   method Bit#(user_) buser;
   method Bool        bvalid;
   (* prefix="" *) method Action bready(Bool bready);
 endinterface
 
+interface AXI4_B_Slave_Xactor#(numeric type id_,
+                               numeric type user_);
+  method Action reset;
+  interface Sink#(AXI4_BFlit#(id_, user_))  sink;
+  interface AXI4_B_Slave_Synth#(id_, user_) slaveSynth;
+endinterface
+
 // connectable instances
-instance Connectable#(BMaster#(a, b), BSlave#(a, b));
-  module mkConnection#(BMaster#(a, b) m, BSlave#(a, b) s)(Empty);
+instance Connectable#(AXI4_B_Master_Synth#(a, b), AXI4_B_Slave_Synth#(a, b));
+  module mkConnection#(AXI4_B_Master_Synth#(a, b) m,
+                       AXI4_B_Slave_Synth#(a, b) s)(Empty);
     rule connect_bid;    m.bid(s.bid);       endrule
     rule connect_bresp;  m.bresp(s.bresp);   endrule
     rule connect_buser;  m.buser(s.buser);   endrule
@@ -239,90 +296,113 @@ instance Connectable#(BMaster#(a, b), BSlave#(a, b));
     rule connect_bready; s.bready(m.bready); endrule
   endmodule
 endinstance
-instance Connectable#(BSlave#(a, b), BMaster#(a, b));
-  module mkConnection#(BSlave#(a, b) s, BMaster#(a, b) m)(Empty);
+instance Connectable#(AXI4_B_Slave_Synth#(a, b), AXI4_B_Master_Synth#(a, b));
+  module mkConnection#(AXI4_B_Slave_Synth#(a, b) s,
+                       AXI4_B_Master_Synth#(a, b) m)(Empty);
     mkConnection(m, s);
   endmodule
 endinstance
 
-//////////////////////////////
-// AXI Read Address Channel //
+///////////////////////////////
+// AXI4 Read Address Channel //
 ////////////////////////////////////////////////////////////////////////////////
 
 // Flit type
 typedef struct {
   Bit#(id_)   arid;
   Bit#(addr_) araddr;
-  Bit#(8)     arlen;
-  Bit#(3)     arsize;
-  AXIBurst    arburst;
-  Bool        arlock;
-  Bit#(4)     arcache;
-  Bit#(3)     arprot;
-  Bit#(4)     arqos;
-  Bit#(4)     arregion;
+  AXI4_Len    arlen;
+  AXI4_Size   arsize;
+  AXI4_Burst  arburst;
+  AXI4_Lock   arlock;
+  AXI4_Cache  arcache;
+  AXI4_Prot   arprot;
+  AXI4_QoS    arqos;
+  AXI4_Region arregion;
   Bit#(user_) aruser;
-} ARFlit#(numeric type id_, numeric type addr_, numeric type user_)
+} AXI4_ARFlit#(numeric type id_, numeric type addr_, numeric type user_)
 deriving (Bits, FShow);
-instance DefaultValue#(ARFlit#(id_, addr_, user_));
-  function defaultValue = ARFlit {
+instance DefaultValue#(AXI4_ARFlit#(id_, addr_, user_));
+  function defaultValue = AXI4_ARFlit {
     arid: 0, araddr: ?, arlen: 0, arsize: 0,
-    arburst: INCR, arlock: False, arcache: 0,
+    arburst: INCR, arlock: NORMAL, arcache: 0,
     arprot: 0, arqos: 0, arregion: 0, aruser: ?
   };
 endinstance
 instance Routable#(
-  ARFlit#(id_, addr_, aruser_),
-  RFlit#(id_, data_, ruser_),
+  AXI4_ARFlit#(id_, addr_, aruser_),
+  AXI4_RFlit#(id_, data_, ruser_),
   Bit#(addr_));
   function routingField(x) = x.araddr;
-  function noRouteFound(x) = RFlit {
+  function noRouteFound(x) = AXI4_RFlit {
     rid: x.arid, rdata: ?, rresp: DECERR, rlast: True, ruser: ?
   };
 endinstance
-instance DetectLast#(ARFlit#(id_, addr_, user_));
+instance DetectLast#(AXI4_ARFlit#(id_, addr_, user_));
   function detectLast(x) = True;
 endinstance
 
-// Master interface
+// Master interfaces
 (* always_ready, always_enabled *)
-interface ARMaster#(numeric type id_, numeric type addr_, numeric type user_);
+interface AXI4_AR_Master_Synth#(numeric type id_,
+                                numeric type addr_,
+                                numeric type user_);
   method Bit#(id_)   arid;
   method Bit#(addr_) araddr;
-  method Bit#(8)     arlen;
-  method Bit#(3)     arsize;
-  method AXIBurst    arburst;
-  method Bool        arlock;
-  method Bit#(4)     arcache;
-  method Bit#(3)     arprot;
-  method Bit#(4)     arqos;
-  method Bit#(4)     arregion;
+  method AXI4_Len    arlen;
+  method AXI4_Size   arsize;
+  method AXI4_Burst  arburst;
+  method AXI4_Lock   arlock;
+  method AXI4_Cache  arcache;
+  method AXI4_Prot   arprot;
+  method AXI4_QoS    arqos;
+  method AXI4_Region arregion;
   method Bit#(user_) aruser;
   method Bool        arvalid;
   (* prefix="" *) method Action arready(Bool arready);
 endinterface
 
-// Slave interface
+interface AXI4_AR_Master_Xactor#(numeric type id_,
+                                 numeric type addr_,
+                                 numeric type user_);
+  method Action reset;
+  interface Source#(AXI4_ARFlit#(id_, addr_, user_)) source;
+  interface AXI4_AR_Master_Synth#(id_, addr_, user_) masterSynth;
+endinterface
+
+// Slave interfaces
 (* always_ready, always_enabled *)
-interface ARSlave#(numeric type id_, numeric type addr_, numeric type user_);
+interface AXI4_AR_Slave_Synth#(numeric type id_,
+                               numeric type addr_,
+                               numeric type user_);
   (* prefix="" *) method Action arid    (Bit#(id_)   arid);
   (* prefix="" *) method Action araddr  (Bit#(addr_) araddr);
-  (* prefix="" *) method Action arlen   (Bit#(8)     arlen);
-  (* prefix="" *) method Action arsize  (Bit#(3)     arsize);
-  (* prefix="" *) method Action arburst (AXIBurst    arburst);
-  (* prefix="" *) method Action arlock  (Bool        arlock);
-  (* prefix="" *) method Action arcache (Bit#(4)     arcache);
-  (* prefix="" *) method Action arprot  (Bit#(3)     arprot);
-  (* prefix="" *) method Action arqos   (Bit#(4)     arqos);
-  (* prefix="" *) method Action arregion(Bit#(4)     arregion);
+  (* prefix="" *) method Action arlen   (AXI4_Len    arlen);
+  (* prefix="" *) method Action arsize  (AXI4_Size   arsize);
+  (* prefix="" *) method Action arburst (AXI4_Burst  arburst);
+  (* prefix="" *) method Action arlock  (AXI4_Lock   arlock);
+  (* prefix="" *) method Action arcache (AXI4_Cache  arcache);
+  (* prefix="" *) method Action arprot  (AXI4_Prot   arprot);
+  (* prefix="" *) method Action arqos   (AXI4_QoS    arqos);
+  (* prefix="" *) method Action arregion(AXI4_Region arregion);
   (* prefix="" *) method Action aruser  (Bit#(user_) aruser);
   (* prefix="" *) method Action arvalid (Bool        arvalid);
   method Bool arready;
 endinterface
 
+interface AXI4_AR_Slave_Xactor#(numeric type id_,
+                                numeric type addr_,
+                                numeric type user_);
+  method Action reset;
+  interface Sink#(AXI4_ARFlit#(id_, addr_, user_))  sink;
+  interface AXI4_AR_Slave_Synth#(id_, addr_, user_) slaveSynth;
+endinterface
+
 // connectable instances
-instance Connectable#(ARMaster#(a, b, c), ARSlave#(a, b, c));
-  module mkConnection#(ARMaster#(a, b, c) m, ARSlave#(a, b, c) s)(Empty);
+instance Connectable#(AXI4_AR_Master_Synth#(a, b, c),
+                      AXI4_AR_Slave_Synth#(a, b, c));
+  module mkConnection#(AXI4_AR_Master_Synth#(a, b, c) m,
+                       AXI4_AR_Slave_Synth#(a, b, c) s)(Empty);
     rule connect_arid;     s.arid(m.arid);         endrule
     rule connect_araddr;   s.araddr(m.araddr);     endrule
     rule connect_arlen;    s.arlen(m.arlen);       endrule
@@ -338,61 +418,85 @@ instance Connectable#(ARMaster#(a, b, c), ARSlave#(a, b, c));
     rule connect_arready;  m.arready(s.arready);   endrule
   endmodule
 endinstance
-instance Connectable#(ARSlave#(a, b, c), ARMaster#(a, b, c));
-  module mkConnection#(ARSlave#(a, b, c) s, ARMaster#(a, b, c) m)(Empty);
+instance Connectable#(AXI4_AR_Slave_Synth#(a, b, c),
+                      AXI4_AR_Master_Synth#(a, b, c));
+  module mkConnection#(AXI4_AR_Slave_Synth#(a, b, c) s,
+                       AXI4_AR_Master_Synth#(a, b, c) m)(Empty);
     mkConnection(m, s);
   endmodule
 endinstance
 
-///////////////////////////
-// AXI Read Data Channel //
+////////////////////////////
+// AXI4 Read Data Channel //
 ////////////////////////////////////////////////////////////////////////////////
 
 // Flit type
 typedef struct {
   Bit#(id_)   rid;
   Bit#(data_) rdata;
-  AXIResp     rresp;
+  AXI4_Resp   rresp;
   Bool        rlast;
   Bit#(user_) ruser;
-} RFlit#(numeric type id_, numeric type data_, numeric type user_)
+} AXI4_RFlit#(numeric type id_, numeric type data_, numeric type user_)
 deriving (Bits, FShow);
-instance DefaultValue#(RFlit#(id_, data_, user_));
-  function defaultValue = RFlit {
+instance DefaultValue#(AXI4_RFlit#(id_, data_, user_));
+  function defaultValue = AXI4_RFlit {
     rid: 0, rdata: ?, rresp: OKAY, rlast: True, ruser: ?
   };
 endinstance
-instance DetectLast#(RFlit#(id_, data_, user_));
+instance DetectLast#(AXI4_RFlit#(id_, data_, user_));
   function detectLast(x) = x.rlast;
 endinstance
 
-// Master interface
+// Master interfaces
 (* always_ready, always_enabled *)
-interface RMaster#(numeric type id_, numeric type data_, numeric type user_);
+interface AXI4_R_Master_Synth#(numeric type id_,
+                               numeric type data_,
+                               numeric type user_);
   (* prefix="" *) method Action rid   (Bit#(id_)   rid);
   (* prefix="" *) method Action rdata (Bit#(data_) rdata);
-  (* prefix="" *) method Action rresp (AXIResp     rresp);
+  (* prefix="" *) method Action rresp (AXI4_Resp   rresp);
   (* prefix="" *) method Action rlast (Bool        rlast);
   (* prefix="" *) method Action ruser (Bit#(user_) ruser);
   (* prefix="" *) method Action rvalid(Bool        rvalid);
   method Bool rready;
 endinterface
 
-// Slave interface
+interface AXI4_R_Master_Xactor#(numeric type id_,
+                                numeric type data_,
+                                numeric type user_);
+  method Action reset;
+  interface Source#(AXI4_RFlit#(id_, data_, user_)) source;
+  interface AXI4_R_Master_Synth#(id_, data_, user_) masterSynth;
+endinterface
+
+// Slave interfaces
 (* always_ready, always_enabled *)
-interface RSlave#(numeric type id_, numeric type data_, numeric type user_);
+interface AXI4_R_Slave_Synth#(numeric type id_,
+                              numeric type data_,
+                              numeric type user_);
   method Bit#(id_)   rid;
   method Bit#(data_) rdata;
-  method AXIResp     rresp;
+  method AXI4_Resp   rresp;
   method Bool        rlast;
   method Bit#(user_) ruser;
   method Bool        rvalid;
   (* prefix="" *) method Action rready(Bool rready);
 endinterface
 
+interface AXI4_R_Slave_Xactor#(numeric type id_,
+                               numeric type data_,
+                               numeric type user_);
+  method Action reset;
+  interface Sink#(AXI4_RFlit#(id_, data_, user_))  sink;
+  interface AXI4_R_Slave_Synth#(id_, data_, user_) slaveSynth;
+endinterface
+
 // connectable instances
-instance Connectable#(RMaster#(a, b, c), RSlave#(a, b, c));
-  module mkConnection#(RMaster#(a, b, c) m, RSlave#(a, b, c) s)(Empty);
+instance Connectable#(AXI4_R_Master_Synth#(a, b, c),
+                      AXI4_R_Slave_Synth#(a, b, c));
+  module mkConnection#(AXI4_R_Master_Synth#(a, b, c) m,
+                       AXI4_R_Slave_Synth#(a, b, c) s)(Empty);
     rule connect_rid;    m.rid(s.rid);       endrule
     rule connect_rdata;  m.rdata(s.rdata);   endrule
     rule connect_rresp;  m.rresp(s.rresp);   endrule
@@ -402,17 +506,83 @@ instance Connectable#(RMaster#(a, b, c), RSlave#(a, b, c));
     rule connect_rready; s.rready(m.rready); endrule
   endmodule
 endinstance
-instance Connectable#(RSlave#(a, b, c), RMaster#(a, b, c));
-  module mkConnection#(RSlave#(a, b, c) s, RMaster#(a, b, c) m)(Empty);
+instance Connectable#(AXI4_R_Slave_Synth#(a, b, c),
+                      AXI4_R_Master_Synth#(a, b, c));
+  module mkConnection#(AXI4_R_Slave_Synth#(a, b, c) s,
+                       AXI4_R_Master_Synth#(a, b, c) m)(Empty);
     mkConnection(m, s);
   endmodule
 endinstance
 
+/////////////////
+// AXI4 Master //
+////////////////////////////////////////////////////////////////////////////////
+
+interface AXI4_Master#(
+  numeric type id_,
+  numeric type addr_,
+  numeric type data_,
+  numeric type awuser_,
+  numeric type wuser_,
+  numeric type buser_,
+  numeric type aruser_,
+  numeric type ruser_);
+  interface Source#(AXI4_AWFlit#(id_, addr_, awuser_)) aw;
+  interface Source#(AXI4_WFlit#(data_, wuser_))        w;
+  interface Sink#(AXI4_BFlit#(id_, buser_))            b;
+  interface Source#(AXI4_ARFlit#(id_, addr_, aruser_)) ar;
+  interface Sink#(AXI4_RFlit#(id_, data_, ruser_))     r;
+endinterface
+
+interface AXI4_Master_Synth#(
+  numeric type id_,
+  numeric type addr_,
+  numeric type data_,
+  numeric type awuser_,
+  numeric type wuser_,
+  numeric type buser_,
+  numeric type aruser_,
+  numeric type ruser_);
+  interface AXI4_AW_Master_Synth#(id_, addr_, awuser_) aw;
+  interface AXI4_W_Master_Synth#(data_, wuser_)        w;
+  interface AXI4_B_Master_Synth#(id_, buser_)          b;
+  interface AXI4_AR_Master_Synth#(id_, addr_, aruser_) ar;
+  interface AXI4_R_Master_Synth#(id_, data_, ruser_)   r;
+endinterface
+
+interface AXI4_Master_Xactor#(
+  numeric type id_,
+  numeric type addr_,
+  numeric type data_,
+  numeric type awuser_,
+  numeric type wuser_,
+  numeric type buser_,
+  numeric type aruser_,
+  numeric type ruser_);
+  method Action reset;
+  interface AXI4_Master#(id_,
+                         addr_,
+                         data_,
+                         awuser_,
+                         wuser_,
+                         buser_,
+                         aruser_,
+                         ruser_)       master;
+  interface AXI4_Master_Synth#(id_,
+                               addr_,
+                               data_,
+                               awuser_,
+                               wuser_,
+                               buser_,
+                               aruser_,
+                               ruser_) masterSynth;
+endinterface
+
 ////////////////
-// AXI Master //
+// AXI4 Slave //
 ////////////////////////////////////////////////////////////////////////////////
 
-interface AXIMaster#(
+interface AXI4_Slave#(
   numeric type id_,
   numeric type addr_,
   numeric type data_,
@@ -421,14 +591,14 @@ interface AXIMaster#(
   numeric type buser_,
   numeric type aruser_,
   numeric type ruser_);
-  interface Source#(AWFlit#(id_, addr_, awuser_)) aw;
-  interface Source#(WFlit#(data_, wuser_))        w;
-  interface Sink#(BFlit#(id_, buser_))            b;
-  interface Source#(ARFlit#(id_, addr_, aruser_)) ar;
-  interface Sink#(RFlit#(id_, data_, ruser_))     r;
+  interface Sink#(AXI4_AWFlit#(id_, addr_, awuser_)) aw;
+  interface Sink#(AXI4_WFlit#(data_, wuser_))        w;
+  interface Source#(AXI4_BFlit#(id_, buser_))        b;
+  interface Sink#(AXI4_ARFlit#(id_, addr_, aruser_)) ar;
+  interface Source#(AXI4_RFlit#(id_, data_, ruser_)) r;
 endinterface
 
-interface AXIMasterSynth#(
+interface AXI4_Slave_Synth#(
   numeric type id_,
   numeric type addr_,
   numeric type data_,
@@ -437,18 +607,46 @@ interface AXIMasterSynth#(
   numeric type buser_,
   numeric type aruser_,
   numeric type ruser_);
-  interface AWMaster#(id_, addr_, awuser_) aw;
-  interface WMaster#(data_, wuser_)        w;
-  interface BMaster#(id_, buser_)          b;
-  interface ARMaster#(id_, addr_, aruser_) ar;
-  interface RMaster#(id_, data_, ruser_)   r;
+  interface AXI4_AW_Slave_Synth#(id_, addr_, awuser_) aw;
+  interface AXI4_W_Slave_Synth#(data_, wuser_)        w;
+  interface AXI4_B_Slave_Synth#(id_, buser_)          b;
+  interface AXI4_AR_Slave_Synth#(id_, addr_, aruser_) ar;
+  interface AXI4_R_Slave_Synth#(id_, data_, ruser_)   r;
 endinterface
 
-///////////////
-// AXI Slave //
+interface AXI4_Slave_Xactor#(
+  numeric type id_,
+  numeric type addr_,
+  numeric type data_,
+  numeric type awuser_,
+  numeric type wuser_,
+  numeric type buser_,
+  numeric type aruser_,
+  numeric type ruser_);
+  method Action reset;
+  interface AXI4_Slave#(id_,
+                        addr_,
+                        data_,
+                        awuser_,
+                        wuser_,
+                        buser_,
+                        aruser_,
+                        ruser_)       slave;
+  interface AXI4_Slave_Synth#(id_,
+                              addr_,
+                              data_,
+                              awuser_,
+                              wuser_,
+                              buser_,
+                              aruser_,
+                              ruser_) slaveSynth;
+endinterface
+
+////////////////////////////////
+// AXI4 Shim Master <-> Slave //
 ////////////////////////////////////////////////////////////////////////////////
 
-interface AXISlave#(
+interface AXI4_Shim#(
   numeric type id_,
   numeric type addr_,
   numeric type data_,
@@ -457,60 +655,24 @@ interface AXISlave#(
   numeric type buser_,
   numeric type aruser_,
   numeric type ruser_);
-  interface Sink#(AWFlit#(id_, addr_, awuser_)) aw;
-  interface Sink#(WFlit#(data_, wuser_))        w;
-  interface Source#(BFlit#(id_, buser_))        b;
-  interface Sink#(ARFlit#(id_, addr_, aruser_)) ar;
-  interface Source#(RFlit#(id_, data_, ruser_)) r;
-endinterface
-
-interface AXISlaveSynth#(
-  numeric type id_,
-  numeric type addr_,
-  numeric type data_,
-  numeric type awuser_,
-  numeric type wuser_,
-  numeric type buser_,
-  numeric type aruser_,
-  numeric type ruser_);
-  interface AWSlave#(id_, addr_, awuser_) aw;
-  interface WSlave#(data_, wuser_)        w;
-  interface BSlave#(id_, buser_)          b;
-  interface ARSlave#(id_, addr_, aruser_) ar;
-  interface RSlave#(id_, data_, ruser_)   r;
-endinterface
-
-///////////////////////////////
-// AXI Shim Master <-> Slave //
-////////////////////////////////////////////////////////////////////////////////
-
-interface AXIShim#(
-  numeric type id_,
-  numeric type addr_,
-  numeric type data_,
-  numeric type awuser_,
-  numeric type wuser_,
-  numeric type buser_,
-  numeric type aruser_,
-  numeric type ruser_);
-  interface AXIMaster#(
+  interface AXI4_Master#(
     id_, addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_
   ) master;
-  interface AXISlave#(
+  interface AXI4_Slave#(
     id_, addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_
   ) slave;
 endinterface
 
-///////////////////////////////
-// AXI Connectable instances //
+////////////////////////////////
+// AXI4 Connectable instances //
 ////////////////////////////////////////////////////////////////////////////////
 
 instance Connectable#(
-  AXIMaster#(a, b, c, d, e, f, g, h),
-  AXISlave#(a, b, c, d, e, f, g, h));
+  AXI4_Master#(a, b, c, d, e, f, g, h),
+  AXI4_Slave#(a, b, c, d, e, f, g, h));
   module mkConnection#(
-    AXIMaster#(a, b, c, d, e, f, g, h) m,
-    AXISlave#(a, b, c, d, e, f, g, h) s)
+    AXI4_Master#(a, b, c, d, e, f, g, h) m,
+    AXI4_Slave#(a, b, c, d, e, f, g, h) s)
     (Empty);
     mkConnection(m.aw, s.aw);
     mkConnection(m.w, s.w);
@@ -520,34 +682,62 @@ instance Connectable#(
   endmodule
 endinstance
 instance Connectable#(
-  AXISlave#(a, b, c, d, e, f, g, h),
-  AXIMaster#(a, b, c, d, e, f, g, h));
+  AXI4_Slave#(a, b, c, d, e, f, g, h),
+  AXI4_Master#(a, b, c, d, e, f, g, h));
   module mkConnection#(
-    AXISlave#(a, b, c, d, e, f, g, h) s,
-    AXIMaster#(a, b, c, d, e, f, g, h) m)
+    AXI4_Slave#(a, b, c, d, e, f, g, h) s,
+    AXI4_Master#(a, b, c, d, e, f, g, h) m)
     (Empty);
     mkConnection(m, s);
   endmodule
 endinstance
 
-///////////////////////////////////
-// AXI write channel helper type //
+instance Connectable#(
+  AXI4_Master_Synth#(a, b, c, d, e, f, g, h),
+  AXI4_Slave_Synth#(a, b, c, d, e, f, g, h));
+  module mkConnection#(
+    AXI4_Master_Synth#(a, b, c, d, e, f, g, h) m,
+    AXI4_Slave_Synth#(a, b, c, d, e, f, g, h) s)
+    (Empty);
+    mkConnection(m.aw, s.aw);
+    mkConnection(m.w, s.w);
+    mkConnection(m.b, s.b);
+    mkConnection(m.ar, s.ar);
+    mkConnection(m.r, s.r);
+  endmodule
+endinstance
+instance Connectable#(
+  AXI4_Slave_Synth#(a, b, c, d, e, f, g, h),
+  AXI4_Master_Synth#(a, b, c, d, e, f, g, h));
+  module mkConnection#(
+    AXI4_Slave_Synth#(a, b, c, d, e, f, g, h) s,
+    AXI4_Master_Synth#(a, b, c, d, e, f, g, h) m)
+    (Empty);
+    mkConnection(m, s);
+  endmodule
+endinstance
+
+////////////////////////////////////
+// AXI4 write channel helper type //
 ////////////////////////////////////////////////////////////////////////////////
 
 typedef union tagged {
-  Tuple2#(AWFlit#(id_, addr_, awuser_), WFlit#(data_, wuser_)) FirstFlit;
-  WFlit#(data_, wuser_) OtherFlit;
-} AXIWriteFlit#(
+  Tuple2#(AXI4_AWFlit#(id_, addr_, awuser_),
+          AXI4_WFlit#(data_, wuser_)) FirstFlit;
+  AXI4_WFlit#(data_, wuser_) OtherFlit;
+} AXI4_WriteFlit#(
   numeric type id_,
   numeric type addr_,
   numeric type data_,
   numeric type awuser_,
   numeric type wuser_) deriving (Bits);
 instance Routable#(
-  AXIWriteFlit#(id_, addr_, data_, awuser_, wuser_),
-  BFlit#(id_, buser_),
+  AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_),
+  AXI4_BFlit#(id_, buser_),
   Bit#(addr_)) provisos (
-    Routable#(AWFlit#(id_, addr_, awuser_), BFlit#(id_, buser_), Bit#(addr_))
+    Routable#(AXI4_AWFlit#(id_, addr_, awuser_),
+              AXI4_BFlit#(id_, buser_),
+              Bit#(addr_))
   );
   function routingField(x) = case (x) matches
     tagged FirstFlit {.aw, .w}: aw.awaddr; // XXX routingField(aw); XXX THIS SHOULD JUST WORK BUT DOESN'T ?!
@@ -558,7 +748,7 @@ instance Routable#(
     default: ?;
   endcase;
 endinstance
-instance DetectLast#(AXIWriteFlit#(id_, addr_, data_, awuser_, wuser_));
+instance DetectLast#(AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_));
   function detectLast(x) = case (x) matches
     tagged FirstFlit {.aw, .w}: detectLast(w);
     tagged OtherFlit .w: detectLast(w);
@@ -570,13 +760,13 @@ endinstance
 ////////////////////////////////////////////////////////////////////////////////
 
 instance ExpandReqRsp#(
-  AXIWriteFlit#(id_, addr_, data_, awuser_, wuser_),
-  AXIWriteFlit#(sid_, addr_, data_, awuser_, wuser_),
-  BFlit#(sid_, buser_),
-  BFlit#(id_, buser_),
+  AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_),
+  AXI4_WriteFlit#(sid_, addr_, data_, awuser_, wuser_),
+  AXI4_BFlit#(sid_, buser_),
+  AXI4_BFlit#(id_, buser_),
   Bit#(n)) provisos (Add#(id_, n, sid_));
   function expand(r, x) = case (r) matches
-    tagged FirstFlit {.aw, .w}: FirstFlit(tuple2(AWFlit {
+    tagged FirstFlit {.aw, .w}: FirstFlit(tuple2(AXI4_AWFlit {
       awid: {x, aw.awid}, awaddr: aw.awaddr, awlen: aw.awlen, awsize: aw.awsize,
       awburst: aw.awburst, awlock: aw.awlock, awcache: aw.awcache,
       awprot: aw.awprot, awqos: aw.awqos, awregion: aw.awregion,
@@ -584,24 +774,24 @@ instance ExpandReqRsp#(
     }, w));
     tagged OtherFlit .f: OtherFlit(f);
   endcase;
-  function shrink(r) = tuple2(BFlit {
+  function shrink(r) = tuple2(AXI4_BFlit {
     bid: truncate(r.bid), bresp: r.bresp, buser: r.buser
   }, truncateLSB(r.bid));
 endinstance
 
 instance ExpandReqRsp#(
-  ARFlit#(id_, addr_, aruser_),
-  ARFlit#(sid_, addr_, aruser_),
-  RFlit#(sid_, data_, ruser_),
-  RFlit#(id_, data_, ruser_),
+  AXI4_ARFlit#(id_, addr_, aruser_),
+  AXI4_ARFlit#(sid_, addr_, aruser_),
+  AXI4_RFlit#(sid_, data_, ruser_),
+  AXI4_RFlit#(id_, data_, ruser_),
   Bit#(n)) provisos (Add#(id_, n, sid_));
-  function expand(ar, x) = ARFlit {
+  function expand(ar, x) = AXI4_ARFlit {
     arid: {x, ar.arid}, araddr: ar.araddr, arlen: ar.arlen, arsize: ar.arsize,
     arburst: ar.arburst, arlock: ar.arlock, arcache: ar.arcache,
     arprot: ar.arprot, arqos: ar.arqos, arregion: ar.arregion,
     aruser: ar.aruser
   };
-  function shrink(r) = tuple2(RFlit {
+  function shrink(r) = tuple2(AXI4_RFlit {
     rid: truncate(r.rid), rdata: r.rdata, rresp: r.rresp,
     rlast: r.rlast, ruser: r.ruser
   }, truncateLSB(r.rid));

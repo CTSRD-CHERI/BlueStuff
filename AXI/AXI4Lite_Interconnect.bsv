@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -44,18 +44,18 @@ import Routable :: *;
 
 `define PARAMS addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_
 
-module mkAXILiteBus#(
+module mkAXI4LiteBus#(
     MappingTable#(nRoutes, addr_) maptab,
-    Vector#(nMasters, AXILiteMaster#(`PARAMS)) masters,
-    Vector#(nSlaves, AXILiteSlave#(`PARAMS)) slaves
+    Vector#(nMasters, AXI4Lite_Master#(`PARAMS)) masters,
+    Vector#(nSlaves, AXI4Lite_Slave#(`PARAMS)) slaves
   ) (Empty) provisos (
     Routable#(
-      AXILiteWriteFlit#(addr_, data_, awuser_, wuser_),
-      BLiteFlit#(buser_),
+      AXI4Lite_WriteFlit#(addr_, data_, awuser_, wuser_),
+      AXI4Lite_BFlit#(buser_),
       Bit#(addr_)),
     Routable#(
-      ARLiteFlit#(addr_, aruser_),
-      RLiteFlit#(data_, ruser_),
+      AXI4Lite_ARFlit#(addr_, aruser_),
+      AXI4Lite_RFlit#(data_, ruser_),
       Bit#(addr_)),
     // assertion on argument sizes
     Add#(1, a__, nMasters), // at least one master is needed
@@ -65,12 +65,12 @@ module mkAXILiteBus#(
 
   // prepare masters
   Vector#(nMasters,
-    Master#(AXILiteWriteFlit#(addr_, data_, awuser_, wuser_),
-    BLiteFlit#(buser_)))
+    Master#(AXI4Lite_WriteFlit#(addr_, data_, awuser_, wuser_),
+    AXI4Lite_BFlit#(buser_)))
     write_masters = newVector;
   Vector#(nMasters,
-    Master#(ARLiteFlit#(addr_, aruser_),
-    RLiteFlit#(data_, ruser_)))
+    Master#(AXI4Lite_ARFlit#(addr_, aruser_),
+    AXI4Lite_RFlit#(data_, ruser_)))
     read_masters  = newVector;
   for (Integer i = 0; i < valueOf(nMasters); i = i + 1) begin
     Bit#(TLog#(nMasters)) mid = fromInteger(i);
@@ -87,12 +87,12 @@ module mkAXILiteBus#(
 
   // prepare slaves
   Vector#(nSlaves,
-    Slave#(AXILiteWriteFlit#(addr_, data_, awuser_, wuser_),
-    BLiteFlit#(buser_)))
+    Slave#(AXI4Lite_WriteFlit#(addr_, data_, awuser_, wuser_),
+    AXI4Lite_BFlit#(buser_)))
     write_slaves = newVector;
   Vector#(nSlaves,
-    Slave#(ARLiteFlit#(addr_, aruser_),
-    RLiteFlit#(data_, ruser_)))
+    Slave#(AXI4Lite_ARFlit#(addr_, aruser_),
+    AXI4Lite_RFlit#(data_, ruser_)))
     read_slaves   = newVector;
   for (Integer i = 0; i < valueOf(nSlaves); i = i + 1) begin  
     // split to write slaves

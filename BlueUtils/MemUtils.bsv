@@ -34,19 +34,19 @@ import SourceSink :: *;
 import MasterSlave :: *;
 import FIFO :: *;
 
-////////////////////////////
-// Mem to AXILite wrapper //
+/////////////////////////////
+// Mem to AXI4Lite wrapper //
 ////////////////////////////////////////////////////////////////////////////////
 
 `define PARAMS addr_sz, data_sz, 0, 0, 0, 0, 0
 
-module mkMemToAXILiteSlave#(Mem#(addr_t, data_t) mem)
-  (AXILiteSlave#(`PARAMS))
+module mkMemToAXI4Lite_Slave#(Mem#(addr_t, data_t) mem)
+  (AXI4Lite_Slave#(`PARAMS))
   provisos (
     Bits#(addr_t, addr_sz), Bits#(data_t, data_sz),
     Log#(TDiv#(data_sz, 8), lowIdx), Add#(a__, lowIdx, data_sz)
   );
-  let shim <- mkAXILiteShim;
+  let shim <- mkAXI4LiteShim;
   // which response ?
   let expectWriteRsp <- mkFIFO;
   let readLowAddr <- mkFIFO;
@@ -66,7 +66,7 @@ module mkMemToAXILiteSlave#(Mem#(addr_t, data_t) mem)
   rule writeRsp(expectWriteRsp.first);
     expectWriteRsp.deq;
     mem.source.drop;
-    shim.master.b.put(BLiteFlit{bresp: OKAY, buser: ?});
+    shim.master.b.put(AXI4Lite_BFlit{bresp: OKAY, buser: ?});
   endrule
   rule readReq;
     let arflit <- get(shim.master.ar);
@@ -83,7 +83,7 @@ module mkMemToAXILiteSlave#(Mem#(addr_t, data_t) mem)
     readLowAddr.deq;
     let rsp <- get(mem.source);
     Bit#(data_sz) shiftAmount = zeroExtend(readLowAddr.first) << 3;
-    shim.master.r.put(RLiteFlit {
+    shim.master.r.put(AXI4Lite_RFlit {
       rdata: pack(rsp.ReadRsp) << shiftAmount, rresp: OKAY, ruser: ?
     });
   endrule
@@ -114,14 +114,14 @@ provisos(
   end
 endmodule
 
-module mkAXILiteMem#(Integer size, Maybe#(String) file) (AXILiteSlave#(`PARAMS))
+module mkAXI4LiteMem#(Integer size, Maybe#(String) file) (AXI4Lite_Slave#(`PARAMS))
   provisos (
     Log#(TAdd#(1, TDiv#(data_sz, 8)), TAdd#(TLog#(TDiv#(data_sz, 8)), 1)),
     Add#(a__, TLog#(TDiv#(data_sz, 8)), addr_sz),
     Add#(b__, TLog#(TDiv#(data_sz, 8)), data_sz)
   );
   Mem#(Bit#(addr_sz), Bit#(data_sz)) mem <- mkMem(size, file);
-  let ifc <- mkMemToAXILiteSlave(mem);
+  let ifc <- mkMemToAXI4Lite_Slave(mem);
   return ifc;
 endmodule
 
@@ -151,17 +151,17 @@ provisos(
   end
 endmodule
 
-module mkAXILiteSharedMem2#(Integer size, Maybe#(String) file)
-  (Array#(AXILiteSlave#(`PARAMS)))
+module mkAXI4LiteSharedMem2#(Integer size, Maybe#(String) file)
+  (Array#(AXI4Lite_Slave#(`PARAMS)))
   provisos (
     Log#(TAdd#(1, TDiv#(data_sz, 8)), TAdd#(TLog#(TDiv#(data_sz, 8)), 1)),
     Add#(a__, TLog#(TDiv#(data_sz, 8)), addr_sz),
     Add#(b__, TLog#(TDiv#(data_sz, 8)), data_sz)
   );
   Mem#(Bit#(addr_sz), Bit#(data_sz)) mem[2] <- mkSharedMem2(size, file);
-  AXILiteSlave#(`PARAMS) ifc[2];
-  ifc[0] <- mkMemToAXILiteSlave(mem[0]);
-  ifc[1] <- mkMemToAXILiteSlave(mem[1]);
+  AXI4Lite_Slave#(`PARAMS) ifc[2];
+  ifc[0] <- mkMemToAXI4Lite_Slave(mem[0]);
+  ifc[1] <- mkMemToAXI4Lite_Slave(mem[1]);
   return ifc;
 endmodule
 

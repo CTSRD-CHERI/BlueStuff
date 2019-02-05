@@ -45,10 +45,10 @@ typedef   0 RUSER_sz;
 `define PARAMS ADDR_sz, DATA_sz, AWUSER_sz, WUSER_sz, BUSER_sz, ARUSER_sz, RUSER_sz
 
 (* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiLiteMaster (AXILiteMaster#(`PARAMS));
+module axiLiteMaster (AXI4Lite_Master#(`PARAMS));
 
   // AXI master shim
-  AXILiteShim#(`PARAMS) shim <- mkAXILiteShim;
+  AXI4Lite_Shim#(`PARAMS) shim <- mkAXI4LiteShim;
 
   // counter
   Reg#(Bit#(DATA_sz)) cnt <- mkReg(0);
@@ -57,12 +57,12 @@ module axiLiteMaster (AXILiteMaster#(`PARAMS));
   // arbitrary work for each channel
   Bool sendWrite = cnt[3:0] == 0;
   rule putAWFlit (sendWrite);
-    AWLiteFlit#(ADDR_sz, AWUSER_sz) f = ?;
+    AXI4Lite_AWFlit#(ADDR_sz, AWUSER_sz) f = ?;
     shim.slave.aw.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
   rule putWFlit (sendWrite);
-    WLiteFlit#(DATA_sz, WUSER_sz) f = WLiteFlit{wdata: cnt, wstrb: ?, wuser: ?};
+    AXI4Lite_WFlit#(DATA_sz, WUSER_sz) f = AXI4Lite_WFlit{wdata: cnt, wstrb: ?, wuser: ?};
     shim.slave.w.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
@@ -79,10 +79,10 @@ module axiLiteMaster (AXILiteMaster#(`PARAMS));
 endmodule
 
 (* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiLiteSlave (AXILiteSlave#(`PARAMS));
+module axiLiteSlave (AXI4Lite_Slave#(`PARAMS));
 
   // AXI slave shim
-  AXILiteShim#(`PARAMS) shim <- mkAXILiteShim;
+  AXI4Lite_Shim#(`PARAMS) shim <- mkAXI4LiteShim;
 
   // arbitrary work for each channel
   FIFOF#(Bit#(0)) writeResp <- mkFIFOF;
@@ -97,7 +97,7 @@ module axiLiteSlave (AXILiteSlave#(`PARAMS));
   endrule
   rule putBFlit;
     writeResp.deq;
-    BLiteFlit#(BUSER_sz) f = ?;
+    AXI4Lite_BFlit#(BUSER_sz) f = ?;
     shim.master.b.put(f);
     $display("%0t - SLAVE - sending ", $time, fshow(f));
   endrule
@@ -110,8 +110,8 @@ module axiLiteSlave (AXILiteSlave#(`PARAMS));
 endmodule
 
 module top (Empty);
-  AXILiteMaster#(`PARAMS) master <- axiLiteMaster;
-  AXILiteSlave#(`PARAMS)  slave  <- axiLiteSlave;
+  AXI4Lite_Master#(`PARAMS) master <- axiLiteMaster;
+  AXI4Lite_Slave#(`PARAMS)  slave  <- axiLiteSlave;
   mkConnection(master, slave);
 endmodule
 

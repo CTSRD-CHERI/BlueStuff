@@ -39,39 +39,41 @@ import SpecialFIFOs :: *;
 
 // typeclasses to convert to/from the flit type
 
-typeclass ToAXIRLiteFlit#(type t, numeric type data_, numeric type user_);
-  function RLiteFlit#(data_, user_) toAXIRLiteFlit (t x);
+typeclass ToAXI4Lite_RFlit#(type t, numeric type data_, numeric type user_);
+  function AXI4Lite_RFlit#(data_, user_) toAXI4Lite_RFlit (t x);
 endtypeclass
 
-instance ToAXIRLiteFlit#(RLiteFlit#(a, b), a, b);
-  function toAXIRLiteFlit = id;
+instance ToAXI4Lite_RFlit#(AXI4Lite_RFlit#(a, b), a, b);
+  function toAXI4Lite_RFlit = id;
 endinstance
 
-typeclass FromAXIRLiteFlit#(type t, numeric type data_, numeric type user_);
-  function t fromAXIRLiteFlit (RLiteFlit#(data_, user_) x);
+typeclass FromAXI4Lite_RFlit#(type t, numeric type data_, numeric type user_);
+  function t fromAXI4Lite_RFlit (AXI4Lite_RFlit#(data_, user_) x);
 endtypeclass
 
-instance FromAXIRLiteFlit#(RLiteFlit#(a, b), a, b);
-  function fromAXIRLiteFlit = id;
+instance FromAXI4Lite_RFlit#(AXI4Lite_RFlit#(a, b), a, b);
+  function fromAXI4Lite_RFlit = id;
 endinstance
 
 // typeclass to turn an interface to the Master interface
 
-typeclass ToAXIRLiteMaster#(type t);
-  module toAXIRLiteMaster#(t#(x) ifc) (RLiteMaster#(data_, user_))
-  provisos (FromAXIRLiteFlit#(x, data_, user_));
+typeclass ToAXI4Lite_R_Master_Synth#(type t);
+  module toAXI4Lite_R_Master_Synth#(t#(x) ifc)
+  (AXI4Lite_R_Master_Synth#(data_, user_))
+  provisos (FromAXI4Lite_RFlit#(x, data_, user_));
 endtypeclass
 
-instance ToAXIRLiteMaster#(Sink);
-  module toAXIRLiteMaster#(Sink#(t) snk)
-  (RLiteMaster#(data_, user_)) provisos (FromAXIRLiteFlit#(t, data_, user_));
+instance ToAXI4Lite_R_Master_Synth#(Sink);
+  module toAXI4Lite_R_Master_Synth#(Sink#(t) snk)
+  (AXI4Lite_R_Master_Synth#(data_, user_))
+  provisos (FromAXI4Lite_RFlit#(t, data_, user_));
 
     let w_rdata <- mkDWire(?);
     let w_rresp <- mkDWire(?);
     let w_ruser <- mkDWire(?);
     PulseWire putWire <- mkPulseWire;
     rule doPut (putWire && snk.canPut);
-      snk.put(fromAXIRLiteFlit(RLiteFlit {
+      snk.put(fromAXI4Lite_RFlit(AXI4Lite_RFlit {
         rdata: w_rdata, rresp: w_rresp, ruser: w_ruser
       }));
     endrule
@@ -85,16 +87,17 @@ instance ToAXIRLiteMaster#(Sink);
   endmodule
 endinstance
 
-instance ToAXIRLiteMaster#(FIFOF);
-  module toAXIRLiteMaster#(FIFOF#(t) ff)
-  (RLiteMaster#(data_, user_)) provisos (FromAXIRLiteFlit#(t, data_, user_));
+instance ToAXI4Lite_R_Master_Synth#(FIFOF);
+  module toAXI4Lite_R_Master_Synth#(FIFOF#(t) ff)
+  (AXI4Lite_R_Master_Synth#(data_, user_))
+  provisos (FromAXI4Lite_RFlit#(t, data_, user_));
 
     let w_rdata <- mkDWire(?);
     let w_rresp <- mkDWire(?);
     let w_ruser <- mkDWire(?);
     PulseWire enqWire <- mkPulseWire;
     rule doEnq (enqWire && ff.notFull);
-      ff.enq(fromAXIRLiteFlit(RLiteFlit {
+      ff.enq(fromAXI4Lite_RFlit(AXI4Lite_RFlit {
         rdata: w_rdata, rresp: w_rresp, ruser: w_ruser
       }));
     endrule
@@ -110,17 +113,19 @@ endinstance
 
 // typeclass to turn an interface to the Slave interface
 
-typeclass ToAXIRLiteSlave#(type t);
-  module toAXIRLiteSlave#(t#(x) ifc) (RLiteSlave#(data_, user_))
-  provisos (ToAXIRLiteFlit#(x, data_, user_));
+typeclass ToAXI4Lite_R_Slave_Synth#(type t);
+  module toAXI4Lite_R_Slave_Synth#(t#(x) ifc)
+  (AXI4Lite_R_Slave_Synth#(data_, user_))
+  provisos (ToAXI4Lite_RFlit#(x, data_, user_));
 endtypeclass
 
-instance ToAXIRLiteSlave#(Source);
-  module toAXIRLiteSlave#(Source#(t) src)
-  (RLiteSlave#(data_, user_)) provisos (ToAXIRLiteFlit#(t, data_, user_));
+instance ToAXI4Lite_R_Slave_Synth#(Source);
+  module toAXI4Lite_R_Slave_Synth#(Source#(t) src)
+  (AXI4Lite_R_Slave_Synth#(data_, user_))
+  provisos (ToAXI4Lite_RFlit#(t, data_, user_));
 
-    Wire#(RLiteFlit#(data_, user_)) flit <- mkDWire(?);
-    rule peekFlit (src.canPeek); flit <= toAXIRLiteFlit(src.peek); endrule
+    Wire#(AXI4Lite_RFlit#(data_, user_)) flit <- mkDWire(?);
+    rule peekFlit (src.canPeek); flit <= toAXI4Lite_RFlit(src.peek); endrule
     PulseWire dropWire <- mkPulseWire;
     rule doDrop (dropWire && src.canPeek); src.drop; endrule
 
@@ -133,12 +138,13 @@ instance ToAXIRLiteSlave#(Source);
   endmodule
 endinstance
 
-instance ToAXIRLiteSlave#(FIFOF);
-  module toAXIRLiteSlave#(FIFOF#(t) ff)
-  (RLiteSlave#(data_, user_)) provisos (ToAXIRLiteFlit#(t, data_, user_));
+instance ToAXI4Lite_R_Slave_Synth#(FIFOF);
+  module toAXI4Lite_R_Slave_Synth#(FIFOF#(t) ff)
+  (AXI4Lite_R_Slave_Synth#(data_, user_))
+  provisos (ToAXI4Lite_RFlit#(t, data_, user_));
 
-    Wire#(RLiteFlit#(data_, user_)) flit <- mkDWire(?);
-    rule peekFlit (ff.notEmpty); flit <= toAXIRLiteFlit(ff.first); endrule
+    Wire#(AXI4Lite_RFlit#(data_, user_)) flit <- mkDWire(?);
+    rule peekFlit (ff.notEmpty); flit <= toAXI4Lite_RFlit(ff.first); endrule
     PulseWire deqWire <- mkPulseWire;
     rule doDeq (deqWire && ff.notEmpty); ff.deq; endrule
 

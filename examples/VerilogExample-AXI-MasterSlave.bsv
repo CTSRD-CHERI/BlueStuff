@@ -43,10 +43,29 @@ typedef   0 RUSER_sz;
 `define LITEPARAMS ADDR_sz, DATA_sz, AWUSER_sz, WUSER_sz, BUSER_sz, ARUSER_sz, RUSER_sz
 
 (* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiMaster (AXIMasterSynth#(`PARAMS));
+module axiMaster (AXI4_Master_Synth#(`PARAMS));
 
   // AXI master shim
-  AXIShim#(`PARAMS) shim <- mkAXIShim;
+  AXI4_Shim#(`PARAMS) shim <- mkAXI4Shim;
+
+  // arbitrary work for each channel
+  rule putAXI4_AWFlit; shim.slave.aw.put(?); endrule
+  rule putAXI4_WFlit;  shim.slave.w.put(?);  endrule
+  rule putAXI4_ARFlit; shim.slave.ar.put(?); endrule
+  rule dropAXI4_BFlit; shim.slave.b.drop; endrule
+  rule dropAXI4_RFlit; shim.slave.r.drop; endrule
+
+  // return AXI interface
+  let ifcSynth <- toAXI4_Master_Synth(shim.master);
+  return ifcSynth;
+
+endmodule
+
+(* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
+module axiLiteMaster (AXI4Lite_Master_Synth#(`LITEPARAMS));
+
+  // AXI master shim
+  AXI4Lite_Shim#(`LITEPARAMS) shim <- mkAXI4LiteShim;
 
   // arbitrary work for each channel
   rule putAWFlit; shim.slave.aw.put(?); endrule
@@ -56,35 +75,35 @@ module axiMaster (AXIMasterSynth#(`PARAMS));
   rule dropRFlit; shim.slave.r.drop; endrule
 
   // return AXI interface
-  let ifcSynth <- toAXIMasterSynth(shim.master);
+  let ifcSynth <- toAXI4Lite_Master_Synth(shim.master);
   return ifcSynth;
 
 endmodule
 
 (* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiLiteMaster (AXILiteMasterSynth#(`LITEPARAMS));
-
-  // AXI master shim
-  AXILiteShim#(`LITEPARAMS) shim <- mkAXILiteShim;
-
-  // arbitrary work for each channel
-  rule putAWFlit; shim.slave.aw.put(?); endrule
-  rule putWFlit;  shim.slave.w.put(?);  endrule
-  rule putARFlit; shim.slave.ar.put(?); endrule
-  rule dropBFlit; shim.slave.b.drop; endrule
-  rule dropRFlit; shim.slave.r.drop; endrule
-
-  // return AXI interface
-  let ifcSynth <- toAXILiteMasterSynth(shim.master);
-  return ifcSynth;
-
-endmodule
-
-(* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiSlave (AXISlaveSynth#(`PARAMS));
+module axiSlave (AXI4_Slave_Synth#(`PARAMS));
 
   // AXI slave shim
-  AXIShim#(`PARAMS) shim <- mkAXIShim;
+  AXI4_Shim#(`PARAMS) shim <- mkAXI4Shim;
+
+  // arbitrary work for each channel
+  rule dropAXI4_AWFlit; shim.master.aw.drop; endrule
+  rule dropAXI4_WFlit;  shim.master.w.drop;  endrule
+  rule dropAXI4_ARFlit; shim.master.ar.drop; endrule
+  rule putAXI4_BFlit; shim.master.b.put(?); endrule
+  rule putAXI4_RFlit; shim.master.r.put(?); endrule
+
+  // return AXI interface
+  let ifcSynth <- toAXI4_Slave_Synth(shim.slave);
+  return ifcSynth;
+
+endmodule
+
+(* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
+module axiLiteSlave (AXI4Lite_Slave_Synth#(`LITEPARAMS));
+
+  // AXI slave shim
+  AXI4Lite_Shim#(`LITEPARAMS) shim <- mkAXI4LiteShim;
 
   // arbitrary work for each channel
   rule dropAWFlit; shim.master.aw.drop; endrule
@@ -94,26 +113,7 @@ module axiSlave (AXISlaveSynth#(`PARAMS));
   rule putRFlit; shim.master.r.put(?); endrule
 
   // return AXI interface
-  let ifcSynth <- toAXISlaveSynth(shim.slave);
-  return ifcSynth;
-
-endmodule
-
-(* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiLiteSlave (AXILiteSlaveSynth#(`LITEPARAMS));
-
-  // AXI slave shim
-  AXILiteShim#(`LITEPARAMS) shim <- mkAXILiteShim;
-
-  // arbitrary work for each channel
-  rule dropAWFlit; shim.master.aw.drop; endrule
-  rule dropWFlit;  shim.master.w.drop;  endrule
-  rule dropARFlit; shim.master.ar.drop; endrule
-  rule putBFlit; shim.master.b.put(?); endrule
-  rule putRFlit; shim.master.r.put(?); endrule
-
-  // return AXI interface
-  let ifcSynth <- toAXILiteSlaveSynth(shim.slave);
+  let ifcSynth <- toAXI4Lite_Slave_Synth(shim.slave);
   return ifcSynth;
 
 endmodule

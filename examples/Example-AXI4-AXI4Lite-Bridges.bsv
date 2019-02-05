@@ -43,15 +43,15 @@ typedef   0 RUSER_sz;
 
 `define PARAMS ID_sz, ADDR_sz, DATA_sz, AWUSER_sz, WUSER_sz, BUSER_sz, ARUSER_sz, RUSER_sz
 `define PARAMS_LITE ADDR_sz, DATA_sz, AWUSER_sz, WUSER_sz, BUSER_sz, ARUSER_sz, RUSER_sz
-`define MASTER_T      AXIMaster#(`PARAMS)
-`define MASTER_LITE_T AXILiteMaster#(`PARAMS_LITE)
-`define SLAVE_T       AXISlave#(`PARAMS)
-`define SLAVE_LITE_T  AXILiteSlave#(`PARAMS_LITE)
+`define MASTER_T      AXI4_Master#(`PARAMS)
+`define MASTER_LITE_T AXI4Lite_Master#(`PARAMS_LITE)
+`define SLAVE_T       AXI4_Slave#(`PARAMS)
+`define SLAVE_LITE_T  AXI4Lite_Slave#(`PARAMS_LITE)
 
 module axiMaster (`MASTER_T);
 
   // AXI master shim
-  AXIShim#(`PARAMS) shim <- mkAXIShim;
+  AXI4_Shim#(`PARAMS) shim <- mkAXI4Shim;
   // Req addr
   Reg#(Bit#(ADDR_sz)) nextWriteAddr <- mkReg(0);
 
@@ -61,27 +61,27 @@ module axiMaster (`MASTER_T);
 
   // arbitrary work for each channel
   Bool sendWrite = cnt[3:0] == 0;
-  rule putAWFlit (sendWrite);
-    AWFlit#(ID_sz, ADDR_sz, AWUSER_sz) f = ?;
+  rule putAXI4_AWFlit (sendWrite);
+    AXI4_AWFlit#(ID_sz, ADDR_sz, AWUSER_sz) f = ?;
     f.awaddr = nextWriteAddr;
     f.awlen  = 0;
     nextWriteAddr <= nextWriteAddr + 1;
     shim.slave.aw.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
-  rule putWFlit (sendWrite);
-    WFlit#(DATA_sz, WUSER_sz) f = WFlit {
+  rule putAXI4_WFlit (sendWrite);
+    AXI4_WFlit#(DATA_sz, WUSER_sz) f = AXI4_WFlit {
       wdata: cnt, wstrb: ?, wlast: True, wuser: ?
     };
     shim.slave.w.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
-  rule getBFlit;
+  rule getAXI4_BFlit;
     let rsp <- get(shim.slave.b);
     $display("%0t - MASTER - received ", $time, fshow(rsp));
   endrule
-  rule putARFlit; shim.slave.ar.put(?); endrule
-  rule dropRFlit; shim.slave.r.drop; endrule
+  rule putAXI4_ARFlit; shim.slave.ar.put(?); endrule
+  rule dropAXI4_RFlit; shim.slave.r.drop; endrule
 
   // return AXI interface
   return shim.master;
@@ -91,7 +91,7 @@ endmodule
 module axiMasterLite (`MASTER_LITE_T);
 
   // AXI master shim
-  AXILiteShim#(`PARAMS_LITE) shim <- mkAXILiteShim;
+  AXI4Lite_Shim#(`PARAMS_LITE) shim <- mkAXI4LiteShim;
   // Req addr
   Reg#(Bit#(ADDR_sz)) nextWriteAddr <- mkReg(0);
 
@@ -102,14 +102,14 @@ module axiMasterLite (`MASTER_LITE_T);
   // arbitrary work for each channel
   Bool sendWrite = cnt[3:0] == 0;
   rule putAWFlit (sendWrite);
-    AWLiteFlit#(ADDR_sz, AWUSER_sz) f = ?;
+    AXI4Lite_AWFlit#(ADDR_sz, AWUSER_sz) f = ?;
     f.awaddr = nextWriteAddr;
     nextWriteAddr <= nextWriteAddr + 1;
     shim.slave.aw.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
   rule putWFlit (sendWrite);
-    WLiteFlit#(DATA_sz, WUSER_sz) f = WLiteFlit {
+    AXI4Lite_WFlit#(DATA_sz, WUSER_sz) f = AXI4Lite_WFlit {
       wdata: cnt, wstrb: ?, wuser: ?
     };
     shim.slave.w.put(f);
@@ -130,34 +130,34 @@ endmodule
 module axiSlave (`SLAVE_T);
 
   // AXI slave shim
-  AXIShim#(`PARAMS) shim <- mkAXIShim;
+  AXI4_Shim#(`PARAMS) shim <- mkAXI4Shim;
 
   // arbitrary work for each channel
   let writeResp <- mkFIFOF;
-  rule getAWFlit;
+  rule getAXI4_AWFlit;
     let req <- get(shim.master.aw);
-    writeResp.enq(BFlit {
+    writeResp.enq(AXI4_BFlit {
       bid: req.awid, bresp: OKAY, buser: ?
     });
     $display("%0t - SLAVE - received ", $time, fshow(req));
   endrule
-  rule getWFlit;
+  rule getAXI4_WFlit;
     let req <- get(shim.master.w);
     $display("%0t - SLAVE - received ", $time, fshow(req));
   endrule
-  rule putBFlit;
+  rule putAXI4_BFlit;
     writeResp.deq;
     shim.master.b.put(writeResp.first);
     $display("%0t - SLAVE - sending ", $time, fshow(writeResp.first));
   endrule
   let readResp <- mkFIFOF;
-  rule getARFlit;
+  rule getAXI4_ARFlit;
     let req <- get(shim.master.ar);
-    readResp.enq(RFlit {
+    readResp.enq(AXI4_RFlit {
       rid: req.arid, rdata: ?, rresp: SLVERR, rlast: True, ruser: ?
     });
   endrule
-  rule putRFlit;
+  rule putAXI4_RFlit;
     readResp.deq;
     shim.master.r.put(readResp.first);
   endrule
@@ -170,13 +170,13 @@ endmodule
 module axiSlaveLite (`SLAVE_LITE_T);
 
   // AXI slave shim
-  AXILiteShim#(`PARAMS_LITE) shim <- mkAXILiteShim;
+  AXI4Lite_Shim#(`PARAMS_LITE) shim <- mkAXI4LiteShim;
 
   // arbitrary work for each channel
   let writeResp <- mkFIFOF;
   rule getAWFlit;
     let req <- get(shim.master.aw);
-    writeResp.enq(BLiteFlit {
+    writeResp.enq(AXI4Lite_BFlit {
       bresp: OKAY, buser: ?
     });
     $display("%0t - SLAVE - received ", $time, fshow(req));
@@ -193,7 +193,7 @@ module axiSlaveLite (`SLAVE_LITE_T);
   let readResp <- mkFIFOF;
   rule getARFlit;
     let req <- get(shim.master.ar);
-    readResp.enq(RLiteFlit {
+    readResp.enq(AXI4Lite_RFlit {
       rdata: ?, rresp: SLVERR, ruser: ?
     });
   endrule
@@ -210,16 +210,16 @@ endmodule
 module top (Empty);
   `MASTER_LITE_T mlite0 <- axiMasterLite;
   `SLAVE_T           s0 <- axiSlave;
-  `MASTER_T          m0 <- fromAXILiteMaster(mlite0);
+  `MASTER_T          m0 <- fromAXI4Lite_Master(mlite0);
   mkConnection(m0, s0);
   //`MASTER_T         m1 <- axiMaster;
   //`SLAVE_LITE_T slite1 <- axiSlaveLite;
-  //`SLAVE_T          s1 <- fromAXILiteSlave(slite1);
+  //`SLAVE_T          s1 <- fromAXI4Lite_Slave(slite1);
   //mkConnection(m1, s1);
   `MASTER_LITE_T mlite2 <- axiMasterLite;
-  `MASTER_T          m2 <- fromAXILiteMaster(mlite2);
+  `MASTER_T          m2 <- fromAXI4Lite_Master(mlite2);
   `SLAVE_LITE_T  slite2 <- axiSlaveLite;
-  `SLAVE_T           s2 <- fromAXILiteSlave(slite2);
+  `SLAVE_T           s2 <- fromAXI4Lite_Slave(slite2);
   mkConnection(m2, s2);
 endmodule
 

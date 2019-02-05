@@ -26,7 +26,7 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
-// AXI imports
+// AXI4 imports
 import AXI4_Types :: *;
 import AXI4_AW_Utils :: *;
 import AXI4_W_Utils :: *;
@@ -41,14 +41,14 @@ import SourceSink :: *;
 import FIFOF :: *;
 import SpecialFIFOs :: *;
 
-///////////////////////////////
-// AXI Write channel helpers //
+////////////////////////////////
+// AXI4 Write channel helpers //
 ////////////////////////////////////////////////////////////////////////////////
 
 module mergeWrite#(
-  Source#(AWFlit#(id_, addr_, awuser_)) aw,
-  Source#(WFlit#(data_, wuser_)) w)
-  (Source#(AXIWriteFlit#(id_, addr_, data_, awuser_, wuser_)));
+  Source#(AXI4_AWFlit#(id_, addr_, awuser_)) aw,
+  Source#(AXI4_WFlit#(data_, wuser_)) w)
+  (Source#(AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_)));
 
   let flitLeft <- mkReg(0);
   let doDrop   <- mkPulseWire;
@@ -86,9 +86,9 @@ module mergeWrite#(
 endmodule
 
 module splitWrite#(
-  Sink#(AWFlit#(id_, addr_, awuser_)) aw,
-  Sink#(WFlit#(data_, wuser_)) w)
-  (Sink#(AXIWriteFlit#(id_, addr_, data_, awuser_, wuser_)));
+  Sink#(AXI4_AWFlit#(id_, addr_, awuser_)) aw,
+  Sink#(AXI4_WFlit#(data_, wuser_)) w)
+  (Sink#(AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_)));
 
   let flitLeft <- mkReg(0);
   let doPut <- mkWire;
@@ -136,17 +136,17 @@ module splitWrite#(
 
 endmodule
 
-///////////////////////////////
-// AXI Slave addr width shim //
+////////////////////////////////
+// AXI4 Slave addr width shim //
 ////////////////////////////////////////////////////////////////////////////////
 
-function AXISlave#(a, addr_out, c, d, e, f, g, h) expandAXISlaveAddr
-  (AXISlave#(a, addr_in, c, d, e, f, g, h) s)
+function AXI4_Slave#(a, addr_out, c, d, e, f, g, h) expandAXI4_Slave_Addr
+  (AXI4_Slave#(a, addr_in, c, d, e, f, g, h) s)
   provisos (Add#(a__, addr_in, addr_out)); // addr_out >= addr_in
-  return interface AXISlave;
+  return interface AXI4_Slave;
     interface aw = interface Sink;
       method canPut = s.aw.canPut;
-      method put(x) = s.aw.put(AWFlit{
+      method put(x) = s.aw.put(AXI4_AWFlit{
         awid: x.awid,
         awaddr: truncate(x.awaddr),
         awlen: x.awlen,
@@ -164,7 +164,7 @@ function AXISlave#(a, addr_out, c, d, e, f, g, h) expandAXISlaveAddr
     interface  b = s.b;
     interface ar = interface Sink;
       method canPut = s.ar.canPut;
-      method put(x) = s.ar.put(ARFlit{
+      method put(x) = s.ar.put(AXI4_ARFlit{
         arid: x.arid,
         araddr: truncate(x.araddr),
         arlen: x.arlen,
@@ -182,24 +182,24 @@ function AXISlave#(a, addr_out, c, d, e, f, g, h) expandAXISlaveAddr
   endinterface;
 endfunction
 
-///////////////////////////////
-// AXI Shim Master <-> Slave //
+////////////////////////////////
+// AXI4 Shim Master <-> Slave //
 ////////////////////////////////////////////////////////////////////////////////
 
-module mkAXIShim (AXIShim#(a, b, c, d, e, f, g, h));
+module mkAXI4Shim (AXI4_Shim#(a, b, c, d, e, f, g, h));
   let awff <- mkBypassFIFOF;
   let  wff <- mkBypassFIFOF;
   let  bff <- mkBypassFIFOF;
   let arff <- mkBypassFIFOF;
   let  rff <- mkBypassFIFOF;
-  interface master = interface AXIMaster;
+  interface master = interface AXI4_Master;
     interface aw = toSource(awff);
     interface  w = toSource(wff);
     interface  b = toSink(bff);
     interface ar = toSource(arff);
     interface  r = toSink(rff);
   endinterface;
-  interface slave = interface AXISlave;
+  interface slave = interface AXI4_Slave;
     interface aw = toSink(awff);
     interface  w = toSink(wff);
     interface  b = toSource(bff);
@@ -212,14 +212,14 @@ endmodule
 // to "Synth" version of the interface //
 ////////////////////////////////////////////////////////////////////////////////
 
-// AXI Master
-module toAXIMasterSynth#(AXIMaster#(a, b, c, d, e, f, g, h) master)
-  (AXIMasterSynth#(a, b, c, d, e, f, g, h));
-  let awifc <- toAXIAWMaster(master.aw);
-  let wifc  <- toAXIWMaster(master.w);
-  let bifc  <- toAXIBMaster(master.b);
-  let arifc <- toAXIARMaster(master.ar);
-  let rifc  <- toAXIRMaster(master.r);
+// AXI4 Master
+module toAXI4_Master_Synth#(AXI4_Master#(a, b, c, d, e, f, g, h) master)
+  (AXI4_Master_Synth#(a, b, c, d, e, f, g, h));
+  let awifc <- toAXI4_AW_Master_Synth(master.aw);
+  let wifc  <- toAXI4_W_Master_Synth(master.w);
+  let bifc  <- toAXI4_B_Master_Synth(master.b);
+  let arifc <- toAXI4_AR_Master_Synth(master.ar);
+  let rifc  <- toAXI4_R_Master_Synth(master.r);
   interface aw = awifc;
   interface w  = wifc;
   interface b  = bifc;
@@ -227,14 +227,14 @@ module toAXIMasterSynth#(AXIMaster#(a, b, c, d, e, f, g, h) master)
   interface r  = rifc;
 endmodule
 
-// AXI Slave
-module toAXISlaveSynth#(AXISlave#(a, b, c, d, e, f, g, h) master)
-  (AXISlaveSynth#(a, b, c, d, e, f, g, h));
-  let awifc <- toAXIAWSlave(master.aw);
-  let wifc  <- toAXIWSlave(master.w);
-  let bifc  <- toAXIBSlave(master.b);
-  let arifc <- toAXIARSlave(master.ar);
-  let rifc  <- toAXIRSlave(master.r);
+// AXI4 Slave
+module toAXI4_Slave_Synth#(AXI4_Slave#(a, b, c, d, e, f, g, h) master)
+  (AXI4_Slave_Synth#(a, b, c, d, e, f, g, h));
+  let awifc <- toAXI4_AW_Slave_Synth(master.aw);
+  let wifc  <- toAXI4_W_Slave_Synth(master.w);
+  let bifc  <- toAXI4_B_Slave_Synth(master.b);
+  let arifc <- toAXI4_AR_Slave_Synth(master.ar);
+  let rifc  <- toAXI4_R_Slave_Synth(master.r);
   interface aw = awifc;
   interface w  = wifc;
   interface b  = bifc;

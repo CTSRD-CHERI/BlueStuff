@@ -39,35 +39,37 @@ import SpecialFIFOs :: *;
 
 // typeclasses to convert to/from the flit type
 
-typeclass ToAXIARLiteFlit#(type t, numeric type addr_, numeric type user_);
-  function ARLiteFlit#(addr_, user_) toAXIARLiteFlit (t x);
+typeclass ToAXI4Lite_ARFlit#(type t, numeric type addr_, numeric type user_);
+  function AXI4Lite_ARFlit#(addr_, user_) toAXI4Lite_ARFlit (t x);
 endtypeclass
 
-instance ToAXIARLiteFlit#(ARLiteFlit#(a, b), a, b);
-  function toAXIARLiteFlit = id;
+instance ToAXI4Lite_ARFlit#(AXI4Lite_ARFlit#(a, b), a, b);
+  function toAXI4Lite_ARFlit = id;
 endinstance
 
-typeclass FromAXIARLiteFlit#(type t, numeric type addr_, numeric type user_);
-  function t fromAXIARLiteFlit (ARLiteFlit#(addr_, user_) x);
+typeclass FromAXI4Lite_ARFlit#(type t, numeric type addr_, numeric type user_);
+  function t fromAXI4Lite_ARFlit (AXI4Lite_ARFlit#(addr_, user_) x);
 endtypeclass
 
-instance FromAXIARLiteFlit#(ARLiteFlit#(a, b), a, b);
-  function fromAXIARLiteFlit = id;
+instance FromAXI4Lite_ARFlit#(AXI4Lite_ARFlit#(a, b), a, b);
+  function fromAXI4Lite_ARFlit = id;
 endinstance
 
 // typeclass to turn an interface to the Master interface
 
-typeclass ToAXIARLiteMaster#(type t);
-  module toAXIARLiteMaster#(t#(x) ifc) (ARLiteMaster#(addr_, user_))
-  provisos (ToAXIARLiteFlit#(x, addr_, user_));
+typeclass ToAXI4Lite_AR_Master_Synth#(type t);
+  module toAXI4Lite_AR_Master_Synth#(t#(x) ifc)
+  (AXI4Lite_AR_Master_Synth#(addr_, user_))
+  provisos (ToAXI4Lite_ARFlit#(x, addr_, user_));
 endtypeclass
 
-instance ToAXIARLiteMaster#(Source);
-  module toAXIARLiteMaster#(Source#(t) src)
-  (ARLiteMaster#(addr_, user_)) provisos (ToAXIARLiteFlit#(t, addr_, user_));
+instance ToAXI4Lite_AR_Master_Synth#(Source);
+  module toAXI4Lite_AR_Master_Synth#(Source#(t) src)
+  (AXI4Lite_AR_Master_Synth#(addr_, user_))
+  provisos (ToAXI4Lite_ARFlit#(t, addr_, user_));
 
-    Wire#(ARLiteFlit#(addr_, user_)) flit <- mkDWire(?);
-    rule peekFlit (src.canPeek); flit <= toAXIARLiteFlit(src.peek); endrule
+    Wire#(AXI4Lite_ARFlit#(addr_, user_)) flit <- mkDWire(?);
+    rule peekFlit (src.canPeek); flit <= toAXI4Lite_ARFlit(src.peek); endrule
     PulseWire dropWire <- mkPulseWire;
     rule doDrop (dropWire && src.canPeek); src.drop; endrule
 
@@ -80,12 +82,13 @@ instance ToAXIARLiteMaster#(Source);
   endmodule
 endinstance
 
-instance ToAXIARLiteMaster#(FIFOF);
-  module toAXIARLiteMaster#(FIFOF#(t) ff)
-  (ARLiteMaster#(addr_, user_)) provisos (ToAXIARLiteFlit#(t, addr_, user_));
+instance ToAXI4Lite_AR_Master_Synth#(FIFOF);
+  module toAXI4Lite_AR_Master_Synth#(FIFOF#(t) ff)
+  (AXI4Lite_AR_Master_Synth#(addr_, user_))
+  provisos (ToAXI4Lite_ARFlit#(t, addr_, user_));
 
-    Wire#(ARLiteFlit#(addr_, user_)) flit <- mkDWire(?);
-    rule peekFlit (ff.notEmpty); flit <= toAXIARLiteFlit(ff.first); endrule
+    Wire#(AXI4Lite_ARFlit#(addr_, user_)) flit <- mkDWire(?);
+    rule peekFlit (ff.notEmpty); flit <= toAXI4Lite_ARFlit(ff.first); endrule
     PulseWire deqWire <- mkPulseWire;
     rule doDeq (deqWire && ff.notEmpty); ff.deq; endrule
 
@@ -100,21 +103,23 @@ endinstance
 
 // typeclass to turn an interface to the Slave interface
 
-typeclass ToAXIARLiteSlave#(type t);
-  module toAXIARLiteSlave#(t#(x) ifc) (ARLiteSlave#(addr_, user_))
-  provisos (FromAXIARLiteFlit#(x, addr_, user_));
+typeclass ToAXI4Lite_AR_Slave_Synth#(type t);
+  module toAXI4Lite_AR_Slave_Synth#(t#(x) ifc)
+  (AXI4Lite_AR_Slave_Synth#(addr_, user_))
+  provisos (FromAXI4Lite_ARFlit#(x, addr_, user_));
 endtypeclass
 
-instance ToAXIARLiteSlave#(Sink);
-  module toAXIARLiteSlave#(Sink#(t) snk)
-  (ARLiteSlave#(addr_, user_)) provisos (FromAXIARLiteFlit#(t, addr_, user_));
+instance ToAXI4Lite_AR_Slave_Synth#(Sink);
+  module toAXI4Lite_AR_Slave_Synth#(Sink#(t) snk)
+  (AXI4Lite_AR_Slave_Synth#(addr_, user_))
+  provisos (FromAXI4Lite_ARFlit#(t, addr_, user_));
 
     let w_araddr <- mkDWire(?);
     let w_arprot <- mkDWire(?);
     let w_aruser <- mkDWire(?);
     PulseWire putWire <- mkPulseWire;
     rule doPut (putWire && snk.canPut);
-      snk.put(fromAXIARLiteFlit(ARLiteFlit {
+      snk.put(fromAXI4Lite_ARFlit(AXI4Lite_ARFlit {
         araddr: w_araddr, arprot: w_arprot, aruser: w_aruser
       }));
     endrule
@@ -128,16 +133,17 @@ instance ToAXIARLiteSlave#(Sink);
   endmodule
 endinstance
 
-instance ToAXIARLiteSlave#(FIFOF);
-  module toAXIARLiteSlave#(FIFOF#(t) ff)
-  (ARLiteSlave#(addr_, user_)) provisos (FromAXIARLiteFlit#(t, addr_, user_));
+instance ToAXI4Lite_AR_Slave_Synth#(FIFOF);
+  module toAXI4Lite_AR_Slave_Synth#(FIFOF#(t) ff)
+  (AXI4Lite_AR_Slave_Synth#(addr_, user_))
+  provisos (FromAXI4Lite_ARFlit#(t, addr_, user_));
 
     let w_araddr <- mkDWire(?);
     let w_arprot <- mkDWire(?);
     let w_aruser <- mkDWire(?);
     PulseWire enqWire <- mkPulseWire;
     rule doEnq (enqWire && ff.notFull);
-      ff.enq(fromAXIARLiteFlit(ARLiteFlit {
+      ff.enq(fromAXI4Lite_ARFlit(AXI4Lite_ARFlit {
         araddr: w_araddr, arprot: w_arprot, aruser: w_aruser
       }));
     endrule

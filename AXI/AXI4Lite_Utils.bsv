@@ -45,17 +45,17 @@ import SpecialFIFOs :: *;
 // AXI Write channel helpers //
 ////////////////////////////////////////////////////////////////////////////////
 
-function Source#(AXILiteWriteFlit#(addr_, data_, awu_, wu_)) mergeLiteWrite(
-  Source#(AWLiteFlit#(addr_, awu_)) aw,
-  Source#(WLiteFlit#(data_, wu_)) w) = interface Source;
+function Source#(AXI4Lite_WriteFlit#(addr_, data_, awu_, wu_)) mergeLiteWrite(
+  Source#(AXI4Lite_AWFlit#(addr_, awu_)) aw,
+  Source#(AXI4Lite_WFlit#(data_, wu_)) w) = interface Source;
     method canPeek = aw.canPeek && w.canPeek;
-    method peek    = AXILiteWriteFlit { aw: aw.peek, w: w.peek };
+    method peek    = AXI4Lite_WriteFlit { aw: aw.peek, w: w.peek };
     method drop    = action aw.drop; w.drop; endaction;
   endinterface;
 
-function Sink#(AXILiteWriteFlit#(addr_, data_, awu_, wu_)) splitLiteWrite(
-  Sink#(AWLiteFlit#(addr_, awu_)) aw,
-  Sink#(WLiteFlit#(data_, wu_)) w) = interface Sink;
+function Sink#(AXI4Lite_WriteFlit#(addr_, data_, awu_, wu_)) splitLiteWrite(
+  Sink#(AXI4Lite_AWFlit#(addr_, awu_)) aw,
+  Sink#(AXI4Lite_WFlit#(data_, wu_)) w) = interface Sink;
     method canPut = aw.canPut && w.canPut;
     method put(x) = action
       aw.put(x.aw);
@@ -67,17 +67,17 @@ function Sink#(AXILiteWriteFlit#(addr_, data_, awu_, wu_)) splitLiteWrite(
 // Address offset helpers //
 ////////////////////////////////////////////////////////////////////////////////
 
-function AWLiteFlit#(a, b) offsetAWFlit(AWLiteFlit#(a, b) f, Int#(a) o) =
-  AWLiteFlit {
+function AXI4Lite_AWFlit#(a, b)
+  offsetAWFlit(AXI4Lite_AWFlit#(a, b) f, Int#(a) o) = AXI4Lite_AWFlit {
     awaddr: pack(unpack(f.awaddr) + o), awprot: f.awprot, awuser: f.awuser
   };
-function ARLiteFlit#(a, b) offsetARFlit(ARLiteFlit#(a, b) f, Int#(a) o) =
-  ARLiteFlit {
+function AXI4Lite_ARFlit#(a, b)
+  offsetARFlit(AXI4Lite_ARFlit#(a, b) f, Int#(a) o) = AXI4Lite_ARFlit {
     araddr: pack(unpack(f.araddr) + o), arprot: f.arprot, aruser: f.aruser
   };
-function AXILiteSlave#(a, b, c, d, e, f, g) offsetSlave(
-  AXILiteSlave#(a, b, c, d, e, f, g) s, Integer offset) =
-  interface AXILiteSlave;
+function AXI4Lite_Slave#(a, b, c, d, e, f, g) offsetSlave(
+  AXI4Lite_Slave#(a, b, c, d, e, f, g) s, Integer offset) =
+  interface AXI4Lite_Slave;
     interface aw = interface Sink;
       method canPut = s.aw.canPut;
       method put(x) = s.aw.put(offsetAWFlit(x, fromInteger(-offset)));
@@ -95,28 +95,30 @@ function AXILiteSlave#(a, b, c, d, e, f, g) offsetSlave(
 // drop user fields helpers //
 ////////////////////////////////////////////////////////////////////////////////
 
-function AXILiteSlave#(a, b, c, d, e, f, g) dropUserFields(
-  AXILiteSlave#(a, b, 0, 0, 0, 0, 0) s) = interface AXILiteSlave;
+function AXI4Lite_Slave#(a, b, c, d, e, f, g) dropUserFields(
+  AXI4Lite_Slave#(a, b, 0, 0, 0, 0, 0) s) = interface AXI4Lite_Slave;
     interface aw = interface Sink;
       method canPut = s.aw.canPut;
-      method put(x) = s.aw.put(AWLiteFlit {
+      method put(x) = s.aw.put(AXI4Lite_AWFlit {
         awaddr: x.awaddr, awprot: x.awprot, awuser: ?
       });
     endinterface;
     interface w = interface Sink;
       method canPut = s.w.canPut;
-      method put(x) = s.w.put(WLiteFlit {
+      method put(x) = s.w.put(AXI4Lite_WFlit {
         wdata: x.wdata, wstrb: x.wstrb, wuser: ?
       });
     endinterface;
     interface b = interface Source;
       method canPeek = s.b.canPeek;
-      method peek    = BLiteFlit { bresp: s.b.peek.bresp, buser: unpack(0) };
+      method peek    = AXI4Lite_BFlit {
+                         bresp: s.b.peek.bresp, buser: unpack(0)
+                       };
       method drop    = s.b.drop;
     endinterface;
     interface ar = interface Sink;
       method canPut = s.ar.canPut;
-      method put(x) = s.ar.put(ARLiteFlit {
+      method put(x) = s.ar.put(AXI4Lite_ARFlit {
         araddr: x.araddr, arprot: x.arprot, aruser: ?
       });
     endinterface;
@@ -124,7 +126,7 @@ function AXILiteSlave#(a, b, c, d, e, f, g) dropUserFields(
       method canPeek = s.r.canPeek;
       method peek;
         let rflit = s.r.peek;
-        return RLiteFlit {
+        return AXI4Lite_RFlit {
           rdata: rflit.rdata, rresp: rflit.rresp, ruser: unpack(0)
         };
       endmethod
@@ -136,20 +138,20 @@ function AXILiteSlave#(a, b, c, d, e, f, g) dropUserFields(
 // AXI Shim Master <-> Slave //
 ////////////////////////////////////////////////////////////////////////////////
 
-module mkAXILiteShim (AXILiteShim#(a, b, c, d, e, f, g));
+module mkAXI4LiteShim (AXI4Lite_Shim#(a, b, c, d, e, f, g));
   let awff <- mkBypassFIFOF;
   let  wff <- mkBypassFIFOF;
   let  bff <- mkBypassFIFOF;
   let arff <- mkBypassFIFOF;
   let  rff <- mkBypassFIFOF;
-  interface master = interface AXILiteMaster;
+  interface master = interface AXI4Lite_Master;
     interface aw = toSource(awff);
     interface  w = toSource(wff);
     interface  b = toSink(bff);
     interface ar = toSource(arff);
     interface  r = toSink(rff);
   endinterface;
-  interface slave = interface AXILiteSlave;
+  interface slave = interface AXI4Lite_Slave;
     interface aw = toSink(awff);
     interface  w = toSink(wff);
     interface  b = toSource(bff);
@@ -163,13 +165,13 @@ endmodule
 ////////////////////////////////////////////////////////////////////////////////
 
 // AXI Master
-module toAXILiteMasterSynth#(AXILiteMaster#(a, b, c, d, e, f, g) master)
-  (AXILiteMasterSynth#(a, b, c, d, e, f, g));
-  let awifc <- toAXIAWLiteMaster(master.aw);
-  let wifc  <- toAXIWLiteMaster(master.w);
-  let bifc  <- toAXIBLiteMaster(master.b);
-  let arifc <- toAXIARLiteMaster(master.ar);
-  let rifc  <- toAXIRLiteMaster(master.r);
+module toAXI4Lite_Master_Synth#(AXI4Lite_Master#(a, b, c, d, e, f, g) master)
+  (AXI4Lite_Master_Synth#(a, b, c, d, e, f, g));
+  let awifc <- toAXI4Lite_AW_Master_Synth(master.aw);
+  let wifc  <- toAXI4Lite_W_Master_Synth(master.w);
+  let bifc  <- toAXI4Lite_B_Master_Synth(master.b);
+  let arifc <- toAXI4Lite_AR_Master_Synth(master.ar);
+  let rifc  <- toAXI4Lite_R_Master_Synth(master.r);
   interface aw = awifc;
   interface w  = wifc;
   interface b  = bifc;
@@ -178,13 +180,13 @@ module toAXILiteMasterSynth#(AXILiteMaster#(a, b, c, d, e, f, g) master)
 endmodule
 
 // AXI Slave
-module toAXILiteSlaveSynth#(AXILiteSlave#(a, b, c, d, e, f, g) master)
-  (AXILiteSlaveSynth#(a, b, c, d, e, f, g));
-  let awifc <- toAXIAWLiteSlave(master.aw);
-  let wifc  <- toAXIWLiteSlave(master.w);
-  let bifc  <- toAXIBLiteSlave(master.b);
-  let arifc <- toAXIARLiteSlave(master.ar);
-  let rifc  <- toAXIRLiteSlave(master.r);
+module toAXI4Lite_Slave_Synth#(AXI4Lite_Slave#(a, b, c, d, e, f, g) master)
+  (AXI4Lite_Slave_Synth#(a, b, c, d, e, f, g));
+  let awifc <- toAXI4Lite_AW_Slave_Synth(master.aw);
+  let wifc  <- toAXI4Lite_W_Slave_Synth(master.w);
+  let bifc  <- toAXI4Lite_B_Slave_Synth(master.b);
+  let arifc <- toAXI4Lite_AR_Slave_Synth(master.ar);
+  let rifc  <- toAXI4Lite_R_Slave_Synth(master.r);
   interface aw = awifc;
   interface w  = wifc;
   interface b  = bifc;

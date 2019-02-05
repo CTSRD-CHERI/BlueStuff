@@ -116,26 +116,26 @@ module mkCharIO (CharIO);
   return core;
 endmodule
 
-// AXILite Slave interface
+// AXI4Lite Slave interface
 ////////////////////////////////////////////////////////////////////////////////
 
 `define PARAMS addr_sz, data_sz, 0, 0, 0, 0, 0
 
-module mkAXILiteCharIOCore#(CharIO charIO) (AXILiteSlave#(`PARAMS))
+module mkAXI4LiteCharIOCore#(CharIO charIO) (AXI4Lite_Slave#(`PARAMS))
   provisos (Add#(8, a__, data_sz));
-  let shim <- mkAXILiteShim;
+  let shim <- mkAXI4LiteShim;
   let wRspFF <- mkFIFOF;
   let rRspFF <- mkFIFOF;
   rule doWrite;
     shim.master.aw.drop;
     let wflit  <- get(shim.master.w);
     if (wflit.wstrb[0] == 1) charIO.sink.put(truncate(wflit.wdata));
-    wRspFF.enq(BLiteFlit {bresp: OKAY, buser: ?});
+    wRspFF.enq(AXI4Lite_BFlit {bresp: OKAY, buser: ?});
   endrule
   rule doRead;
     shim.master.ar.drop;
     let c <- get(charIO.source);
-    rRspFF.enq(RLiteFlit {rdata: zeroExtend(c), rresp: OKAY, ruser: ?});
+    rRspFF.enq(AXI4Lite_RFlit {rdata: zeroExtend(c), rresp: OKAY, ruser: ?});
   endrule
   rule writeRsp;
     shim.master.b.put(wRspFF.first);
@@ -148,26 +148,26 @@ module mkAXILiteCharIOCore#(CharIO charIO) (AXILiteSlave#(`PARAMS))
   return shim.slave;
 endmodule
 
-module mkAXILiteSocketCharIO#(String name, Integer dflt_port)
-  (AXILiteSlave#(`PARAMS))
+module mkAXI4LiteSocketCharIO#(String name, Integer dflt_port)
+  (AXI4Lite_Slave#(`PARAMS))
   provisos (Add#(8, a__, data_sz));
   let charIO <- mkSocketCharIO(name, dflt_port);
-  let core   <- mkAXILiteCharIOCore(charIO);
+  let core   <- mkAXI4LiteCharIOCore(charIO);
   return core;
 endmodule
 
-module mkAXILiteFileCharIO#(String inf, String outf)
-  (AXILiteSlave#(`PARAMS))
+module mkAXI4LiteFileCharIO#(String inf, String outf)
+  (AXI4Lite_Slave#(`PARAMS))
   provisos (Add#(8, a__, data_sz));
   let charIO <- mkFileCharIO(inf, outf);
-  let core   <- mkAXILiteCharIOCore(charIO);
+  let core   <- mkAXI4LiteCharIOCore(charIO);
   return core;
 endmodule
 
-module mkAXILiteCharIO (AXILiteSlave#(`PARAMS))
+module mkAXI4LiteCharIO (AXI4Lite_Slave#(`PARAMS))
   provisos (Add#(8, a__, data_sz));
   let charIO <- mkCharIO;
-  let core   <- mkAXILiteCharIOCore(charIO);
+  let core   <- mkAXI4LiteCharIOCore(charIO);
   return core;
 endmodule
 

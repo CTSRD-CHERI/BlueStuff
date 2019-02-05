@@ -39,39 +39,41 @@ import SpecialFIFOs :: *;
 
 // typeclasses to convert to/from the flit type
 
-typeclass ToAXIBFlit#(type t, numeric type id_, numeric type user_);
-  function BFlit#(id_, user_) toAXIBFlit (t x);
+typeclass ToAXI4_BFlit#(type t, numeric type id_, numeric type user_);
+  function AXI4_BFlit#(id_, user_) toAXI4_BFlit (t x);
 endtypeclass
 
-instance ToAXIBFlit#(BFlit#(a, b), a, b);
-  function toAXIBFlit = id;
+instance ToAXI4_BFlit#(AXI4_BFlit#(a, b), a, b);
+  function toAXI4_BFlit = id;
 endinstance
 
-typeclass FromAXIBFlit#(type t, numeric type id_, numeric type user_);
-  function t fromAXIBFlit (BFlit#(id_, user_) x);
+typeclass FromAXI4_BFlit#(type t, numeric type id_, numeric type user_);
+  function t fromAXI4_BFlit (AXI4_BFlit#(id_, user_) x);
 endtypeclass
 
-instance FromAXIBFlit#(BFlit#(a, b), a, b);
-  function fromAXIBFlit = id;
+instance FromAXI4_BFlit#(AXI4_BFlit#(a, b), a, b);
+  function fromAXI4_BFlit = id;
 endinstance
 
 // typeclass to turn an interface to the Master interface
 
-typeclass ToAXIBMaster#(type t);
-  module toAXIBMaster#(t#(x) ifc) (BMaster#(id_, user_))
-  provisos (FromAXIBFlit#(x, id_, user_));
+typeclass ToAXI4_B_Master_Synth#(type t);
+  module toAXI4_B_Master_Synth#(t#(x) ifc) (AXI4_B_Master_Synth#(id_, user_))
+  provisos (FromAXI4_BFlit#(x, id_, user_));
 endtypeclass
 
-instance ToAXIBMaster#(Sink);
-  module toAXIBMaster#(Sink#(t) snk)
-  (BMaster#(id_, user_)) provisos (FromAXIBFlit#(t, id_, user_));
+instance ToAXI4_B_Master_Synth#(Sink);
+  module toAXI4_B_Master_Synth#(Sink#(t) snk)
+  (AXI4_B_Master_Synth#(id_, user_)) provisos (FromAXI4_BFlit#(t, id_, user_));
 
     let w_bid   <- mkDWire(?);
     let w_bresp <- mkDWire(?);
     let w_buser <- mkDWire(?);
     PulseWire putWire <- mkPulseWire;
     rule doPut (putWire && snk.canPut);
-      snk.put(fromAXIBFlit(BFlit{bid: w_bid, bresp: w_bresp, buser: w_buser}));
+      snk.put(fromAXI4_BFlit(AXI4_BFlit{
+        bid: w_bid, bresp: w_bresp, buser: w_buser
+      }));
     endrule
 
     method bid(id)       = action w_bid   <= id; endaction;
@@ -83,16 +85,18 @@ instance ToAXIBMaster#(Sink);
   endmodule
 endinstance
 
-instance ToAXIBMaster#(FIFOF);
-  module toAXIBMaster#(FIFOF#(t) ff)
-  (BMaster#(id_, user_)) provisos (FromAXIBFlit#(t, id_, user_));
+instance ToAXI4_B_Master_Synth#(FIFOF);
+  module toAXI4_B_Master_Synth#(FIFOF#(t) ff)
+  (AXI4_B_Master_Synth#(id_, user_)) provisos (FromAXI4_BFlit#(t, id_, user_));
 
     let w_bid   <- mkDWire(?);
     let w_bresp <- mkDWire(?);
     let w_buser <- mkDWire(?);
     PulseWire enqWire <- mkPulseWire;
     rule doEnq (enqWire && ff.notFull);
-      ff.enq(fromAXIBFlit(BFlit{bid: w_bid, bresp: w_bresp, buser: w_buser}));
+      ff.enq(fromAXI4_BFlit(AXI4_BFlit{
+        bid: w_bid, bresp: w_bresp, buser: w_buser
+      }));
     endrule
 
     method bid(id)       = action w_bid   <= id; endaction;
@@ -106,17 +110,17 @@ endinstance
 
 // typeclass to turn an interface to the Slave interface
 
-typeclass ToAXIBSlave#(type t);
-  module toAXIBSlave#(t#(x) ifc) (BSlave#(id_, user_))
-  provisos (ToAXIBFlit#(x, id_, user_));
+typeclass ToAXI4_B_Slave_Synth#(type t);
+  module toAXI4_B_Slave_Synth#(t#(x) ifc) (AXI4_B_Slave_Synth#(id_, user_))
+  provisos (ToAXI4_BFlit#(x, id_, user_));
 endtypeclass
 
-instance ToAXIBSlave#(Source);
-  module toAXIBSlave#(Source#(t) src)
-  (BSlave#(id_, user_)) provisos (ToAXIBFlit#(t, id_, user_));
+instance ToAXI4_B_Slave_Synth#(Source);
+  module toAXI4_B_Slave_Synth#(Source#(t) src)
+  (AXI4_B_Slave_Synth#(id_, user_)) provisos (ToAXI4_BFlit#(t, id_, user_));
 
-    Wire#(BFlit#(id_, user_)) flit <- mkDWire(?);
-    rule peekFlit (src.canPeek); flit <= toAXIBFlit(src.peek); endrule
+    Wire#(AXI4_BFlit#(id_, user_)) flit <- mkDWire(?);
+    rule peekFlit (src.canPeek); flit <= toAXI4_BFlit(src.peek); endrule
     PulseWire dropWire <- mkPulseWire;
     rule doDrop (dropWire && src.canPeek); src.drop; endrule
 
@@ -129,12 +133,12 @@ instance ToAXIBSlave#(Source);
   endmodule
 endinstance
 
-instance ToAXIBSlave#(FIFOF);
-  module toAXIBSlave#(FIFOF#(t) ff)
-  (BSlave#(id_, user_)) provisos (ToAXIBFlit#(t, id_, user_));
+instance ToAXI4_B_Slave_Synth#(FIFOF);
+  module toAXI4_B_Slave_Synth#(FIFOF#(t) ff)
+  (AXI4_B_Slave_Synth#(id_, user_)) provisos (ToAXI4_BFlit#(t, id_, user_));
 
-    Wire#(BFlit#(id_, user_)) flit <- mkDWire(?);
-    rule peekFlit (ff.notEmpty); flit <= toAXIBFlit(ff.first); endrule
+    Wire#(AXI4_BFlit#(id_, user_)) flit <- mkDWire(?);
+    rule peekFlit (ff.notEmpty); flit <= toAXI4_BFlit(ff.first); endrule
     PulseWire deqWire <- mkPulseWire;
     rule doDeq (deqWire && ff.notEmpty); ff.deq; endrule
 

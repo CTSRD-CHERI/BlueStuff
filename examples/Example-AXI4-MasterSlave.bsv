@@ -46,10 +46,10 @@ typedef   0 RUSER_sz;
 `define PARAMS ID_sz, ADDR_sz, DATA_sz, AWUSER_sz, WUSER_sz, BUSER_sz, ARUSER_sz, RUSER_sz
 
 (* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiMaster (AXIMaster#(`PARAMS));
+module axiMaster (AXI4_Master#(`PARAMS));
 
-  // AXI master shim
-  AXIShim#(`PARAMS) shim <- mkAXIShim;
+  // AXI4 master shim
+  AXI4_Shim#(`PARAMS) shim <- mkAXI4Shim;
 
   // counter
   Reg#(Bit#(DATA_sz)) cnt <- mkReg(0);
@@ -57,64 +57,64 @@ module axiMaster (AXIMaster#(`PARAMS));
 
   // arbitrary work for each channel
   Bool sendWrite = cnt[3:0] == 0;
-  rule putAWFlit (sendWrite);
-    AWFlit#(ID_sz, ADDR_sz, AWUSER_sz) f = ?;
+  rule putAXI4_AWFlit (sendWrite);
+    AXI4_AWFlit#(ID_sz, ADDR_sz, AWUSER_sz) f = ?;
     shim.slave.aw.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
-  rule putWFlit (sendWrite);
-    WFlit#(DATA_sz, WUSER_sz) f = WFlit{
+  rule putAXI4_WFlit (sendWrite);
+    AXI4_WFlit#(DATA_sz, WUSER_sz) f = AXI4_WFlit{
       wdata: cnt, wstrb: ?, wlast: True, wuser: ?
     };
     shim.slave.w.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
-  rule getBFlit;
+  rule getAXI4_BFlit;
     let rsp <- get(shim.slave.b);
     $display("%0t - MASTER - received ", $time, fshow(rsp));
   endrule
-  rule putARFlit; shim.slave.ar.put(?); endrule
-  rule dropRFlit; shim.slave.r.drop; endrule
+  rule putAXI4_ARFlit; shim.slave.ar.put(?); endrule
+  rule dropAXI4_RFlit; shim.slave.r.drop; endrule
 
-  // return AXI interface
+  // return AXI4 interface
   return shim.master;
 
 endmodule
 
 (* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
-module axiSlave (AXISlave#(`PARAMS));
+module axiSlave (AXI4_Slave#(`PARAMS));
 
-  // AXI slave shim
-  AXIShim#(`PARAMS) shim <- mkAXIShim;
+  // AXI4 slave shim
+  AXI4_Shim#(`PARAMS) shim <- mkAXI4Shim;
 
   // arbitrary work for each channel
   FIFOF#(Bit#(0)) writeResp <- mkFIFOF;
-  rule getAWFlit;
+  rule getAXI4_AWFlit;
     let req <- get(shim.master.aw);
     $display("%0t - SLAVE - received ", $time, fshow(req));
   endrule
-  rule getWFlit;
+  rule getAXI4_WFlit;
     let req <- get(shim.master.w);
     $display("%0t - SLAVE - received ", $time, fshow(req));
     writeResp.enq(?);
   endrule
-  rule putBFlit;
+  rule putAXI4_BFlit;
     writeResp.deq;
-    BFlit#(ID_sz, BUSER_sz) f = ?;
+    AXI4_BFlit#(ID_sz, BUSER_sz) f = ?;
     shim.master.b.put(f);
     $display("%0t - SLAVE - sending ", $time, fshow(f));
   endrule
-  rule dropARFlit; shim.master.ar.drop; endrule
-  rule putRFlit; shim.master.r.put(?); endrule
+  rule dropAXI4_ARFlit; shim.master.ar.drop; endrule
+  rule putAXI4_RFlit; shim.master.r.put(?); endrule
 
-  // return AXI interface
+  // return AXI4 interface
   return shim.slave;
 
 endmodule
 
 module top (Empty);
-  AXIMaster#(`PARAMS) master <- axiMaster;
-  AXISlave#(`PARAMS)  slave  <- axiSlave;
+  AXI4_Master#(`PARAMS) master <- axiMaster;
+  AXI4_Slave#(`PARAMS)  slave  <- axiSlave;
   mkConnection(master, slave);
 endmodule
 

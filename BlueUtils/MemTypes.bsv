@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2019 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -112,27 +112,27 @@ instance NeedRsp#(MemReq#(a,b));
   endfunction
 endinstance
 
-instance ToAXIAWLiteFlit#(MemReq#(addr_t, data_t), addr_sz, user_sz)
+instance ToAXI4Lite_AWFlit#(MemReq#(addr_t, data_t), addr_sz, user_sz)
   provisos (Bits#(addr_t, addr_sz));
-  function toAXIAWLiteFlit(x);
+  function toAXI4Lite_AWFlit(x);
     let w = x.WriteReq;
-    return AWLiteFlit {awaddr: pack(w.addr), awprot: 0, awuser: 0};
+    return AXI4Lite_AWFlit {awaddr: pack(w.addr), awprot: 0, awuser: 0};
   endfunction
 endinstance
 
-instance ToAXIWLiteFlit#(MemReq#(addr_t, data_t), data_sz, user_sz)
+instance ToAXI4Lite_WFlit#(MemReq#(addr_t, data_t), data_sz, user_sz)
   provisos (Bits#(data_t, data_sz));
-  function toAXIWLiteFlit(x);
+  function toAXI4Lite_WFlit(x);
     let w = x.WriteReq;
-    return WLiteFlit {wdata: pack(w.data), wstrb: w.byteEnable, wuser: 0};
+    return AXI4Lite_WFlit {wdata: pack(w.data), wstrb: w.byteEnable, wuser: 0};
   endfunction
 endinstance
 
-instance ToAXIARLiteFlit#(MemReq#(addr_t, data_t), addr_sz, user_sz)
+instance ToAXI4Lite_ARFlit#(MemReq#(addr_t, data_t), addr_sz, user_sz)
   provisos (Bits#(addr_t, addr_sz));
-  function toAXIARLiteFlit(x);
+  function toAXI4Lite_ARFlit(x);
     let r = x.ReadReq;
-    return ARLiteFlit {araddr: pack(r.addr), arprot: 0, aruser: 0};
+    return AXI4Lite_ARFlit {araddr: pack(r.addr), arprot: 0, aruser: 0};
   endfunction
 endinstance
 
@@ -143,16 +143,16 @@ typedef union tagged {
   void BusError;
 } MemRsp#(type content_t) deriving (Bits, FShow);
 
-instance FromAXIRLiteFlit#(MemRsp#(data_t), data_sz, user_sz)
+instance FromAXI4Lite_RFlit#(MemRsp#(data_t), data_sz, user_sz)
   provisos (Bits#(data_t, data_sz));
-  function fromAXIRLiteFlit(x) = case (x.rresp)
+  function fromAXI4Lite_RFlit(x) = case (x.rresp)
     OKAY: ReadRsp(unpack(x.rdata));
     default: BusError;
   endcase;
 endinstance
 
-instance FromAXIBLiteFlit#(MemRsp#(data_t), user_sz);
-  function fromAXIBLiteFlit(x) = case (x.bresp)
+instance FromAXI4Lite_BFlit#(MemRsp#(data_t), user_sz);
+  function fromAXI4Lite_BFlit(x) = case (x.bresp)
     OKAY: WriteRsp;
     default: BusError;
   endcase;

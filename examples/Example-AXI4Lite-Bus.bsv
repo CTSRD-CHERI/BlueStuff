@@ -52,13 +52,13 @@ typedef   0 ARUSER_sz;
 typedef   0 RUSER_sz;
 
 `define PARAMS ADDR_sz, DATA_sz, AWUSER_sz, WUSER_sz, BUSER_sz, ARUSER_sz, RUSER_sz
-`define MASTER_T AXILiteMaster#(`PARAMS)
-`define SLAVE_T  AXILiteSlave#(`PARAMS)
+`define MASTER_T AXI4Lite_Master#(`PARAMS)
+`define SLAVE_T  AXI4Lite_Slave#(`PARAMS)
 
 module axiMaster (`MASTER_T);
 
   // AXI master shim
-  AXILiteShim#(`PARAMS) shim <- mkAXILiteShim;
+  AXI4Lite_Shim#(`PARAMS) shim <- mkAXI4LiteShim;
   // Req addr
   Reg#(Bit#(ADDR_sz)) nextWriteAddr <- mkReg(0);
 
@@ -69,14 +69,14 @@ module axiMaster (`MASTER_T);
   // arbitrary work for each channel
   Bool sendWrite = cnt[3:0] == 0;
   rule putAWFlit (sendWrite);
-    AWLiteFlit#(ADDR_sz, AWUSER_sz) f = ?;
+    AXI4Lite_AWFlit#(ADDR_sz, AWUSER_sz) f = ?;
     f.awaddr = nextWriteAddr;
     nextWriteAddr <= nextWriteAddr + fromInteger(valueOf(SlaveWidth)) + 1;
     shim.slave.aw.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
   rule putWFlit (sendWrite);
-    WLiteFlit#(DATA_sz, WUSER_sz) f = WLiteFlit{wdata: cnt, wstrb: ?, wuser: ?};
+    AXI4Lite_WFlit#(DATA_sz, WUSER_sz) f = AXI4Lite_WFlit{wdata: cnt, wstrb: ?, wuser: ?};
     shim.slave.w.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
   endrule
@@ -95,7 +95,7 @@ endmodule
 module axiSlave (`SLAVE_T);
 
   // AXI slave shim
-  AXILiteShim#(`PARAMS) shim <- mkAXILiteShim;
+  AXI4Lite_Shim#(`PARAMS) shim <- mkAXI4LiteShim;
 
   // arbitrary work for each channel
   FIFOF#(Bit#(0)) writeResp <- mkFIFOF;
@@ -110,7 +110,7 @@ module axiSlave (`SLAVE_T);
   endrule
   rule putBFlit;
     writeResp.deq;
-    BLiteFlit#(BUSER_sz) f = ?;
+    AXI4Lite_BFlit#(BUSER_sz) f = ?;
     shim.master.b.put(f);
     $display("%0t - SLAVE - sending ", $time, fshow(f));
   endrule
@@ -132,7 +132,7 @@ module top (Empty);
     maptab[i] = Range{base: fromInteger(i*valueOf(SlaveWidth)), size: fromInteger(valueOf(SlaveWidth))};
     ss[i] <- axiSlave;
   end
-  mkAXILiteBus(maptab, ms, ss);
+  mkAXI4LiteBus(maptab, ms, ss);
 endmodule
 
 `undef PARAMS

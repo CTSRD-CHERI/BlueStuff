@@ -45,17 +45,17 @@ function Action abort(Fmt m) = action $display(m); $finish(0); endaction;
 // from AXI4Lite Master to AXI4 Master //
 ////////////////////////////////////////////////////////////////////////////////
 
-module fromAXILiteMaster#(
-  AXILiteMaster#(addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_) mlite)
-  (AXIMaster#(id_, addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_));
+module fromAXI4Lite_Master#(
+  AXI4Lite_Master#(addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_) mlite)
+  (AXI4_Master#(id_, addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_));
 
-  module fromAXIAWLiteSource#(Source#(AWLiteFlit#(addr_, awuser_)) src)
-    (Source#(AWFlit#(id_, addr_, awuser_)));
-    function AWFlit#(id_, addr_, awuser_) f(AWLiteFlit#(addr_, awuser_) x) =
-    AWFlit {
+  module fromAXIAWLiteSource#(Source#(AXI4Lite_AWFlit#(addr_, awuser_)) src)
+    (Source#(AXI4_AWFlit#(id_, addr_, awuser_)));
+    function AXI4_AWFlit#(id_, addr_, awuser_) f(AXI4Lite_AWFlit#(addr_, awuser_) x) =
+    AXI4_AWFlit {
       awid: 0, awaddr: x.awaddr, awlen: 0,
       awsize: fromInteger(log2(valueOf(data_)/8)),
-      awburst: FIXED, awlock: False, awcache: 0,
+      awburst: FIXED, awlock: NORMAL, awcache: 0,
       awprot: x.awprot, awqos: 0, awregion: 0, awuser: x.awuser
     };
     method canPeek = src.canPeek;
@@ -63,9 +63,9 @@ module fromAXILiteMaster#(
     method drop    = src.drop;
   endmodule
 
-  module fromAXIWLiteSource#(Source#(WLiteFlit#(data_, wuser_)) src)
-    (Source#(WFlit#(data_, wuser_)));
-    function WFlit#(data_, wuser_) f(WLiteFlit#(data_, wuser_) x) = WFlit {
+  module fromAXIWLiteSource#(Source#(AXI4Lite_WFlit#(data_, wuser_)) src)
+    (Source#(AXI4_WFlit#(data_, wuser_)));
+    function AXI4_WFlit#(data_, wuser_) f(AXI4Lite_WFlit#(data_, wuser_) x) = AXI4_WFlit {
       wdata: x.wdata, wstrb: x.wstrb, wlast: True, wuser: x.wuser
     };
     method canPeek = src.canPeek;
@@ -73,22 +73,22 @@ module fromAXILiteMaster#(
     method drop    = src.drop;
   endmodule
 
-  module fromAXIBLiteSink#(Sink#(BLiteFlit#(buser_)) snk)
-    (Sink#(BFlit#(id_, buser_)));
+  module fromAXIBLiteSink#(Sink#(AXI4Lite_BFlit#(buser_)) snk)
+    (Sink#(AXI4_BFlit#(id_, buser_)));
     method canPut = snk.canPut;
     method put(x) = action
       if (x.bid != 0) abort($format("Unsupported bid (0x%0x)", x.bid));
-      snk.put(BLiteFlit {bresp: x.bresp, buser: x.buser});
+      snk.put(AXI4Lite_BFlit {bresp: x.bresp, buser: x.buser});
     endaction;
   endmodule
 
-  module fromAXIARLiteSource#(Source#(ARLiteFlit#(addr_, aruser_)) src)
-    (Source#(ARFlit#(id_, addr_, aruser_)));
-    function ARFlit#(id_, addr_, aruser_) f(ARLiteFlit#(addr_, aruser_) x) =
-    ARFlit {
+  module fromAXIARLiteSource#(Source#(AXI4Lite_ARFlit#(addr_, aruser_)) src)
+    (Source#(AXI4_ARFlit#(id_, addr_, aruser_)));
+    function AXI4_ARFlit#(id_, addr_, aruser_) f(AXI4Lite_ARFlit#(addr_, aruser_) x) =
+    AXI4_ARFlit {
       arid: 0, araddr: x.araddr, arlen: 0,
       arsize: fromInteger(log2(valueOf(data_)/8)),
-      arburst: FIXED, arlock: False, arcache: 0,
+      arburst: FIXED, arlock: NORMAL, arcache: 0,
       arprot: x.arprot, arqos: 0, arregion: 0, aruser: x.aruser
     };
     method canPeek = src.canPeek;
@@ -96,14 +96,14 @@ module fromAXILiteMaster#(
     method drop    = src.drop;
   endmodule
 
-  module fromAXIRLiteSink#(Sink#(RLiteFlit#(data_, ruser_)) snk)
-    (Sink#(RFlit#(id_, data_, ruser_)));
+  module fromAXIRLiteSink#(Sink#(AXI4Lite_RFlit#(data_, ruser_)) snk)
+    (Sink#(AXI4_RFlit#(id_, data_, ruser_)));
     method canPut = snk.canPut;
     method put(x) = action
       if (x.rid != 0) abort($format("Unsupported rid (0x%0x)", x.rid));
       if (x.rlast != True)
         abort($format("Unsupported rlast (", fshow(x.rlast), ")"));
-      snk.put(RLiteFlit {rdata: x.rdata, rresp: x.rresp, ruser: x.ruser});
+      snk.put(AXI4Lite_RFlit {rdata: x.rdata, rresp: x.rresp, ruser: x.ruser});
     endaction;
   endmodule
 
@@ -124,12 +124,12 @@ endmodule
 // from AXI4Lite Slave to AXI4 Slave //
 ////////////////////////////////////////////////////////////////////////////////
 
-module fromAXILiteSlave#(
-  AXILiteSlave#(addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_) slite)
-  (AXISlave#(id_, addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_));
+module fromAXI4Lite_Slave#(
+  AXI4Lite_Slave#(addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_) slite)
+  (AXI4_Slave#(id_, addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_));
 
-  module fromAXIAWLiteSink#(Sink#(AWLiteFlit#(addr_, awuser_)) snk)
-    (Sink#(AWFlit#(id_, addr_, awuser_)));
+  module fromAXIAWLiteSink#(Sink#(AXI4Lite_AWFlit#(addr_, awuser_)) snk)
+    (Sink#(AXI4_AWFlit#(id_, addr_, awuser_)));
     method canPut = snk.canPut;
     method put(x) = action
       if (x.awid != 0) abort($format("Unsupported awid (0x%0x)", x.awid));
@@ -138,32 +138,32 @@ module fromAXILiteSlave#(
         abort($format("Unsupported awsize (0x%0x)", x.awsize));
       if (x.awburst != FIXED)
         abort($format("Unsupported awburst (", fshow(x.awburst), ")"));
-      if (x.awlock != False)
+      if (x.awlock != NORMAL)
         abort($format("Unsupported awlock (", fshow(x.awlock), ")"));
       if (x.awcache != 0)
         abort($format("Unsupported awcache (0x%0x)", x.awcache));
       if (x.awqos != 0) abort($format("Unsupported awqos (0x%0x)", x.awqos));
       if (x.awregion != 0)
         abort($format("Unsupported awregion (0x%0x)", x.awregion));
-      snk.put(AWLiteFlit {
+      snk.put(AXI4Lite_AWFlit {
         awaddr: x.awaddr, awprot: x.awprot, awuser: x.awuser
       });
     endaction;
   endmodule
 
-  module fromAXIWLiteSink#(Sink#(WLiteFlit#(data_, wuser_)) snk)
-    (Sink#(WFlit#(data_, wuser_)));
+  module fromAXIWLiteSink#(Sink#(AXI4Lite_WFlit#(data_, wuser_)) snk)
+    (Sink#(AXI4_WFlit#(data_, wuser_)));
     method canPut = snk.canPut;
     method put(x) = action
       if (x.wlast != True)
         abort($format("Unsupported wlast (", fshow(x.wlast), ")"));
-      snk.put(WLiteFlit {wdata: x.wdata, wstrb: x.wstrb, wuser: x.wuser});
+      snk.put(AXI4Lite_WFlit {wdata: x.wdata, wstrb: x.wstrb, wuser: x.wuser});
     endaction;
   endmodule
 
-  module fromAXIBLiteSource#(Source#(BLiteFlit#(buser_)) src)
-    (Source#(BFlit#(id_, buser_)));
-    function BFlit#(id_, buser_) f(BLiteFlit#(buser_) x) = BFlit {
+  module fromAXIBLiteSource#(Source#(AXI4Lite_BFlit#(buser_)) src)
+    (Source#(AXI4_BFlit#(id_, buser_)));
+    function AXI4_BFlit#(id_, buser_) f(AXI4Lite_BFlit#(buser_) x) = AXI4_BFlit {
       bid: 0, bresp: x.bresp, buser: x.buser
     };
     method canPeek = src.canPeek;
@@ -171,8 +171,8 @@ module fromAXILiteSlave#(
     method drop    = src.drop;
   endmodule
 
-  module fromAXIARLiteSink#(Sink#(ARLiteFlit#(addr_, aruser_)) snk)
-    (Sink#(ARFlit#(id_, addr_, aruser_)));
+  module fromAXIARLiteSink#(Sink#(AXI4Lite_ARFlit#(addr_, aruser_)) snk)
+    (Sink#(AXI4_ARFlit#(id_, addr_, aruser_)));
     method canPut = snk.canPut;
     method put(x) = action
       if (x.arid != 0) abort($format("Unsupported arid (0x%0x)", x.arid));
@@ -181,22 +181,22 @@ module fromAXILiteSlave#(
         abort($format("Unsupported arsize (0x%0x)", x.arsize));
       if (x.arburst != FIXED)
         abort($format("Unsupported arburst (", fshow(x.arburst), ")"));
-      if (x.arlock != False)
+      if (x.arlock != NORMAL)
         abort($format("Unsupported arlock (", fshow(x.arlock), ")"));
       if (x.arcache != 0)
         abort($format("Unsupported arcache (0x%0x)", x.arcache));
       if (x.arqos != 0) abort($format("Unsupported arqos (0x%0x)", x.arqos));
       if (x.arregion != 0)
         abort($format("Unsupported arregion (0x%0x)", x.arregion));
-      snk.put(ARLiteFlit {
+      snk.put(AXI4Lite_ARFlit {
         araddr: x.araddr, arprot: x.arprot, aruser: x.aruser
       });
     endaction;
   endmodule
 
-  module fromAXIRLiteSource#(Source#(RLiteFlit#(data_, ruser_)) src)
-    (Source#(RFlit#(id_, data_, ruser_)));
-    function RFlit#(id_, data_, ruser_) f(RLiteFlit#(data_, ruser_) x) = RFlit {
+  module fromAXIRLiteSource#(Source#(AXI4Lite_RFlit#(data_, ruser_)) src)
+    (Source#(AXI4_RFlit#(id_, data_, ruser_)));
+    function AXI4_RFlit#(id_, data_, ruser_) f(AXI4Lite_RFlit#(data_, ruser_) x) = AXI4_RFlit {
       rid: 0, rdata: x.rdata, rresp: x.rresp, rlast: True, ruser: x.ruser
     };
     method canPeek = src.canPeek;

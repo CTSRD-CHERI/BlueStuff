@@ -39,37 +39,39 @@ import SpecialFIFOs :: *;
 
 // typeclasses to convert to/from the flit type
 
-typeclass ToAXIAWFlit#(type t,
+typeclass ToAXI4_AWFlit#(type t,
 numeric type id_, numeric type addr_, numeric type user_);
-  function AWFlit#(id_, addr_, user_) toAXIAWFlit (t x);
+  function AXI4_AWFlit#(id_, addr_, user_) toAXI4_AWFlit (t x);
 endtypeclass
 
-instance ToAXIAWFlit#(AWFlit#(a, b, c), a, b, c);
-  function toAXIAWFlit = id;
+instance ToAXI4_AWFlit#(AXI4_AWFlit#(a, b, c), a, b, c);
+  function toAXI4_AWFlit = id;
 endinstance
 
-typeclass FromAXIAWFlit#(type t,
+typeclass FromAXI4_AWFlit#(type t,
 numeric type id_, numeric type addr_, numeric type user_);
-  function t fromAXIAWFlit (AWFlit#(id_, addr_, user_) x);
+  function t fromAXI4_AWFlit (AXI4_AWFlit#(id_, addr_, user_) x);
 endtypeclass
 
-instance FromAXIAWFlit#(AWFlit#(a, b, c), a, b, c);
-  function fromAXIAWFlit = id;
+instance FromAXI4_AWFlit#(AXI4_AWFlit#(a, b, c), a, b, c);
+  function fromAXI4_AWFlit = id;
 endinstance
 
 // typeclass to turn an interface to the Master interface
 
-typeclass ToAXIAWMaster#(type t);
-  module toAXIAWMaster#(t#(x) ifc) (AWMaster#(id_, addr_, user_))
-  provisos (ToAXIAWFlit#(x, id_, addr_, user_));
+typeclass ToAXI4_AW_Master_Synth#(type t);
+  module toAXI4_AW_Master_Synth#(t#(x) ifc)
+  (AXI4_AW_Master_Synth#(id_, addr_, user_))
+  provisos (ToAXI4_AWFlit#(x, id_, addr_, user_));
 endtypeclass
 
-instance ToAXIAWMaster#(Source);
-  module toAXIAWMaster#(Source#(t) src)
-  (AWMaster#(id_, addr_, user_)) provisos (ToAXIAWFlit#(t, id_, addr_, user_));
+instance ToAXI4_AW_Master_Synth#(Source);
+  module toAXI4_AW_Master_Synth#(Source#(t) src)
+  (AXI4_AW_Master_Synth#(id_, addr_, user_))
+  provisos (ToAXI4_AWFlit#(t, id_, addr_, user_));
 
-    Wire#(AWFlit#(id_, addr_, user_)) flit <- mkDWire(?);
-    rule peekFlit (src.canPeek); flit <= toAXIAWFlit(src.peek); endrule
+    Wire#(AXI4_AWFlit#(id_, addr_, user_)) flit <- mkDWire(?);
+    rule peekFlit (src.canPeek); flit <= toAXI4_AWFlit(src.peek); endrule
     PulseWire dropWire <- mkPulseWire;
     rule doDrop (dropWire && src.canPeek); src.drop; endrule
 
@@ -90,12 +92,13 @@ instance ToAXIAWMaster#(Source);
   endmodule
 endinstance
 
-instance ToAXIAWMaster#(FIFOF);
-  module toAXIAWMaster#(FIFOF#(t) ff)
-  (AWMaster#(id_, addr_, user_)) provisos (ToAXIAWFlit#(t, id_, addr_, user_));
+instance ToAXI4_AW_Master_Synth#(FIFOF);
+  module toAXI4_AW_Master_Synth#(FIFOF#(t) ff)
+  (AXI4_AW_Master_Synth#(id_, addr_, user_))
+  provisos (ToAXI4_AWFlit#(t, id_, addr_, user_));
 
-    Wire#(AWFlit#(id_, addr_, user_)) flit <- mkDWire(?);
-    rule peekFlit (ff.notEmpty); flit <= toAXIAWFlit(ff.first); endrule
+    Wire#(AXI4_AWFlit#(id_, addr_, user_)) flit <- mkDWire(?);
+    rule peekFlit (ff.notEmpty); flit <= toAXI4_AWFlit(ff.first); endrule
     PulseWire deqWire <- mkPulseWire;
     rule doDeq (deqWire && ff.notEmpty); ff.deq; endrule
 
@@ -118,14 +121,16 @@ endinstance
 
 // typeclass to turn an interface to the Slave interface
 
-typeclass ToAXIAWSlave#(type t);
-  module toAXIAWSlave#(t#(x) ifc) (AWSlave#(id_, addr_, user_))
-  provisos (FromAXIAWFlit#(x, id_, addr_, user_));
+typeclass ToAXI4_AW_Slave_Synth#(type t);
+  module toAXI4_AW_Slave_Synth#(t#(x) ifc)
+  (AXI4_AW_Slave_Synth#(id_, addr_, user_))
+  provisos (FromAXI4_AWFlit#(x, id_, addr_, user_));
 endtypeclass
 
-instance ToAXIAWSlave#(Sink);
-  module toAXIAWSlave#(Sink#(t) snk)
-  (AWSlave#(id_, addr_, user_)) provisos (FromAXIAWFlit#(t, id_, addr_, user_));
+instance ToAXI4_AW_Slave_Synth#(Sink);
+  module toAXI4_AW_Slave_Synth#(Sink#(t) snk)
+  (AXI4_AW_Slave_Synth#(id_, addr_, user_))
+  provisos (FromAXI4_AWFlit#(t, id_, addr_, user_));
 
     let w_awid     <- mkDWire(?);
     let w_awaddr   <- mkDWire(?);
@@ -140,7 +145,7 @@ instance ToAXIAWSlave#(Sink);
     let w_awuser   <- mkDWire(?);
     PulseWire putWire <- mkPulseWire;
     rule doPut (putWire && snk.canPut);
-      snk.put(fromAXIAWFlit(AWFlit{
+      snk.put(fromAXI4_AWFlit(AXI4_AWFlit{
         awid:     w_awid,
         awaddr:   w_awaddr,
         awlen:    w_awlen,
@@ -172,9 +177,10 @@ instance ToAXIAWSlave#(Sink);
   endmodule
 endinstance
 
-instance ToAXIAWSlave#(FIFOF);
-  module toAXIAWSlave#(FIFOF#(t) ff)
-  (AWSlave#(id_, addr_, user_)) provisos (FromAXIAWFlit#(t, id_, addr_, user_));
+instance ToAXI4_AW_Slave_Synth#(FIFOF);
+  module toAXI4_AW_Slave_Synth#(FIFOF#(t) ff)
+  (AXI4_AW_Slave_Synth#(id_, addr_, user_))
+  provisos (FromAXI4_AWFlit#(t, id_, addr_, user_));
 
     let w_awid     <- mkDWire(?);
     let w_awaddr   <- mkDWire(?);
@@ -189,7 +195,7 @@ instance ToAXIAWSlave#(FIFOF);
     let w_awuser   <- mkDWire(?);
     PulseWire enqWire <- mkPulseWire;
     rule doEnq (enqWire && ff.notFull);
-      ff.enq(fromAXIAWFlit(AWFlit{
+      ff.enq(fromAXI4_AWFlit(AXI4_AWFlit{
         awid:     w_awid,
         awaddr:   w_awaddr,
         awlen:    w_awlen,
