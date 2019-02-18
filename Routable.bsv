@@ -67,7 +67,7 @@ endtypeclass
 typedef struct {
   Bit#(n) base;
   Bit#(n) size;
-} Range#(numeric type n);
+} Range#(numeric type n) deriving (Bits);
 function Bit#(n) rangeBase(Range#(n) range) = range.base;
 function Bit#(n) rangeSize(Range#(n) range) = range.size;
 function Bit#(n) rangeTop (Range#(n) range) = range.base + range.size;
