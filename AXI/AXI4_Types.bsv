@@ -701,6 +701,23 @@ interface AXI4_Master#(
   interface Sink#(AXI4_RFlit#(id_, data_, ruser_))     r;
 endinterface
 
+instance CulDeSac#(AXI4_Master#(id_,
+                                addr_,
+                                data_,
+                                awuser_,
+                                wuser_,
+                                buser_,
+                                aruser_,
+                                ruser_));
+  function culDeSac = interface AXI4_Master;
+    interface aw = nullSource;
+    interface  w = nullSource;
+    interface  b = nullSink;
+    interface ar = nullSource;
+    interface  r = nullSink;
+  endinterface;
+endinstance
+
 interface AXI4_Master_Synth#(
   numeric type id_,
   numeric type addr_,
@@ -788,6 +805,23 @@ interface AXI4_Slave#(
   interface Sink#(AXI4_ARFlit#(id_, addr_, aruser_)) ar;
   interface Source#(AXI4_RFlit#(id_, data_, ruser_)) r;
 endinterface
+
+instance CulDeSac#(AXI4_Slave#(id_,
+                               addr_,
+                               data_,
+                               awuser_,
+                               wuser_,
+                               buser_,
+                               aruser_,
+                               ruser_));
+  function culDeSac = interface AXI4_Slave;
+    interface aw = nullSink;
+    interface  w = nullSink;
+    interface  b = nullSource;
+    interface ar = nullSink;
+    interface  r = nullSource;
+  endinterface;
+endinstance
 
 interface AXI4_Slave_Synth#(
   numeric type id_,
