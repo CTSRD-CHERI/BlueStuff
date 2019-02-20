@@ -31,7 +31,6 @@ import SourceSink :: *;
 import AXI4_Types :: *;
 
 import FIFOF :: *;
-import SpecialFIFOs :: *;
 
 ///////////////////////////////
 // AXI Address Write Channel //
@@ -57,7 +56,8 @@ instance FromAXI4_AWFlit#(AXI4_AWFlit#(a, b, c), a, b, c);
   function fromAXI4_AWFlit = id;
 endinstance
 
-// typeclass to turn an interface to the Master interface
+// convert to/from Synth Master interface
+////////////////////////////////////////////////////////////////////////////////
 
 typeclass ToAXI4_AW_Master_Synth#(type t);
   module toAXI4_AW_Master_Synth#(t#(x) ifc)
@@ -119,7 +119,29 @@ instance ToAXI4_AW_Master_Synth#(FIFOF);
   endmodule
 endinstance
 
-// typeclass to turn an interface to the Slave interface
+module fromAXI4_AW_Master_Synth#(AXI4_AW_Master_Synth#(id_, addr_, user_) m)
+  (Source#(AXI4_AWFlit#(id_, addr_, user_)));
+
+  method canPeek = m.awvalid;
+  method peek = AXI4_AWFlit {
+    awid:     m.awid,
+    awaddr:   m.awaddr,
+    awlen:    m.awlen,
+    awsize:   m.awsize,
+    awburst:  m.awburst,
+    awlock:   m.awlock,
+    awcache:  m.awcache,
+    awprot:   m.awprot,
+    awqos:    m.awqos,
+    awregion: m.awregion,
+    awuser:   m.awuser
+  };
+  method drop if (m.awvalid) = m.awready(True);
+
+endmodule
+
+// convert to/from Synth Slave interface
+////////////////////////////////////////////////////////////////////////////////
 
 typeclass ToAXI4_AW_Slave_Synth#(type t);
   module toAXI4_AW_Slave_Synth#(t#(x) ifc)
@@ -226,3 +248,24 @@ instance ToAXI4_AW_Slave_Synth#(FIFOF);
 
   endmodule
 endinstance
+
+module fromAXI4_AW_Slave_Synth#(AXI4_AW_Slave_Synth#(id_, addr_, user_) s)
+  (Sink#(AXI4_AWFlit#(id_, addr_, user_)));
+
+  method canPut = s.awready;
+  method put(x) if (s.awready) = action
+    s.awid(x.awid);
+    s.awaddr(x.awaddr);
+    s.awlen(x.awlen);
+    s.awsize(x.awsize);
+    s.awburst(x.awburst);
+    s.awlock(x.awlock);
+    s.awcache(x.awcache);
+    s.awprot(x.awprot);
+    s.awqos(x.awqos);
+    s.awregion(x.awregion);
+    s.awuser(x.awuser);
+    s.awvalid(True);
+  endaction;
+
+endmodule

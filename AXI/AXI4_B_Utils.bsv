@@ -55,7 +55,8 @@ instance FromAXI4_BFlit#(AXI4_BFlit#(a, b), a, b);
   function fromAXI4_BFlit = id;
 endinstance
 
-// typeclass to turn an interface to the Master interface
+// convert to/from Synth Master interface
+////////////////////////////////////////////////////////////////////////////////
 
 typeclass ToAXI4_B_Master_Synth#(type t);
   module toAXI4_B_Master_Synth#(t#(x) ifc) (AXI4_B_Master_Synth#(id_, user_))
@@ -108,7 +109,21 @@ instance ToAXI4_B_Master_Synth#(FIFOF);
   endmodule
 endinstance
 
-// typeclass to turn an interface to the Slave interface
+module fromAXI4_B_Master_Synth#(AXI4_B_Master_Synth#(id_, user_) m)
+  (Sink#(AXI4_BFlit#(id_, user_)));
+
+  method canPut = m.bready;
+  method put(x) if (m.bready) = action
+    m.bid(x.bid);
+    m.bresp(x.bresp);
+    m.buser(x.buser);
+    m.bvalid(True);
+  endaction;
+
+endmodule
+
+// convert to/from Synth Slave interface
+////////////////////////////////////////////////////////////////////////////////
 
 typeclass ToAXI4_B_Slave_Synth#(type t);
   module toAXI4_B_Slave_Synth#(t#(x) ifc) (AXI4_B_Slave_Synth#(id_, user_))
@@ -150,3 +165,14 @@ instance ToAXI4_B_Slave_Synth#(FIFOF);
 
   endmodule
 endinstance
+
+module fromAXI4_B_Slave_Synth#(AXI4_B_Slave_Synth#(id_, user_) s)
+  (Source#(AXI4_BFlit#(id_, user_)));
+
+  method canPeek = s.bvalid;
+  method peek = AXI4_BFlit {
+    bid: s.bid, bresp: s.bresp, buser: s.buser
+  };
+  method drop if (s.bvalid) = s.bready(True);
+
+endmodule

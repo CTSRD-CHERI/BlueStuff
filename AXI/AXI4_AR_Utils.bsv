@@ -57,7 +57,8 @@ instance FromAXI4_ARFlit#(AXI4_ARFlit#(a, b, c), a, b, c);
   function fromAXI4_ARFlit = id;
 endinstance
 
-// typeclass to turn an interface to the Master interface
+// convert to/from Synth Master interface
+////////////////////////////////////////////////////////////////////////////////
 
 typeclass ToAXI4_AR_Master_Synth#(type t);
   module toAXI4_AR_Master_Synth#(t#(x) ifc)
@@ -119,7 +120,29 @@ instance ToAXI4_AR_Master_Synth#(FIFOF);
   endmodule
 endinstance
 
-// typeclass to turn an interface to the Slave interface
+module fromAXI4_AR_Master_Synth#(AXI4_AR_Master_Synth#(id_, addr_, user_) m)
+  (Source#(AXI4_ARFlit#(id_, addr_, user_)));
+
+  method canPeek = m.arvalid;
+  method peek = AXI4_ARFlit {
+    arid:     m.arid,
+    araddr:   m.araddr,
+    arlen:    m.arlen,
+    arsize:   m.arsize,
+    arburst:  m.arburst,
+    arlock:   m.arlock,
+    arcache:  m.arcache,
+    arprot:   m.arprot,
+    arqos:    m.arqos,
+    arregion: m.arregion,
+    aruser:   m.aruser
+  };
+  method drop if (m.arvalid) = m.arready(True);
+
+endmodule
+
+// convert to/from Synth Slave interface
+////////////////////////////////////////////////////////////////////////////////
 
 typeclass ToAXI4_AR_Slave_Synth#(type t);
   module toAXI4_AR_Slave_Synth#(t#(x) ifc)
@@ -226,3 +249,24 @@ instance ToAXI4_AR_Slave_Synth#(FIFOF);
 
   endmodule
 endinstance
+
+module fromAXI4_AR_Slave_Synth#(AXI4_AR_Slave_Synth#(id_, addr_, user_) s)
+  (Sink#(AXI4_ARFlit#(id_, addr_, user_)));
+
+  method canPut = s.arready;
+  method put(x) if (s.arready) = action
+    s.arid(x.arid);
+    s.araddr(x.araddr);
+    s.arlen(x.arlen);
+    s.arsize(x.arsize);
+    s.arburst(x.arburst);
+    s.arlock(x.arlock);
+    s.arcache(x.arcache);
+    s.arprot(x.arprot);
+    s.arqos(x.arqos);
+    s.arregion(x.arregion);
+    s.aruser(x.aruser);
+    s.arvalid(True);
+  endaction;
+
+endmodule

@@ -56,7 +56,8 @@ instance FromAXI4_WFlit#(AXI4_WFlit#(a, b), a, b);
   function fromAXI4_WFlit = id;
 endinstance
 
-// typeclass to turn an interface to the Master interface
+// convert to/from Synth Master interface
+////////////////////////////////////////////////////////////////////////////////
 
 typeclass ToAXI4_W_Master_Synth#(type t);
   module toAXI4_W_Master_Synth#(t#(x) ifc)
@@ -104,7 +105,19 @@ instance ToAXI4_W_Master_Synth#(FIFOF);
   endmodule
 endinstance
 
-// typeclass to turn an interface to the Slave interface
+module fromAXI4_W_Master_Synth#(AXI4_W_Master_Synth#(data_, user_) m)
+  (Source#(AXI4_WFlit#(data_, user_)));
+
+  method canPeek = m.wvalid;
+  method peek = AXI4_WFlit {
+    wdata: m.wdata, wstrb: m.wstrb, wlast: m.wlast, wuser: m.wuser
+  };
+  method drop if (m.wvalid) = m.wready(True);
+
+endmodule
+
+// convert to/from Synth Slave interface
+////////////////////////////////////////////////////////////////////////////////
 
 typeclass ToAXI4_W_Slave_Synth#(type t);
   module toAXI4_W_Slave_Synth#(t#(x) ifc) (AXI4_W_Slave_Synth#(data_, user_))
@@ -162,3 +175,17 @@ instance ToAXI4_W_Slave_Synth#(FIFOF);
 
   endmodule
 endinstance
+
+module fromAXI4_W_Slave_Synth#(AXI4_W_Slave_Synth#(data_, user_) s)
+  (Sink#(AXI4_WFlit#(data_, user_)));
+
+  method canPut = s.wready;
+  method put(x) if (s.wready) = action
+    s.wdata(x.wdata);
+    s.wstrb(x.wstrb);
+    s.wlast(x.wlast);
+    s.wuser(x.wuser);
+    s.wvalid(True);
+  endaction;
+
+endmodule

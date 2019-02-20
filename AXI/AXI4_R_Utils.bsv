@@ -57,7 +57,8 @@ instance FromAXI4_RFlit#(AXI4_RFlit#(a, b, c), a, b, c);
   function fromAXI4_RFlit = id;
 endinstance
 
-// typeclass to turn an interface to the Master interface
+// convert to/from Synth Master interface
+////////////////////////////////////////////////////////////////////////////////
 
 typeclass ToAXI4_R_Master_Synth#(type t);
   module toAXI4_R_Master_Synth#(t#(x) ifc)
@@ -129,7 +130,23 @@ instance ToAXI4_R_Master_Synth#(FIFOF);
   endmodule
 endinstance
 
-// typeclass to turn an interface to the Slave interface
+module fromAXI4_R_Master_Synth#(AXI4_R_Master_Synth#(id_, data_, user_) m)
+  (Sink#(AXI4_RFlit#(id_, data_, user_)));
+
+  method canPut = m.rready;
+  method put(x) if (m.rready) = action
+    m.rid(x.rid);
+    m.rdata(x.rdata);
+    m.rresp(x.rresp);
+    m.rlast(x.rlast);
+    m.ruser(x.ruser);
+    m.rvalid(True);
+  endaction;
+
+endmodule
+
+// convert to/from Synth Slave interface
+////////////////////////////////////////////////////////////////////////////////
 
 typeclass ToAXI4_R_Slave_Synth#(type t);
   module toAXI4_R_Slave_Synth#(t#(x) ifc)
@@ -178,3 +195,18 @@ instance ToAXI4_R_Slave_Synth#(FIFOF);
 
   endmodule
 endinstance
+
+module fromAXI4_R_Slave_Synth#(AXI4_R_Slave_Synth#(id_, data_, user_) s)
+  (Source#(AXI4_RFlit#(id_, data_, user_)));
+
+  method canPeek = s.rvalid;
+  method peek = AXI4_RFlit {
+    rid:   s.rid,
+    rdata: s.rdata,
+    rresp: s.rresp,
+    rlast: s.rlast,
+    ruser: s.ruser
+  };
+  method drop if (s.rvalid) = s.rready(True);
+
+endmodule

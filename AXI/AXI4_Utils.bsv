@@ -220,6 +220,8 @@ module mkAXI4Shim``name (AXI4_Shim#(a, b, c, d, e, f, g, h));\
 endmodule
 
 `defAXI4ShimFIFOF(BypassFIFOF, mkBypassFIFOF)
+`defAXI4ShimFIFOF(BypassFF1, mkSizedBypassFIFOF(1))
+`defAXI4ShimFIFOF(FF1, mkFIFOF1)
 `defAXI4ShimFIFOF(SizedFIFOF4, mkSizedFIFOF(4))
 
 module mkAXI4Shim (AXI4_Shim#(a, b, c, d, e, f, g, h));
@@ -227,8 +229,8 @@ module mkAXI4Shim (AXI4_Shim#(a, b, c, d, e, f, g, h));
   return shim;
 endmodule
 
-/////////////////////////////////////////
-// to "Synth" version of the interface //
+/////////////////////////////////////
+// to/from "Synth" interface utils //
 ////////////////////////////////////////////////////////////////////////////////
 
 // AXI4 Master
@@ -239,6 +241,20 @@ module toAXI4_Master_Synth#(AXI4_Master#(a, b, c, d, e, f, g, h) master)
   let bifc  <- toAXI4_B_Master_Synth(master.b);
   let arifc <- toAXI4_AR_Master_Synth(master.ar);
   let rifc  <- toAXI4_R_Master_Synth(master.r);
+  interface aw = awifc;
+  interface w  = wifc;
+  interface b  = bifc;
+  interface ar = arifc;
+  interface r  = rifc;
+endmodule
+
+module fromAXI4_Master_Synth#(AXI4_Master_Synth#(a, b, c, d, e, f, g, h) master)
+  (AXI4_Master#(a, b, c, d, e, f, g, h));
+  let awifc <- fromAXI4_AW_Master_Synth(master.aw);
+  let wifc  <- fromAXI4_W_Master_Synth(master.w);
+  let bifc  <- fromAXI4_B_Master_Synth(master.b);
+  let arifc <- fromAXI4_AR_Master_Synth(master.ar);
+  let rifc  <- fromAXI4_R_Master_Synth(master.r);
   interface aw = awifc;
   interface w  = wifc;
   interface b  = bifc;
@@ -263,6 +279,20 @@ module toAXI4_Slave_Synth#(AXI4_Slave#(a, b, c, d, e, f, g, h) slave)
   let bifc  <- toAXI4_B_Slave_Synth(slave.b);
   let arifc <- toAXI4_AR_Slave_Synth(slave.ar);
   let rifc  <- toAXI4_R_Slave_Synth(slave.r);
+  interface aw = awifc;
+  interface w  = wifc;
+  interface b  = bifc;
+  interface ar = arifc;
+  interface r  = rifc;
+endmodule
+
+module fromAXI4_Slave_Synth#(AXI4_Slave_Synth#(a, b, c, d, e, f, g, h) slave)
+  (AXI4_Slave#(a, b, c, d, e, f, g, h));
+  let awifc <- fromAXI4_AW_Slave_Synth(slave.aw);
+  let wifc  <- fromAXI4_W_Slave_Synth(slave.w);
+  let bifc  <- fromAXI4_B_Slave_Synth(slave.b);
+  let arifc <- fromAXI4_AR_Slave_Synth(slave.ar);
+  let rifc  <- fromAXI4_R_Slave_Synth(slave.r);
   interface aw = awifc;
   interface w  = wifc;
   interface b  = bifc;

@@ -46,6 +46,42 @@ import Routable :: *;
 `define MPARAMS id_, `PARAMS
 `define SPARAMS sid_, `PARAMS
 
+module mkAXI4Bus_Synth#(
+    MappingTable#(nRoutes, addr_) maptab,
+    Vector#(nMasters, AXI4_Master_Synth#(`MPARAMS)) masters,
+    Vector#(nSlaves, AXI4_Slave_Synth#(`SPARAMS)) slaves
+  ) (Empty) provisos (
+    Add#(id_, TLog#(nMasters), sid_),
+    Routable#(
+      AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_),
+      AXI4_BFlit#(id_, buser_),
+      Bit#(addr_)),
+    Routable#(
+      AXI4_ARFlit#(id_, addr_, aruser_),
+      AXI4_RFlit#(id_, data_, ruser_),
+      Bit#(addr_)),
+    ExpandReqRsp#(
+      AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_),
+      AXI4_WriteFlit#(sid_, addr_, data_, awuser_, wuser_),
+      AXI4_BFlit#(sid_, buser_),
+      AXI4_BFlit#(id_, buser_),
+      Bit#(TLog#(nMasters))),
+    ExpandReqRsp#(
+      AXI4_ARFlit#(id_, addr_, aruser_),
+      AXI4_ARFlit#(sid_, addr_, aruser_),
+      AXI4_RFlit#(sid_, data_, ruser_),
+      AXI4_RFlit#(id_, data_, ruser_),
+      Bit#(TLog#(nMasters))),
+    // assertion on argument sizes
+    Add#(1, a__, nMasters), // at least one master is needed
+    Add#(1, b__, nSlaves), // at least one slave is needed
+    Add#(nRoutes, 0, nSlaves) // nRoutes == nSlaves
+  );
+  let ms <- mapM(fromAXI4_Master_Synth, masters);
+  let ss <- mapM(fromAXI4_Slave_Synth, slaves);
+  mkAXI4Bus(maptab, ms, ss);
+endmodule
+
 module mkAXI4Bus#(
     MappingTable#(nRoutes, addr_) maptab,
     Vector#(nMasters, AXI4_Master#(`MPARAMS)) masters,
