@@ -45,7 +45,6 @@ typedef   0 RUSER_sz;
 
 `define PARAMS ID_sz, ADDR_sz, DATA_sz, AWUSER_sz, WUSER_sz, BUSER_sz, ARUSER_sz, RUSER_sz
 
-(* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
 module axiMaster (AXI4_Master#(`PARAMS));
 
   // AXI4 master shim
@@ -81,7 +80,6 @@ module axiMaster (AXI4_Master#(`PARAMS));
 
 endmodule
 
-(* synthesize, clock_prefix="aclk", reset_prefix="aresetn" *)
 module axiSlave (AXI4_Slave#(`PARAMS));
 
   // AXI4 slave shim

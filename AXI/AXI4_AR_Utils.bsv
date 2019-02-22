@@ -60,22 +60,12 @@ endinstance
 // convert to/from Synth Master interface
 ////////////////////////////////////////////////////////////////////////////////
 
-typeclass ToAXI4_AR_Master_Synth#(type t);
-  module toAXI4_AR_Master_Synth#(t#(x) ifc)
-  (AXI4_AR_Master_Synth#(id_, addr_, user_))
-  provisos (ToAXI4_ARFlit#(x, id_, addr_, user_));
-endtypeclass
-
-instance ToAXI4_AR_Master_Synth#(Source);
-  module toAXI4_AR_Master_Synth#(Source#(t) src)
-  (AXI4_AR_Master_Synth#(id_, addr_, user_))
-  provisos (ToAXI4_ARFlit#(t, id_, addr_, user_));
-
-    Wire#(AXI4_ARFlit#(id_, addr_, user_)) flit <- mkDWire(?);
-    rule peekFlit (src.canPeek); flit <= toAXI4_ARFlit(src.peek); endrule
-    PulseWire dropWire <- mkPulseWire;
-    rule doDrop (dropWire && src.canPeek); src.drop; endrule
-
+function AXI4_AR_Master_Synth#(id_, addr_, user_)
+  toAXI4_AR_Master_Synth(src_t#(t) s)
+  provisos (ToSource#(src_t#(t), t), ToAXI4_ARFlit#(t, id_, addr_, user_));
+  let src = toSource(s);
+  AXI4_ARFlit#(id_, addr_, user_) flit = toAXI4_ARFlit(src.peek);
+  return interface AXI4_AR_Master_Synth;
     method arid     = flit.arid;
     method araddr   = flit.araddr;
     method arlen    = flit.arlen;
@@ -88,185 +78,76 @@ instance ToAXI4_AR_Master_Synth#(Source);
     method arregion = flit.arregion;
     method aruser   = flit.aruser;
     method arvalid  = src.canPeek;
-    method arready(rdy) = action if (rdy) dropWire.send; endaction;
+    method arready(rdy) = action if (src.canPeek && rdy) src.drop; endaction;
+  endinterface;
+endfunction
 
-  endmodule
-endinstance
-
-instance ToAXI4_AR_Master_Synth#(FIFOF);
-  module toAXI4_AR_Master_Synth#(FIFOF#(t) ff)
-  (AXI4_AR_Master_Synth#(id_, addr_, user_))
-  provisos (ToAXI4_ARFlit#(t, id_, addr_, user_));
-
-    Wire#(AXI4_ARFlit#(id_, addr_, user_)) flit <- mkDWire(?);
-    rule peekFlit (ff.notEmpty); flit <= toAXI4_ARFlit(ff.first); endrule
-    PulseWire deqWire <- mkPulseWire;
-    rule doDeq (deqWire && ff.notEmpty); ff.deq; endrule
-
-    method arid     = flit.arid;
-    method araddr   = flit.araddr;
-    method arlen    = flit.arlen;
-    method arsize   = flit.arsize;
-    method arburst  = flit.arburst;
-    method arlock   = flit.arlock;
-    method arcache  = flit.arcache;
-    method arprot   = flit.arprot;
-    method arqos    = flit.arqos;
-    method arregion = flit.arregion;
-    method aruser   = flit.aruser;
-    method arvalid  = ff.notEmpty;
-    method arready(rdy) = action if (rdy) deqWire.send; endaction;
-
-  endmodule
-endinstance
-
-module fromAXI4_AR_Master_Synth#(AXI4_AR_Master_Synth#(id_, addr_, user_) m)
-  (Source#(AXI4_ARFlit#(id_, addr_, user_)));
-
-  method canPeek = m.arvalid;
-  method peek = AXI4_ARFlit {
-    arid:     m.arid,
-    araddr:   m.araddr,
-    arlen:    m.arlen,
-    arsize:   m.arsize,
-    arburst:  m.arburst,
-    arlock:   m.arlock,
-    arcache:  m.arcache,
-    arprot:   m.arprot,
-    arqos:    m.arqos,
-    arregion: m.arregion,
-    aruser:   m.aruser
-  };
-  method drop if (m.arvalid) = m.arready(True);
-
-endmodule
+function Source#(AXI4_ARFlit#(id_, addr_, user_))
+  fromAXI4_AR_Master_Synth(AXI4_AR_Master_Synth#(id_, addr_, user_) m) =
+  interface Source;
+    method canPeek = m.arvalid;
+    method peek = AXI4_ARFlit {
+      arid:     m.arid,
+      araddr:   m.araddr,
+      arlen:    m.arlen,
+      arsize:   m.arsize,
+      arburst:  m.arburst,
+      arlock:   m.arlock,
+      arcache:  m.arcache,
+      arprot:   m.arprot,
+      arqos:    m.arqos,
+      arregion: m.arregion,
+      aruser:   m.aruser
+    };
+    method drop = action if (m.arvalid) m.arready(True); endaction;
+  endinterface;
 
 // convert to/from Synth Slave interface
 ////////////////////////////////////////////////////////////////////////////////
 
-typeclass ToAXI4_AR_Slave_Synth#(type t);
-  module toAXI4_AR_Slave_Synth#(t#(x) ifc)
-  (AXI4_AR_Slave_Synth#(id_, addr_, user_))
-  provisos (FromAXI4_ARFlit#(x, id_, addr_, user_));
-endtypeclass
+function AXI4_AR_Slave_Synth#(id_, addr_, user_)
+  toAXI4_AR_Slave_Synth(snk_t s)
+  provisos (ToSink#(snk_t, t), FromAXI4_ARFlit#(t, id_, addr_, user_)) =
+  interface AXI4_AR_Slave_Synth;
+    method arflit(arid,
+                  araddr,
+                  arlen,
+                  arsize,
+                  arburst,
+                  arlock,
+                  arcache,
+                  arprot,
+                  arqos,
+                  arregion,
+                  aruser) = toSink(s).put(fromAXI4_ARFlit(AXI4_ARFlit{
+      arid:     arid,
+      araddr:   araddr,
+      arlen:    arlen,
+      arsize:   arsize,
+      arburst:  arburst,
+      arlock:   arlock,
+      arcache:  arcache,
+      arprot:   arprot,
+      arqos:    arqos,
+      arregion: arregion,
+      aruser:   aruser
+    }));
+    method arready = toSink(s).canPut;
+  endinterface;
 
-instance ToAXI4_AR_Slave_Synth#(Sink);
-  module toAXI4_AR_Slave_Synth#(Sink#(t) snk)
-  (AXI4_AR_Slave_Synth#(id_, addr_, user_))
-  provisos (FromAXI4_ARFlit#(t, id_, addr_, user_));
-
-    let w_arid     <- mkDWire(?);
-    let w_araddr   <- mkDWire(?);
-    let w_arlen    <- mkDWire(?);
-    let w_arsize   <- mkDWire(?);
-    let w_arburst  <- mkDWire(?);
-    let w_arlock   <- mkDWire(?);
-    let w_arcache  <- mkDWire(?);
-    let w_arprot   <- mkDWire(?);
-    let w_arqos    <- mkDWire(?);
-    let w_arregion <- mkDWire(?);
-    let w_aruser   <- mkDWire(?);
-    PulseWire putWire <- mkPulseWire;
-    rule doPut (putWire && snk.canPut);
-      snk.put(fromAXI4_ARFlit(AXI4_ARFlit{
-        arid:     w_arid,
-        araddr:   w_araddr,
-        arlen:    w_arlen,
-        arsize:   w_arsize,
-        arburst:  w_arburst,
-        arlock:   w_arlock,
-        arcache:  w_arcache,
-        arprot:   w_arprot,
-        arqos:    w_arqos,
-        arregion: w_arregion,
-        aruser:   w_aruser
-      }));
-    endrule
-
-    method arid(id)         = action w_arid     <= id; endaction;
-    method araddr(addr)     = action w_araddr   <= addr; endaction;
-    method arlen(len)       = action w_arlen    <= len; endaction;
-    method arsize(size)     = action w_arsize   <= size; endaction;
-    method arburst(burst)   = action w_arburst  <= burst; endaction;
-    method arlock(lock)     = action w_arlock   <= lock; endaction;
-    method arcache(cache)   = action w_arcache  <= cache; endaction;
-    method arprot(prot)     = action w_arprot   <= prot; endaction;
-    method arqos(qos)       = action w_arqos    <= qos; endaction;
-    method arregion(region) = action w_arregion <= region; endaction;
-    method aruser(user)     = action w_aruser   <= user; endaction;
-    method arvalid(valid)   = action if (valid) putWire.send; endaction;
-    method arready          = snk.canPut;
-
-  endmodule
-endinstance
-
-instance ToAXI4_AR_Slave_Synth#(FIFOF);
-  module toAXI4_AR_Slave_Synth#(FIFOF#(t) ff)
-  (AXI4_AR_Slave_Synth#(id_, addr_, user_))
-  provisos (FromAXI4_ARFlit#(t, id_, addr_, user_));
-
-    let w_arid     <- mkDWire(?);
-    let w_araddr   <- mkDWire(?);
-    let w_arlen    <- mkDWire(?);
-    let w_arsize   <- mkDWire(?);
-    let w_arburst  <- mkDWire(?);
-    let w_arlock   <- mkDWire(?);
-    let w_arcache  <- mkDWire(?);
-    let w_arprot   <- mkDWire(?);
-    let w_arqos    <- mkDWire(?);
-    let w_arregion <- mkDWire(?);
-    let w_aruser   <- mkDWire(?);
-    PulseWire enqWire <- mkPulseWire;
-    rule doEnq (enqWire && ff.notFull);
-      ff.enq(fromAXI4_ARFlit(AXI4_ARFlit{
-        arid:     w_arid,
-        araddr:   w_araddr,
-        arlen:    w_arlen,
-        arsize:   w_arsize,
-        arburst:  w_arburst,
-        arlock:   w_arlock,
-        arcache:  w_arcache,
-        arprot:   w_arprot,
-        arqos:    w_arqos,
-        arregion: w_arregion,
-        aruser:   w_aruser
-      }));
-    endrule
-
-    method arid(id)         = action w_arid     <= id; endaction;
-    method araddr(addr)     = action w_araddr   <= addr; endaction;
-    method arlen(len)       = action w_arlen    <= len; endaction;
-    method arsize(size)     = action w_arsize   <= size; endaction;
-    method arburst(burst)   = action w_arburst  <= burst; endaction;
-    method arlock(lock)     = action w_arlock   <= lock; endaction;
-    method arcache(cache)   = action w_arcache  <= cache; endaction;
-    method arprot(prot)     = action w_arprot   <= prot; endaction;
-    method arqos(qos)       = action w_arqos    <= qos; endaction;
-    method arregion(region) = action w_arregion <= region; endaction;
-    method aruser(user)     = action w_aruser   <= user; endaction;
-    method arvalid(valid)   = action if (valid) enqWire.send; endaction;
-    method arready          = ff.notFull;
-
-  endmodule
-endinstance
-
-module fromAXI4_AR_Slave_Synth#(AXI4_AR_Slave_Synth#(id_, addr_, user_) s)
-  (Sink#(AXI4_ARFlit#(id_, addr_, user_)));
-
-  method canPut = s.arready;
-  method put(x) if (s.arready) = action
-    s.arid(x.arid);
-    s.araddr(x.araddr);
-    s.arlen(x.arlen);
-    s.arsize(x.arsize);
-    s.arburst(x.arburst);
-    s.arlock(x.arlock);
-    s.arcache(x.arcache);
-    s.arprot(x.arprot);
-    s.arqos(x.arqos);
-    s.arregion(x.arregion);
-    s.aruser(x.aruser);
-    s.arvalid(True);
-  endaction;
-
-endmodule
+function Sink#(AXI4_ARFlit#(id_, addr_, user_))
+  fromAXI4_AR_Slave_Synth(AXI4_AR_Slave_Synth#(id_, addr_, user_) s) =
+  interface Sink;
+    method canPut = s.arready;
+    method put(x) = s.arflit(x.arid,
+                             x.araddr,
+                             x.arlen,
+                             x.arsize,
+                             x.arburst,
+                             x.arlock,
+                             x.arcache,
+                             x.arprot,
+                             x.arqos,
+                             x.arregion,
+                             x.aruser);
+  endinterface;

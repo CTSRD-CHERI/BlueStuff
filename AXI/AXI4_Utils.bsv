@@ -234,76 +234,96 @@ endmodule
 ////////////////////////////////////////////////////////////////////////////////
 
 // AXI4 Master
-module toAXI4_Master_Synth#(AXI4_Master#(a, b, c, d, e, f, g, h) master)
-  (AXI4_Master_Synth#(a, b, c, d, e, f, g, h));
-  let awifc <- toAXI4_AW_Master_Synth(master.aw);
-  let wifc  <- toAXI4_W_Master_Synth(master.w);
-  let bifc  <- toAXI4_B_Master_Synth(master.b);
-  let arifc <- toAXI4_AR_Master_Synth(master.ar);
-  let rifc  <- toAXI4_R_Master_Synth(master.r);
-  interface aw = awifc;
-  interface w  = wifc;
-  interface b  = bifc;
-  interface ar = arifc;
-  interface r  = rifc;
-endmodule
+function AXI4_Master_Synth#(a, b, c, d, e, f, g, h)
+  toAXI4_Master_Synth (AXI4_Master#(a, b, c, d, e, f, g, h) master) =
+  interface AXI4_Master_Synth;
+    interface aw = toAXI4_AW_Master_Synth(master.aw);
+    interface w  = toAXI4_W_Master_Synth(master.w);
+    interface b  = toAXI4_B_Master_Synth(master.b);
+    interface ar = toAXI4_AR_Master_Synth(master.ar);
+    interface r  = toAXI4_R_Master_Synth(master.r);
+  endinterface;
 
-module fromAXI4_Master_Synth#(AXI4_Master_Synth#(a, b, c, d, e, f, g, h) master)
+function AXI4_Master#(a, b, c, d, e, f, g, h)
+  fromAXI4_Master_Synth (AXI4_Master_Synth#(a, b, c, d, e, f, g, h) master) =
+  interface AXI4_Master;
+    interface aw = fromAXI4_AW_Master_Synth(master.aw);
+    interface w  = fromAXI4_W_Master_Synth(master.w);
+    interface b  = fromAXI4_B_Master_Synth(master.b);
+    interface ar = fromAXI4_AR_Master_Synth(master.ar);
+    interface r  = fromAXI4_R_Master_Synth(master.r);
+  endinterface;
+
+// AXI4 Slave
+function AXI4_Slave_Synth#(a, b, c, d, e, f, g, h)
+  toAXI4_Slave_Synth (AXI4_Slave#(a, b, c, d, e, f, g, h) slave) =
+  interface AXI4_Slave_Synth;
+    interface aw = toAXI4_AW_Slave_Synth(slave.aw);
+    interface w  = toAXI4_W_Slave_Synth(slave.w);
+    interface b  = toAXI4_B_Slave_Synth(slave.b);
+    interface ar = toAXI4_AR_Slave_Synth(slave.ar);
+    interface r  = toAXI4_R_Slave_Synth(slave.r);
+  endinterface;
+
+function AXI4_Slave#(a, b, c, d, e, f, g, h)
+  fromAXI4_Slave_Synth (AXI4_Slave_Synth#(a, b, c, d, e, f, g, h) slave) =
+  interface AXI4_Slave;
+    interface aw = fromAXI4_AW_Slave_Synth(slave.aw);
+    interface w  = fromAXI4_W_Slave_Synth(slave.w);
+    interface b  = fromAXI4_B_Slave_Synth(slave.b);
+    interface ar = fromAXI4_AR_Slave_Synth(slave.ar);
+    interface r  = fromAXI4_R_Slave_Synth(slave.r);
+  endinterface;
+
+/////////////////////////////
+// to unguarded interfaces //
+////////////////////////////////////////////////////////////////////////////////
+
+module toUnguarded_AXI4_Master#(AXI4_Master#(a, b, c, d, e, f, g, h) m)
   (AXI4_Master#(a, b, c, d, e, f, g, h));
-  let awifc <- fromAXI4_AW_Master_Synth(master.aw);
-  let wifc  <- fromAXI4_W_Master_Synth(master.w);
-  let bifc  <- fromAXI4_B_Master_Synth(master.b);
-  let arifc <- fromAXI4_AR_Master_Synth(master.ar);
-  let rifc  <- fromAXI4_R_Master_Synth(master.r);
-  interface aw = awifc;
-  interface w  = wifc;
-  interface b  = bifc;
-  interface ar = arifc;
-  interface r  = rifc;
+  let u_aw <- toUnguardedSource(m.aw, ?);
+  let u_w  <- toUnguardedSource(m.w, ?);
+  let u_b  <- toUnguardedSink(m.b);
+  let u_ar <- toUnguardedSource(m.ar, ?);
+  let u_r  <- toUnguardedSink(m.r);
+  return interface AXI4_Master;
+    interface aw = u_aw;
+    interface w  = u_w;
+    interface b  = u_b;
+    interface ar = u_ar;
+    interface r  = u_r;
+  endinterface;
 endmodule
 
 module mkAXI4_Master_Xactor (AXI4_Master_Xactor#(a, b, c, d, e, f, g, h));
-  let  shim <- mkAXI4ShimSizedFIFOF4;
-  let synth <- toAXI4_Master_Synth(shim.master);
+  let shim <- mkAXI4ShimSizedFIFOF4;
+  let u_master <- toUnguarded_AXI4_Master(shim.master);
   //method clear = shim.clear;
   method clear = noAction;
   interface slave = shim.slave;
-  interface masterSynth = synth;
+  interface masterSynth = toAXI4_Master_Synth(u_master);
 endmodule
 
-// AXI4 Slave
-module toAXI4_Slave_Synth#(AXI4_Slave#(a, b, c, d, e, f, g, h) slave)
-  (AXI4_Slave_Synth#(a, b, c, d, e, f, g, h));
-  let awifc <- toAXI4_AW_Slave_Synth(slave.aw);
-  let wifc  <- toAXI4_W_Slave_Synth(slave.w);
-  let bifc  <- toAXI4_B_Slave_Synth(slave.b);
-  let arifc <- toAXI4_AR_Slave_Synth(slave.ar);
-  let rifc  <- toAXI4_R_Slave_Synth(slave.r);
-  interface aw = awifc;
-  interface w  = wifc;
-  interface b  = bifc;
-  interface ar = arifc;
-  interface r  = rifc;
-endmodule
-
-module fromAXI4_Slave_Synth#(AXI4_Slave_Synth#(a, b, c, d, e, f, g, h) slave)
+module toUnguarded_AXI4_Slave#(AXI4_Slave#(a, b, c, d, e, f, g, h) s)
   (AXI4_Slave#(a, b, c, d, e, f, g, h));
-  let awifc <- fromAXI4_AW_Slave_Synth(slave.aw);
-  let wifc  <- fromAXI4_W_Slave_Synth(slave.w);
-  let bifc  <- fromAXI4_B_Slave_Synth(slave.b);
-  let arifc <- fromAXI4_AR_Slave_Synth(slave.ar);
-  let rifc  <- fromAXI4_R_Slave_Synth(slave.r);
-  interface aw = awifc;
-  interface w  = wifc;
-  interface b  = bifc;
-  interface ar = arifc;
-  interface r  = rifc;
+  let u_aw <- toUnguardedSink(s.aw);
+  let u_w  <- toUnguardedSink(s.w);
+  let u_b  <- toUnguardedSource(s.b, ?);
+  let u_ar <- toUnguardedSink(s.ar);
+  let u_r  <- toUnguardedSource(s.r, ?);
+  return interface AXI4_Slave;
+    interface aw = u_aw;
+    interface w  = u_w;
+    interface b  = u_b;
+    interface ar = u_ar;
+    interface r  = u_r;
+  endinterface;
 endmodule
 
 module mkAXI4_Slave_Xactor (AXI4_Slave_Xactor#(a, b, c, d, e, f, g, h));
-  let  shim <- mkAXI4ShimSizedFIFOF4;
-  let synth <- toAXI4_Slave_Synth(shim.slave);
+  let shim <- mkAXI4ShimSizedFIFOF4;
+  let u_slave <- toUnguarded_AXI4_Slave(shim.slave);
   method clear = shim.clear;
   interface master = shim.master;
-  interface slaveSynth = synth;
+  interface slaveSynth = toAXI4_Slave_Synth(u_slave);
 endmodule

@@ -55,98 +55,49 @@ instance FromAXI4Lite_WFlit#(AXI4Lite_WFlit#(a, b), a, b);
   function fromAXI4Lite_WFlit = id;
 endinstance
 
-// typeclass to turn an interface to the Master interface
+// convert to/from Synth Master interface
+////////////////////////////////////////////////////////////////////////////////
 
-typeclass ToAXI4Lite_W_Master_Synth#(type t);
-  module toAXI4Lite_W_Master_Synth#(t#(x) ifc) (AXI4Lite_W_Master_Synth#(data_, user_))
-  provisos (ToAXI4Lite_WFlit#(x, data_, user_));
-endtypeclass
-
-instance ToAXI4Lite_W_Master_Synth#(Source);
-  module toAXI4Lite_W_Master_Synth#(Source#(t) src)
-  (AXI4Lite_W_Master_Synth#(data_, user_)) provisos (ToAXI4Lite_WFlit#(t, data_, user_));
-
-    Wire#(AXI4Lite_WFlit#(data_, user_)) flit <- mkDWire(?);
-    rule peekFlit (src.canPeek); flit <= toAXI4Lite_WFlit(src.peek); endrule
-    PulseWire dropWire <- mkPulseWire;
-    rule doDrop (dropWire && src.canPeek); src.drop; endrule
-
+function AXI4Lite_W_Master_Synth#(data_, user_)
+  toAXI4Lite_W_Master_Synth(src_t#(t) s)
+  provisos (ToSource#(src_t#(t), t), ToAXI4Lite_WFlit#(t, data_, user_));
+  let src = toSource(s);
+  AXI4Lite_WFlit#(data_, user_) flit = toAXI4Lite_WFlit(src.peek);
+  return interface AXI4Lite_W_Master_Synth;
     method wdata  = flit.wdata;
     method wstrb  = flit.wstrb;
     method wuser  = flit.wuser;
     method wvalid = src.canPeek;
-    method wready(rdy) = action if (rdy) dropWire.send; endaction;
+    method wready(rdy) = action if (src.canPeek && rdy) src.drop; endaction;
+  endinterface;
+endfunction
 
-  endmodule
-endinstance
+function Source#(AXI4Lite_WFlit#(data_, user_))
+  fromAXI4Lite_W_Master_Synth(AXI4Lite_W_Master_Synth#(data_, user_) m) =
+  interface Source;
+    method canPeek = m.wvalid;
+    method peek = AXI4Lite_WFlit {
+      wdata: m.wdata, wstrb: m.wstrb, wuser: m.wuser
+    };
+    method drop = action if (m.wvalid) m.wready(True); endaction;
+  endinterface;
 
-instance ToAXI4Lite_W_Master_Synth#(FIFOF);
-  module toAXI4Lite_W_Master_Synth#(FIFOF#(t) ff)
-  (AXI4Lite_W_Master_Synth#(data_, user_)) provisos (ToAXI4Lite_WFlit#(t, data_, user_));
+// convert to/from Synth Slave interface
+////////////////////////////////////////////////////////////////////////////////
 
-    Wire#(AXI4Lite_WFlit#(data_, user_)) flit <- mkDWire(?);
-    rule peekFlit (ff.notEmpty); flit <= toAXI4Lite_WFlit(ff.first); endrule
-    PulseWire deqWire <- mkPulseWire;
-    rule doDeq (deqWire && ff.notEmpty); ff.deq; endrule
+function AXI4Lite_W_Slave_Synth#(data_, user_)
+  toAXI4Lite_W_Slave_Synth(snk_t s)
+  provisos (ToSink#(snk_t, t), FromAXI4Lite_WFlit#(t, data_, user_)) =
+  interface AXI4Lite_W_Slave_Synth;
+    method wflit(wdata, wstrb, wuser) = toSink(s).put(fromAXI4Lite_WFlit(
+      AXI4Lite_WFlit{ wdata: wdata, wstrb: wstrb, wuser: wuser }
+    ));
+    method wready = toSink(s).canPut;
+  endinterface;
 
-    method wdata  = flit.wdata;
-    method wstrb  = flit.wstrb;
-    method wuser  = flit.wuser;
-    method wvalid = ff.notEmpty;
-    method wready(rdy) = action if (rdy) deqWire.send; endaction;
-
-  endmodule
-endinstance
-
-// typeclass to turn an interface to the Slave interface
-
-typeclass ToAXI4Lite_W_Slave_Synth#(type t);
-  module toAXI4Lite_W_Slave_Synth#(t#(x) ifc) (AXI4Lite_W_Slave_Synth#(data_, user_))
-  provisos (FromAXI4Lite_WFlit#(x, data_, user_));
-endtypeclass
-
-instance ToAXI4Lite_W_Slave_Synth#(Sink);
-  module toAXI4Lite_W_Slave_Synth#(Sink#(t) snk)
-  (AXI4Lite_W_Slave_Synth#(data_, user_)) provisos (FromAXI4Lite_WFlit#(t, data_, user_));
-
-    let w_wdata <- mkDWire(?);
-    let w_wstrb <- mkDWire(?);
-    let w_wuser <- mkDWire(?);
-    PulseWire putWire <- mkPulseWire;
-    rule doPut (putWire && snk.canPut);
-      snk.put(fromAXI4Lite_WFlit(AXI4Lite_WFlit {
-        wdata: w_wdata, wstrb: w_wstrb, wuser: w_wuser
-      }));
-    endrule
-
-    method wdata(data)   = action w_wdata <= data; endaction;
-    method wstrb(strb)   = action w_wstrb <= strb; endaction;
-    method wuser(user)   = action w_wuser <= user; endaction;
-    method wvalid(valid) = action if (valid) putWire.send; endaction;
-    method wready        = snk.canPut;
-
-  endmodule
-endinstance
-
-instance ToAXI4Lite_W_Slave_Synth#(FIFOF);
-  module toAXI4Lite_W_Slave_Synth#(FIFOF#(t) ff)
-  (AXI4Lite_W_Slave_Synth#(data_, user_)) provisos (FromAXI4Lite_WFlit#(t, data_, user_));
-
-    let w_wdata <- mkDWire(?);
-    let w_wstrb <- mkDWire(?);
-    let w_wuser <- mkDWire(?);
-    PulseWire enqWire <- mkPulseWire;
-    rule doEnq (enqWire && ff.notFull);
-      ff.enq(fromAXI4Lite_WFlit(AXI4Lite_WFlit {
-        wdata: w_wdata, wstrb: w_wstrb, wuser: w_wuser
-      }));
-    endrule
-
-    method wdata(data)   = action w_wdata <= data; endaction;
-    method wstrb(strb)   = action w_wstrb <= strb; endaction;
-    method wuser(user)   = action w_wuser <= user; endaction;
-    method wvalid(valid) = action if (valid) enqWire.send; endaction;
-    method wready        = ff.notFull;
-
-  endmodule
-endinstance
+function Sink#(AXI4Lite_WFlit#(data_, user_))
+  fromAXI4Lite_W_Slave_Synth(AXI4Lite_W_Slave_Synth#(data_, user_) s) =
+  interface Sink;
+    method canPut = s.wready;
+    method put(x) = s.wflit(x.wdata, x.wstrb, x.wuser);
+  endinterface;

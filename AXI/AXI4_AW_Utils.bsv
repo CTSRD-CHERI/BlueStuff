@@ -36,7 +36,8 @@ import FIFOF :: *;
 // AXI Address Write Channel //
 ////////////////////////////////////////////////////////////////////////////////
 
-// typeclasses to convert to/from the flit type
+// to convert to/from the flit type
+////////////////////////////////////////////////////////////////////////////////
 
 typeclass ToAXI4_AWFlit#(type t,
 numeric type id_, numeric type addr_, numeric type user_);
@@ -59,22 +60,12 @@ endinstance
 // convert to/from Synth Master interface
 ////////////////////////////////////////////////////////////////////////////////
 
-typeclass ToAXI4_AW_Master_Synth#(type t);
-  module toAXI4_AW_Master_Synth#(t#(x) ifc)
-  (AXI4_AW_Master_Synth#(id_, addr_, user_))
-  provisos (ToAXI4_AWFlit#(x, id_, addr_, user_));
-endtypeclass
-
-instance ToAXI4_AW_Master_Synth#(Source);
-  module toAXI4_AW_Master_Synth#(Source#(t) src)
-  (AXI4_AW_Master_Synth#(id_, addr_, user_))
-  provisos (ToAXI4_AWFlit#(t, id_, addr_, user_));
-
-    Wire#(AXI4_AWFlit#(id_, addr_, user_)) flit <- mkDWire(?);
-    rule peekFlit (src.canPeek); flit <= toAXI4_AWFlit(src.peek); endrule
-    PulseWire dropWire <- mkPulseWire;
-    rule doDrop (dropWire && src.canPeek); src.drop; endrule
-
+function AXI4_AW_Master_Synth#(id_, addr_, user_)
+  toAXI4_AW_Master_Synth(src_t#(t) s)
+  provisos (ToSource#(src_t#(t), t), ToAXI4_AWFlit#(t, id_, addr_, user_));
+  let src = toSource(s);
+  AXI4_AWFlit#(id_, addr_, user_) flit = toAXI4_AWFlit(src.peek);
+  return interface AXI4_AW_Master_Synth;
     method awid     = flit.awid;
     method awaddr   = flit.awaddr;
     method awlen    = flit.awlen;
@@ -87,185 +78,76 @@ instance ToAXI4_AW_Master_Synth#(Source);
     method awregion = flit.awregion;
     method awuser   = flit.awuser;
     method awvalid  = src.canPeek;
-    method awready(rdy) = action if (rdy) dropWire.send; endaction;
+    method awready(rdy) = action if (src.canPeek && rdy) src.drop; endaction;
+  endinterface;
+endfunction
 
-  endmodule
-endinstance
-
-instance ToAXI4_AW_Master_Synth#(FIFOF);
-  module toAXI4_AW_Master_Synth#(FIFOF#(t) ff)
-  (AXI4_AW_Master_Synth#(id_, addr_, user_))
-  provisos (ToAXI4_AWFlit#(t, id_, addr_, user_));
-
-    Wire#(AXI4_AWFlit#(id_, addr_, user_)) flit <- mkDWire(?);
-    rule peekFlit (ff.notEmpty); flit <= toAXI4_AWFlit(ff.first); endrule
-    PulseWire deqWire <- mkPulseWire;
-    rule doDeq (deqWire && ff.notEmpty); ff.deq; endrule
-
-    method awid     = flit.awid;
-    method awaddr   = flit.awaddr;
-    method awlen    = flit.awlen;
-    method awsize   = flit.awsize;
-    method awburst  = flit.awburst;
-    method awlock   = flit.awlock;
-    method awcache  = flit.awcache;
-    method awprot   = flit.awprot;
-    method awqos    = flit.awqos;
-    method awregion = flit.awregion;
-    method awuser   = flit.awuser;
-    method awvalid  = ff.notEmpty;
-    method awready(rdy) = action if (rdy) deqWire.send; endaction;
-
-  endmodule
-endinstance
-
-module fromAXI4_AW_Master_Synth#(AXI4_AW_Master_Synth#(id_, addr_, user_) m)
-  (Source#(AXI4_AWFlit#(id_, addr_, user_)));
-
-  method canPeek = m.awvalid;
-  method peek = AXI4_AWFlit {
-    awid:     m.awid,
-    awaddr:   m.awaddr,
-    awlen:    m.awlen,
-    awsize:   m.awsize,
-    awburst:  m.awburst,
-    awlock:   m.awlock,
-    awcache:  m.awcache,
-    awprot:   m.awprot,
-    awqos:    m.awqos,
-    awregion: m.awregion,
-    awuser:   m.awuser
-  };
-  method drop if (m.awvalid) = m.awready(True);
-
-endmodule
+function Source#(AXI4_AWFlit#(id_, addr_, user_))
+  fromAXI4_AW_Master_Synth(AXI4_AW_Master_Synth#(id_, addr_, user_) m) =
+  interface Source;
+    method canPeek = m.awvalid;
+    method peek = AXI4_AWFlit {
+      awid:     m.awid,
+      awaddr:   m.awaddr,
+      awlen:    m.awlen,
+      awsize:   m.awsize,
+      awburst:  m.awburst,
+      awlock:   m.awlock,
+      awcache:  m.awcache,
+      awprot:   m.awprot,
+      awqos:    m.awqos,
+      awregion: m.awregion,
+      awuser:   m.awuser
+    };
+    method drop = action if (m.awvalid) m.awready(True); endaction;
+  endinterface;
 
 // convert to/from Synth Slave interface
 ////////////////////////////////////////////////////////////////////////////////
 
-typeclass ToAXI4_AW_Slave_Synth#(type t);
-  module toAXI4_AW_Slave_Synth#(t#(x) ifc)
-  (AXI4_AW_Slave_Synth#(id_, addr_, user_))
-  provisos (FromAXI4_AWFlit#(x, id_, addr_, user_));
-endtypeclass
+function AXI4_AW_Slave_Synth#(id_, addr_, user_)
+  toAXI4_AW_Slave_Synth(snk_t s)
+  provisos (ToSink#(snk_t, t), FromAXI4_AWFlit#(t, id_, addr_, user_)) =
+  interface AXI4_AW_Slave_Synth;
+    method awflit(awid,
+                  awaddr,
+                  awlen,
+                  awsize,
+                  awburst,
+                  awlock,
+                  awcache,
+                  awprot,
+                  awqos,
+                  awregion,
+                  awuser) = toSink(s).put(fromAXI4_AWFlit(AXI4_AWFlit{
+      awid:     awid,
+      awaddr:   awaddr,
+      awlen:    awlen,
+      awsize:   awsize,
+      awburst:  awburst,
+      awlock:   awlock,
+      awcache:  awcache,
+      awprot:   awprot,
+      awqos:    awqos,
+      awregion: awregion,
+      awuser:   awuser
+    }));
+    method awready = toSink(s).canPut;
+  endinterface;
 
-instance ToAXI4_AW_Slave_Synth#(Sink);
-  module toAXI4_AW_Slave_Synth#(Sink#(t) snk)
-  (AXI4_AW_Slave_Synth#(id_, addr_, user_))
-  provisos (FromAXI4_AWFlit#(t, id_, addr_, user_));
-
-    let w_awid     <- mkDWire(?);
-    let w_awaddr   <- mkDWire(?);
-    let w_awlen    <- mkDWire(?);
-    let w_awsize   <- mkDWire(?);
-    let w_awburst  <- mkDWire(?);
-    let w_awlock   <- mkDWire(?);
-    let w_awcache  <- mkDWire(?);
-    let w_awprot   <- mkDWire(?);
-    let w_awqos    <- mkDWire(?);
-    let w_awregion <- mkDWire(?);
-    let w_awuser   <- mkDWire(?);
-    PulseWire putWire <- mkPulseWire;
-    rule doPut (putWire && snk.canPut);
-      snk.put(fromAXI4_AWFlit(AXI4_AWFlit{
-        awid:     w_awid,
-        awaddr:   w_awaddr,
-        awlen:    w_awlen,
-        awsize:   w_awsize,
-        awburst:  w_awburst,
-        awlock:   w_awlock,
-        awcache:  w_awcache,
-        awprot:   w_awprot,
-        awqos:    w_awqos,
-        awregion: w_awregion,
-        awuser:   w_awuser
-      }));
-    endrule
-
-    method awid(id)         = action w_awid     <= id; endaction;
-    method awaddr(addr)     = action w_awaddr   <= addr; endaction;
-    method awlen(len)       = action w_awlen    <= len; endaction;
-    method awsize(size)     = action w_awsize   <= size; endaction;
-    method awburst(burst)   = action w_awburst  <= burst; endaction;
-    method awlock(lock)     = action w_awlock   <= lock; endaction;
-    method awcache(cache)   = action w_awcache  <= cache; endaction;
-    method awprot(prot)     = action w_awprot   <= prot; endaction;
-    method awqos(qos)       = action w_awqos    <= qos; endaction;
-    method awregion(region) = action w_awregion <= region; endaction;
-    method awuser(user)     = action w_awuser   <= user; endaction;
-    method awvalid(valid)   = action if (valid) putWire.send; endaction;
-    method awready          = snk.canPut;
-
-  endmodule
-endinstance
-
-instance ToAXI4_AW_Slave_Synth#(FIFOF);
-  module toAXI4_AW_Slave_Synth#(FIFOF#(t) ff)
-  (AXI4_AW_Slave_Synth#(id_, addr_, user_))
-  provisos (FromAXI4_AWFlit#(t, id_, addr_, user_));
-
-    let w_awid     <- mkDWire(?);
-    let w_awaddr   <- mkDWire(?);
-    let w_awlen    <- mkDWire(?);
-    let w_awsize   <- mkDWire(?);
-    let w_awburst  <- mkDWire(?);
-    let w_awlock   <- mkDWire(?);
-    let w_awcache  <- mkDWire(?);
-    let w_awprot   <- mkDWire(?);
-    let w_awqos    <- mkDWire(?);
-    let w_awregion <- mkDWire(?);
-    let w_awuser   <- mkDWire(?);
-    PulseWire enqWire <- mkPulseWire;
-    rule doEnq (enqWire && ff.notFull);
-      ff.enq(fromAXI4_AWFlit(AXI4_AWFlit{
-        awid:     w_awid,
-        awaddr:   w_awaddr,
-        awlen:    w_awlen,
-        awsize:   w_awsize,
-        awburst:  w_awburst,
-        awlock:   w_awlock,
-        awcache:  w_awcache,
-        awprot:   w_awprot,
-        awqos:    w_awqos,
-        awregion: w_awregion,
-        awuser:   w_awuser
-      }));
-    endrule
-
-    method awid(id)         = action w_awid     <= id; endaction;
-    method awaddr(addr)     = action w_awaddr   <= addr; endaction;
-    method awlen(len)       = action w_awlen    <= len; endaction;
-    method awsize(size)     = action w_awsize   <= size; endaction;
-    method awburst(burst)   = action w_awburst  <= burst; endaction;
-    method awlock(lock)     = action w_awlock   <= lock; endaction;
-    method awcache(cache)   = action w_awcache  <= cache; endaction;
-    method awprot(prot)     = action w_awprot   <= prot; endaction;
-    method awqos(qos)       = action w_awqos    <= qos; endaction;
-    method awregion(region) = action w_awregion <= region; endaction;
-    method awuser(user)     = action w_awuser   <= user; endaction;
-    method awvalid(valid)   = action if (valid) enqWire.send; endaction;
-    method awready          = ff.notFull;
-
-  endmodule
-endinstance
-
-module fromAXI4_AW_Slave_Synth#(AXI4_AW_Slave_Synth#(id_, addr_, user_) s)
-  (Sink#(AXI4_AWFlit#(id_, addr_, user_)));
-
-  method canPut = s.awready;
-  method put(x) if (s.awready) = action
-    s.awid(x.awid);
-    s.awaddr(x.awaddr);
-    s.awlen(x.awlen);
-    s.awsize(x.awsize);
-    s.awburst(x.awburst);
-    s.awlock(x.awlock);
-    s.awcache(x.awcache);
-    s.awprot(x.awprot);
-    s.awqos(x.awqos);
-    s.awregion(x.awregion);
-    s.awuser(x.awuser);
-    s.awvalid(True);
-  endaction;
-
-endmodule
+function Sink#(AXI4_AWFlit#(id_, addr_, user_))
+  fromAXI4_AW_Slave_Synth(AXI4_AW_Slave_Synth#(id_, addr_, user_) s) =
+  interface Sink;
+    method canPut = s.awready;
+    method put(x) = s.awflit(x.awid,
+                             x.awaddr,
+                             x.awlen,
+                             x.awsize,
+                             x.awburst,
+                             x.awlock,
+                             x.awcache,
+                             x.awprot,
+                             x.awqos,
+                             x.awregion,
+                             x.awuser);
+  endinterface;

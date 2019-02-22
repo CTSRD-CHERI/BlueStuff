@@ -55,104 +55,49 @@ instance FromAXI4Lite_ARFlit#(AXI4Lite_ARFlit#(a, b), a, b);
   function fromAXI4Lite_ARFlit = id;
 endinstance
 
-// typeclass to turn an interface to the Master interface
+// convert to/from Synth Master interface
+////////////////////////////////////////////////////////////////////////////////
 
-typeclass ToAXI4Lite_AR_Master_Synth#(type t);
-  module toAXI4Lite_AR_Master_Synth#(t#(x) ifc)
-  (AXI4Lite_AR_Master_Synth#(addr_, user_))
-  provisos (ToAXI4Lite_ARFlit#(x, addr_, user_));
-endtypeclass
-
-instance ToAXI4Lite_AR_Master_Synth#(Source);
-  module toAXI4Lite_AR_Master_Synth#(Source#(t) src)
-  (AXI4Lite_AR_Master_Synth#(addr_, user_))
-  provisos (ToAXI4Lite_ARFlit#(t, addr_, user_));
-
-    Wire#(AXI4Lite_ARFlit#(addr_, user_)) flit <- mkDWire(?);
-    rule peekFlit (src.canPeek); flit <= toAXI4Lite_ARFlit(src.peek); endrule
-    PulseWire dropWire <- mkPulseWire;
-    rule doDrop (dropWire && src.canPeek); src.drop; endrule
-
+function AXI4Lite_AR_Master_Synth#(addr_, user_)
+  toAXI4Lite_AR_Master_Synth(src_t#(t) s)
+  provisos (ToSource#(src_t#(t), t), ToAXI4Lite_ARFlit#(t, addr_, user_));
+  let src = toSource(s);
+  AXI4Lite_ARFlit#(addr_, user_) flit = toAXI4Lite_ARFlit(src.peek);
+  return interface AXI4Lite_AR_Master_Synth;
     method araddr   = flit.araddr;
     method arprot   = flit.arprot;
     method aruser   = flit.aruser;
     method arvalid  = src.canPeek;
-    method arready(rdy) = action if (rdy) dropWire.send; endaction;
+    method arready(rdy) = action if (src.canPeek && rdy) src.drop; endaction;
+  endinterface;
+endfunction
 
-  endmodule
-endinstance
+function Source#(AXI4Lite_ARFlit#(addr_, user_))
+  fromAXI4Lite_AR_Master_Synth(AXI4Lite_AR_Master_Synth#(addr_, user_) m) =
+  interface Source;
+    method canPeek = m.arvalid;
+    method peek = AXI4Lite_ARFlit {
+      araddr: m.araddr, arprot: m.arprot, aruser: m.aruser
+    };
+    method drop = action if (m.arvalid) m.arready(True); endaction;
+  endinterface;
 
-instance ToAXI4Lite_AR_Master_Synth#(FIFOF);
-  module toAXI4Lite_AR_Master_Synth#(FIFOF#(t) ff)
-  (AXI4Lite_AR_Master_Synth#(addr_, user_))
-  provisos (ToAXI4Lite_ARFlit#(t, addr_, user_));
+// convert to/from Synth Slave interface
+////////////////////////////////////////////////////////////////////////////////
 
-    Wire#(AXI4Lite_ARFlit#(addr_, user_)) flit <- mkDWire(?);
-    rule peekFlit (ff.notEmpty); flit <= toAXI4Lite_ARFlit(ff.first); endrule
-    PulseWire deqWire <- mkPulseWire;
-    rule doDeq (deqWire && ff.notEmpty); ff.deq; endrule
+function AXI4Lite_AR_Slave_Synth#(addr_, user_)
+  toAXI4Lite_AR_Slave_Synth(snk_t s)
+  provisos (ToSink#(snk_t, t), FromAXI4Lite_ARFlit#(t, addr_, user_)) =
+  interface AXI4Lite_AR_Slave_Synth;
+    method arflit(araddr, arprot, aruser) = toSink(s).put(fromAXI4Lite_ARFlit(
+      AXI4Lite_ARFlit{ araddr: araddr, arprot: arprot, aruser: aruser }
+    ));
+    method arready = toSink(s).canPut;
+  endinterface;
 
-    method araddr   = flit.araddr;
-    method arprot   = flit.arprot;
-    method aruser   = flit.aruser;
-    method arvalid  = ff.notEmpty;
-    method arready(rdy) = action if (rdy) deqWire.send; endaction;
-
-  endmodule
-endinstance
-
-// typeclass to turn an interface to the Slave interface
-
-typeclass ToAXI4Lite_AR_Slave_Synth#(type t);
-  module toAXI4Lite_AR_Slave_Synth#(t#(x) ifc)
-  (AXI4Lite_AR_Slave_Synth#(addr_, user_))
-  provisos (FromAXI4Lite_ARFlit#(x, addr_, user_));
-endtypeclass
-
-instance ToAXI4Lite_AR_Slave_Synth#(Sink);
-  module toAXI4Lite_AR_Slave_Synth#(Sink#(t) snk)
-  (AXI4Lite_AR_Slave_Synth#(addr_, user_))
-  provisos (FromAXI4Lite_ARFlit#(t, addr_, user_));
-
-    let w_araddr <- mkDWire(?);
-    let w_arprot <- mkDWire(?);
-    let w_aruser <- mkDWire(?);
-    PulseWire putWire <- mkPulseWire;
-    rule doPut (putWire && snk.canPut);
-      snk.put(fromAXI4Lite_ARFlit(AXI4Lite_ARFlit {
-        araddr: w_araddr, arprot: w_arprot, aruser: w_aruser
-      }));
-    endrule
-
-    method araddr(addr)   = action w_araddr <= addr; endaction;
-    method arprot(prot)   = action w_arprot <= prot; endaction;
-    method aruser(user)   = action w_aruser <= user; endaction;
-    method arvalid(valid) = action if (valid) putWire.send; endaction;
-    method arready        = snk.canPut;
-
-  endmodule
-endinstance
-
-instance ToAXI4Lite_AR_Slave_Synth#(FIFOF);
-  module toAXI4Lite_AR_Slave_Synth#(FIFOF#(t) ff)
-  (AXI4Lite_AR_Slave_Synth#(addr_, user_))
-  provisos (FromAXI4Lite_ARFlit#(t, addr_, user_));
-
-    let w_araddr <- mkDWire(?);
-    let w_arprot <- mkDWire(?);
-    let w_aruser <- mkDWire(?);
-    PulseWire enqWire <- mkPulseWire;
-    rule doEnq (enqWire && ff.notFull);
-      ff.enq(fromAXI4Lite_ARFlit(AXI4Lite_ARFlit {
-        araddr: w_araddr, arprot: w_arprot, aruser: w_aruser
-      }));
-    endrule
-
-    method araddr(addr)   = action w_araddr <= addr; endaction;
-    method arprot(prot)   = action w_arprot <= prot; endaction;
-    method aruser(user)   = action w_aruser <= user; endaction;
-    method arvalid(valid) = action if (valid) enqWire.send; endaction;
-    method arready        = ff.notFull;
-
-  endmodule
-endinstance
+function Sink#(AXI4Lite_ARFlit#(addr_, user_))
+  fromAXI4Lite_AR_Slave_Synth(AXI4Lite_AR_Slave_Synth#(addr_, user_) s) =
+  interface Sink;
+    method canPut = s.arready;
+    method put(x) = s.arflit(x.araddr, x.arprot, x.aruser);
+  endinterface;

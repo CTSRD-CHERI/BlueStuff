@@ -138,58 +138,145 @@ function AXI4Lite_Slave#(a, b, c, d, e, f, g) dropUserFields(
 // AXI Shim Master <-> Slave //
 ////////////////////////////////////////////////////////////////////////////////
 
-module mkAXI4LiteShim (AXI4Lite_Shim#(a, b, c, d, e, f, g));
-  let awff <- mkBypassFIFOF;
-  let  wff <- mkBypassFIFOF;
-  let  bff <- mkBypassFIFOF;
-  let arff <- mkBypassFIFOF;
-  let  rff <- mkBypassFIFOF;
-  interface master = interface AXI4Lite_Master;
-    interface aw = toSource(awff);
-    interface  w = toSource(wff);
-    interface  b = toSink(bff);
-    interface ar = toSource(arff);
-    interface  r = toSink(rff);
-  endinterface;
-  interface slave = interface AXI4Lite_Slave;
-    interface aw = toSink(awff);
-    interface  w = toSink(wff);
-    interface  b = toSource(bff);
-    interface ar = toSink(arff);
-    interface  r = toSource(rff);
-  endinterface;
+// XXX
+// Macro to work around the fact that we cannot pass FIFOF module constructor
+// and use it for different channels with different types (need Rank2Types)...?
+`define defAXI4LiteShimFIFOF (name, mkFF)\
+module mkAXI4LiteShim``name (AXI4Lite_Shim#(a, b, c, d, e, f, g));\
+  let awff <- mkFF;\
+  let  wff <- mkFF;\
+  let  bff <- mkFF;\
+  let arff <- mkFF;\
+  let  rff <- mkFF;\
+  method clear = action\
+    awff.clear;\
+    wff.clear;\
+    bff.clear;\
+    arff.clear;\
+    rff.clear;\
+  endaction;\
+  interface master = interface AXI4Lite_Master;\
+    interface aw = toSource(awff);\
+    interface  w = toSource(wff);\
+    interface  b = toSink(bff);\
+    interface ar = toSource(arff);\
+    interface  r = toSink(rff);\
+  endinterface;\
+  interface slave = interface AXI4Lite_Slave;\
+    interface aw = toSink(awff);\
+    interface  w = toSink(wff);\
+    interface  b = toSource(bff);\
+    interface ar = toSink(arff);\
+    interface  r = toSource(rff);\
+  endinterface;\
 endmodule
 
-/////////////////////////////////////////
-// to "Synth" version of the interface //
+`defAXI4LiteShimFIFOF(BypassFIFOF, mkBypassFIFOF)
+`defAXI4LiteShimFIFOF(BypassFF1, mkSizedBypassFIFOF(1))
+`defAXI4LiteShimFIFOF(FF1, mkFIFOF1)
+`defAXI4LiteShimFIFOF(SizedFIFOF4, mkSizedFIFOF(4))
+
+module mkAXI4LiteShim (AXI4Lite_Shim#(a, b, c, d, e, f, g));
+  AXI4Lite_Shim#(a, b, c, d, e, f, g) shim <- mkAXI4LiteShimBypassFIFOF;
+  return shim;
+endmodule
+
+
+/////////////////////////////////////
+// to/from "Synth" interface utils //
 ////////////////////////////////////////////////////////////////////////////////
 
-// AXI Master
-module toAXI4Lite_Master_Synth#(AXI4Lite_Master#(a, b, c, d, e, f, g) master)
-  (AXI4Lite_Master_Synth#(a, b, c, d, e, f, g));
-  let awifc <- toAXI4Lite_AW_Master_Synth(master.aw);
-  let wifc  <- toAXI4Lite_W_Master_Synth(master.w);
-  let bifc  <- toAXI4Lite_B_Master_Synth(master.b);
-  let arifc <- toAXI4Lite_AR_Master_Synth(master.ar);
-  let rifc  <- toAXI4Lite_R_Master_Synth(master.r);
-  interface aw = awifc;
-  interface w  = wifc;
-  interface b  = bifc;
-  interface ar = arifc;
-  interface r  = rifc;
+// AXI4Lite Master
+function AXI4Lite_Master_Synth#(a, b, c, d, e, f, g)
+  toAXI4Lite_Master_Synth (AXI4Lite_Master#(a, b, c, d, e, f, g) master) =
+  interface AXI4Lite_Master_Synth;
+    interface aw = toAXI4Lite_AW_Master_Synth(master.aw);
+    interface w  = toAXI4Lite_W_Master_Synth(master.w);
+    interface b  = toAXI4Lite_B_Master_Synth(master.b);
+    interface ar = toAXI4Lite_AR_Master_Synth(master.ar);
+    interface r  = toAXI4Lite_R_Master_Synth(master.r);
+  endinterface;
+
+function AXI4Lite_Master#(a, b, c, d, e, f, g)
+  fromAXI4Lite_Master_Synth (AXI4Lite_Master_Synth#(a, b, c, d, e, f, g) master) =
+  interface AXI4Lite_Master;
+    interface aw = fromAXI4Lite_AW_Master_Synth(master.aw);
+    interface w  = fromAXI4Lite_W_Master_Synth(master.w);
+    interface b  = fromAXI4Lite_B_Master_Synth(master.b);
+    interface ar = fromAXI4Lite_AR_Master_Synth(master.ar);
+    interface r  = fromAXI4Lite_R_Master_Synth(master.r);
+  endinterface;
+
+// AXI4Lite Slave
+function AXI4Lite_Slave_Synth#(a, b, c, d, e, f, g)
+  toAXI4Lite_Slave_Synth (AXI4Lite_Slave#(a, b, c, d, e, f, g) slave) =
+  interface AXI4Lite_Slave_Synth;
+    interface aw = toAXI4Lite_AW_Slave_Synth(slave.aw);
+    interface w  = toAXI4Lite_W_Slave_Synth(slave.w);
+    interface b  = toAXI4Lite_B_Slave_Synth(slave.b);
+    interface ar = toAXI4Lite_AR_Slave_Synth(slave.ar);
+    interface r  = toAXI4Lite_R_Slave_Synth(slave.r);
+  endinterface;
+
+function AXI4Lite_Slave#(a, b, c, d, e, f, g)
+  fromAXI4Lite_Slave_Synth (AXI4Lite_Slave_Synth#(a, b, c, d, e, f, g) slave) =
+  interface AXI4Lite_Slave;
+    interface aw = fromAXI4Lite_AW_Slave_Synth(slave.aw);
+    interface w  = fromAXI4Lite_W_Slave_Synth(slave.w);
+    interface b  = fromAXI4Lite_B_Slave_Synth(slave.b);
+    interface ar = fromAXI4Lite_AR_Slave_Synth(slave.ar);
+    interface r  = fromAXI4Lite_R_Slave_Synth(slave.r);
+  endinterface;
+
+/////////////////////////////
+// to unguarded interfaces //
+////////////////////////////////////////////////////////////////////////////////
+
+module toUnguarded_AXI4Lite_Master#(AXI4Lite_Master#(a, b, c, d, e, f, g) m)
+  (AXI4Lite_Master#(a, b, c, d, e, f, g));
+  let u_aw <- toUnguardedSource(m.aw, ?);
+  let u_w  <- toUnguardedSource(m.w, ?);
+  let u_b  <- toUnguardedSink(m.b);
+  let u_ar <- toUnguardedSource(m.ar, ?);
+  let u_r  <- toUnguardedSink(m.r);
+  return interface AXI4Lite_Master;
+    interface aw = u_aw;
+    interface w  = u_w;
+    interface b  = u_b;
+    interface ar = u_ar;
+    interface r  = u_r;
+  endinterface;
 endmodule
 
-// AXI Slave
-module toAXI4Lite_Slave_Synth#(AXI4Lite_Slave#(a, b, c, d, e, f, g) master)
-  (AXI4Lite_Slave_Synth#(a, b, c, d, e, f, g));
-  let awifc <- toAXI4Lite_AW_Slave_Synth(master.aw);
-  let wifc  <- toAXI4Lite_W_Slave_Synth(master.w);
-  let bifc  <- toAXI4Lite_B_Slave_Synth(master.b);
-  let arifc <- toAXI4Lite_AR_Slave_Synth(master.ar);
-  let rifc  <- toAXI4Lite_R_Slave_Synth(master.r);
-  interface aw = awifc;
-  interface w  = wifc;
-  interface b  = bifc;
-  interface ar = arifc;
-  interface r  = rifc;
+module mkAXI4Lite_Master_Xactor(AXI4Lite_Master_Xactor#(a, b, c, d, e, f, g));
+  let shim <- mkAXI4LiteShimSizedFIFOF4;
+  let u_master <- toUnguarded_AXI4Lite_Master(shim.master);
+  //method clear = shim.clear;
+  method clear = noAction;
+  interface slave = shim.slave;
+  interface masterSynth = toAXI4Lite_Master_Synth(u_master);
+endmodule
+
+module toUnguarded_AXI4Lite_Slave#(AXI4Lite_Slave#(a, b, c, d, e, f, g) s)
+  (AXI4Lite_Slave#(a, b, c, d, e, f, g));
+  let u_aw <- toUnguardedSink(s.aw);
+  let u_w  <- toUnguardedSink(s.w);
+  let u_b  <- toUnguardedSource(s.b, ?);
+  let u_ar <- toUnguardedSink(s.ar);
+  let u_r  <- toUnguardedSource(s.r, ?);
+  return interface AXI4Lite_Slave;
+    interface aw = u_aw;
+    interface w  = u_w;
+    interface b  = u_b;
+    interface ar = u_ar;
+    interface r  = u_r;
+  endinterface;
+endmodule
+
+module mkAXI4Lite_Slave_Xactor (AXI4Lite_Slave_Xactor#(a, b, c, d, e, f, g));
+  let shim <- mkAXI4LiteShimSizedFIFOF4;
+  let u_slave <- toUnguarded_AXI4Lite_Slave(shim.slave);
+  method clear = shim.clear;
+  interface master = shim.master;
+  interface slaveSynth = toAXI4Lite_Slave_Synth(u_slave);
 endmodule

@@ -55,93 +55,47 @@ instance FromAXI4Lite_BFlit#(AXI4Lite_BFlit#(user_), user_);
   function fromAXI4Lite_BFlit = id;
 endinstance
 
-// typeclass to turn an interface to the Master interface
+// convert to/from Synth Master interface
+////////////////////////////////////////////////////////////////////////////////
 
-typeclass ToAXI4Lite_B_Master_Synth#(type t);
-  module toAXI4Lite_B_Master_Synth#(t#(x) ifc)
-  (AXI4Lite_B_Master_Synth#(user_))
-  provisos (FromAXI4Lite_BFlit#(x, user_));
-endtypeclass
+function AXI4Lite_B_Master_Synth#(user_)
+  toAXI4Lite_B_Master_Synth(snk_t s)
+  provisos (ToSink#(snk_t, t), FromAXI4Lite_BFlit#(t, user_)) =
+  interface AXI4Lite_B_Master_Synth;
+    //method bflit(bid, bresp, buser) if (toSink(s).canPut) =
+    method bflit(bresp, buser) = toSink(s).put(fromAXI4Lite_BFlit(
+      AXI4Lite_BFlit{ bresp: bresp, buser: buser }
+    ));
+    method bready = toSink(s).canPut;
+  endinterface;
 
-instance ToAXI4Lite_B_Master_Synth#(Sink);
-  module toAXI4Lite_B_Master_Synth#(Sink#(t) snk)
-  (AXI4Lite_B_Master_Synth#(user_)) provisos (FromAXI4Lite_BFlit#(t, user_));
+function Sink#(AXI4Lite_BFlit#(user_))
+  fromAXI4Lite_B_Master_Synth(AXI4Lite_B_Master_Synth#(user_) m) =
+  interface Sink;
+    method canPut = m.bready;
+    method put(x) = m.bflit(x.bresp, x.buser);
+  endinterface;
 
-    let w_bresp <- mkDWire(?);
-    let w_buser <- mkDWire(?);
-    PulseWire putWire <- mkPulseWire;
-    rule doPut (putWire && snk.canPut);
-      snk.put(fromAXI4Lite_BFlit(AXI4Lite_BFlit{
-        bresp: w_bresp, buser: w_buser
-      }));
-    endrule
+// convert to/from Synth Slave interface
+////////////////////////////////////////////////////////////////////////////////
 
-    method bresp(resp)   = action w_bresp <= resp; endaction;
-    method buser(user)   = action w_buser <= user; endaction;
-    method bvalid(valid) = action if (valid) putWire.send; endaction;
-    method bready        = snk.canPut;
-
-  endmodule
-endinstance
-
-instance ToAXI4Lite_B_Master_Synth#(FIFOF);
-  module toAXI4Lite_B_Master_Synth#(FIFOF#(t) ff)
-  (AXI4Lite_B_Master_Synth#(user_)) provisos (FromAXI4Lite_BFlit#(t, user_));
-
-    let w_bresp <- mkDWire(?);
-    let w_buser <- mkDWire(?);
-    PulseWire enqWire <- mkPulseWire;
-    rule doEnq (enqWire && ff.notFull);
-      ff.enq(fromAXI4Lite_BFlit(AXI4Lite_BFlit{
-        bresp: w_bresp, buser: w_buser
-      }));
-    endrule
-
-    method bresp(resp)   = action w_bresp <= resp; endaction;
-    method buser(user)   = action w_buser <= user; endaction;
-    method bvalid(valid) = action if (valid) enqWire.send; endaction;
-    method bready        = ff.notFull;
-
-  endmodule
-endinstance
-
-// typeclass to turn an interface to the Slave interface
-
-typeclass ToAXI4Lite_B_Slave_Synth#(type t);
-  module toAXI4Lite_B_Slave_Synth#(t#(x) ifc) (AXI4Lite_B_Slave_Synth#(user_))
-  provisos (ToAXI4Lite_BFlit#(x, user_));
-endtypeclass
-
-instance ToAXI4Lite_B_Slave_Synth#(Source);
-  module toAXI4Lite_B_Slave_Synth#(Source#(t) src)
-  (AXI4Lite_B_Slave_Synth#(user_)) provisos (ToAXI4Lite_BFlit#(t, user_));
-
-    Wire#(AXI4Lite_BFlit#(user_)) flit <- mkDWire(?);
-    rule peekFlit (src.canPeek); flit <= toAXI4Lite_BFlit(src.peek); endrule
-    PulseWire dropWire <- mkPulseWire;
-    rule doDrop (dropWire && src.canPeek); src.drop; endrule
-
+function AXI4Lite_B_Slave_Synth#(user_)
+  toAXI4Lite_B_Slave_Synth(src_t#(t) s)
+  provisos (ToSource#(src_t#(t), t), ToAXI4Lite_BFlit#(t, user_));
+  let src = toSource(s);
+  AXI4Lite_BFlit#(user_) flit = toAXI4Lite_BFlit(src.peek);
+  return interface AXI4Lite_B_Slave_Synth;
     method bresp  = flit.bresp;
     method buser  = flit.buser;
     method bvalid = src.canPeek;
-    method bready(rdy) = action if (rdy) dropWire.send; endaction;
+    method bready(rdy) = action if (src.canPeek && rdy) src.drop; endaction;
+  endinterface;
+endfunction
 
-  endmodule
-endinstance
-
-instance ToAXI4Lite_B_Slave_Synth#(FIFOF);
-  module toAXI4Lite_B_Slave_Synth#(FIFOF#(t) ff)
-  (AXI4Lite_B_Slave_Synth#(user_)) provisos (ToAXI4Lite_BFlit#(t, user_));
-
-    Wire#(AXI4Lite_BFlit#(user_)) flit <- mkDWire(?);
-    rule peekFlit (ff.notEmpty); flit <= toAXI4Lite_BFlit(ff.first); endrule
-    PulseWire deqWire <- mkPulseWire;
-    rule doDeq (deqWire && ff.notEmpty); ff.deq; endrule
-
-    method bresp  = flit.bresp;
-    method buser  = flit.buser;
-    method bvalid = ff.notEmpty;
-    method bready(rdy) = action if (rdy) deqWire.send; endaction;
-
-  endmodule
-endinstance
+function Source#(AXI4Lite_BFlit#(user_))
+  fromAXI4Lite_B_Slave_Synth(AXI4Lite_B_Slave_Synth#(user_) s) =
+  interface Source;
+    method canPeek = s.bvalid;
+    method peek = AXI4Lite_BFlit {bresp: s.bresp, buser: s.buser};
+    method drop = action if (s.bvalid) s.bready(True); endaction;
+  endinterface;

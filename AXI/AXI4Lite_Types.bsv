@@ -70,26 +70,14 @@ interface AXI4Lite_AW_Master_Synth#(numeric type addr_, numeric type user_);
   (* prefix="" *) method Action awready(Bool awready);
 endinterface
 
-interface AXI4Lite_AW_Master_Xactor#(numeric type addr_, numeric type user_);
-  method Action reset;
-  interface Sink#(AXI4Lite_AWFlit#(addr_, user_))   sink;
-  interface AXI4Lite_AW_Master_Synth#(addr_, user_) masterSynth;
-endinterface
-
 // Slave interfaces
-(* always_ready, always_enabled *)
 interface AXI4Lite_AW_Slave_Synth#(numeric type addr_, numeric type user_);
-  (* prefix="" *) method Action awaddr (Bit#(addr_) awaddr);
-  (* prefix="" *) method Action awprot (AXI4_Prot   awprot);
-  (* prefix="" *) method Action awuser (Bit#(user_) awuser);
-  (* prefix="" *) method Action awvalid(Bool        awvalid);
+  (* always_ready, enable="awvalid", prefix="" *)
+  method Action awflit (Bit#(addr_) awaddr,
+                        AXI4_Prot   awprot,
+                        Bit#(user_) awuser);
+  (* always_ready, always_enabled *)
   method Bool awready;
-endinterface
-
-interface AXI4Lite_AW_Slave_Xactor#(numeric type addr_, numeric type user_);
-  method Action reset;
-  interface Source#(AXI4Lite_AWFlit#(addr_, user_)) source;
-  interface AXI4Lite_AW_Slave_Synth#(addr_, user_)  slaveSynth;
 endinterface
 
 // connectable instances
@@ -97,10 +85,9 @@ instance Connectable#(AXI4Lite_AW_Master_Synth#(a, b),
                       AXI4Lite_AW_Slave_Synth#(a, b));
   module mkConnection#(AXI4Lite_AW_Master_Synth#(a,b ) m,
                        AXI4Lite_AW_Slave_Synth#(a, b) s)(Empty);
-    rule connect_awaddr;  s.awaddr(m.awaddr);   endrule
-    rule connect_awprot;  s.awprot(m.awprot);   endrule
-    rule connect_awuser;  s.awuser(m.awuser);   endrule
-    rule connect_awvalid; s.awvalid(m.awvalid); endrule
+    rule connect_awflit (m.awvalid);
+      s.awflit(m.awaddr, m.awprot, m.awuser);
+    endrule
     rule connect_awready; m.awready(s.awready); endrule
   endmodule
 endinstance
@@ -140,26 +127,14 @@ interface AXI4Lite_W_Master_Synth#(numeric type data_, numeric type user_);
   (* prefix="" *) method Action wready(Bool wready);
 endinterface
 
-interface AXI4Lite_W_Master_Xactor#(numeric type data_, numeric type user_);
-  method Action reset;
-  interface Sink#(AXI4Lite_WFlit#(data_, user_))   sink;
-  interface AXI4Lite_W_Master_Synth#(data_, user_) masterSynth;
-endinterface
-
 // Slave interfaces
-(* always_ready, always_enabled *)
 interface AXI4Lite_W_Slave_Synth#(numeric type data_, numeric type user_);
-  (* prefix="" *) method Action wdata (Bit#(data_)            wdata);
-  (* prefix="" *) method Action wstrb (Bit#(TDiv#(data_,  8)) wstrb);
-  (* prefix="" *) method Action wuser (Bit#(user_)            wuser);
-  (* prefix="" *) method Action wvalid(Bool                   wvalid);
+  (* always_ready, enable="wvalid", prefix="" *)
+  method Action wflit (Bit#(data_)           wdata,
+                       Bit#(TDiv#(data_, 8)) wstrb,
+                       Bit#(user_)           wuser);
+  (* always_ready, always_enabled *)
   method Bool wready;
-endinterface
-
-interface AXI4Lite_W_Slave_Xactor#(numeric type data_, numeric type user_);
-  method Action reset;
-  interface Source#(AXI4Lite_WFlit#(data_, user_)) source;
-  interface AXI4Lite_W_Slave_Synth#(data_, user_)  slaveSynth;
 endinterface
 
 // connectable instances
@@ -167,10 +142,7 @@ instance Connectable#(AXI4Lite_W_Master_Synth#(a, b),
                       AXI4Lite_W_Slave_Synth#(a, b));
   module mkConnection#(AXI4Lite_W_Master_Synth#(a, b) m,
                        AXI4Lite_W_Slave_Synth#(a, b) s)(Empty);
-    rule connect_wdata;  s.wdata(m.wdata);   endrule
-    rule connect_wstrb;  s.wstrb(m.wstrb);   endrule
-    rule connect_wuser;  s.wuser(m.wuser);   endrule
-    rule connect_wvalid; s.wvalid(m.wvalid); endrule
+    rule connect_wflit; s.wflit(m.wdata, m.wstrb, m.wuser); endrule
     rule connect_wready; m.wready(s.wready); endrule
   endmodule
 endinstance
@@ -199,18 +171,12 @@ instance DetectLast#(AXI4Lite_BFlit#(user_));
 endinstance
 
 // Master interfaces
-(* always_ready, always_enabled *)
 interface AXI4Lite_B_Master_Synth#(numeric type user_);
-  (* prefix="" *) method Action bresp (AXI4_Resp   bresp);
-  (* prefix="" *) method Action buser (Bit#(user_) buser);
-  (* prefix="" *) method Action bvalid(Bool        bvalid);
+  (* always_ready, enable="bvalid", prefix="" *)
+  method Action bflit (AXI4_Resp   bresp,
+                       Bit#(user_) buser);
+  (* always_ready, always_enabled *)
   method Bool bready;
-endinterface
-
-interface AXI4Lite_B_Master_Xactor#(numeric type user_);
-  method Action reset;
-  interface Source#(AXI4Lite_BFlit#(user_)) source;
-  interface AXI4Lite_B_Master_Synth#(user_) masterSynth;
 endinterface
 
 // Slave interfaces
@@ -222,19 +188,11 @@ interface AXI4Lite_B_Slave_Synth#(numeric type user_);
   (* prefix="" *) method Action bready(Bool bready);
 endinterface
 
-interface AXI4Lite_B_Slave_Xactor#(numeric type user_);
-  method Action reset;
-  interface Sink#(AXI4Lite_BFlit#(user_))  sink;
-  interface AXI4Lite_B_Slave_Synth#(user_) slaveSynth;
-endinterface
-
 // connectable instances
 instance Connectable#(AXI4Lite_B_Master_Synth#(a), AXI4Lite_B_Slave_Synth#(a));
   module mkConnection#(AXI4Lite_B_Master_Synth#(a) m,
                        AXI4Lite_B_Slave_Synth#(a) s)(Empty);
-    rule connect_bresp;  m.bresp(s.bresp);   endrule
-    rule connect_buser;  m.buser(s.buser);   endrule
-    rule connect_bvalid; m.bvalid(s.bvalid); endrule
+    rule connect_bflit (s.bvalid); m.bflit(s.bresp, s.buser); endrule
     rule connect_bready; s.bready(m.bready); endrule
   endmodule
 endinstance
@@ -282,26 +240,14 @@ interface AXI4Lite_AR_Master_Synth#(numeric type addr_, numeric type user_);
   (* prefix="" *) method Action arready(Bool arready);
 endinterface
 
-interface AXI4Lite_AR_Master_Xactor#(numeric type addr_, numeric type user_);
-  method Action reset;
-  interface Source#(AXI4Lite_ARFlit#(addr_, user_)) source;
-  interface AXI4Lite_AR_Master_Synth#(addr_, user_) masterSynth;
-endinterface
-
 // Slave interfaces
-(* always_ready, always_enabled *)
 interface AXI4Lite_AR_Slave_Synth#(numeric type addr_, numeric type user_);
-  (* prefix="" *) method Action araddr (Bit#(addr_) araddr);
-  (* prefix="" *) method Action arprot (AXI4_Prot   arprot);
-  (* prefix="" *) method Action aruser (Bit#(user_) aruser);
-  (* prefix="" *) method Action arvalid(Bool        arvalid);
+  (* always_ready, enable="arvalid", prefix="" *)
+  method Action arflit (Bit#(addr_) araddr,
+                        AXI4_Prot   arprot,
+                        Bit#(user_) aruser);
+  (* always_ready, always_enabled *)
   method Bool arready;
-endinterface
-
-interface AXI4Lite_AR_Slave_Xactor#(numeric type addr_, numeric type user_);
-  method Action reset;
-  interface Sink#(AXI4Lite_ARFlit#(addr_, user_))  sink;
-  interface AXI4Lite_AR_Slave_Synth#(addr_, user_) slaveSynth;
 endinterface
 
 // connectable instances
@@ -309,10 +255,7 @@ instance Connectable#(AXI4Lite_AR_Master_Synth#(a, b),
                       AXI4Lite_AR_Slave_Synth#(a, b));
   module mkConnection#(AXI4Lite_AR_Master_Synth#(a, b) m,
                        AXI4Lite_AR_Slave_Synth#(a, b) s)(Empty);
-    rule connect_araddr;  s.araddr(m.araddr);   endrule
-    rule connect_arprot;  s.arprot(m.arprot);   endrule
-    rule connect_aruser;  s.aruser(m.aruser);   endrule
-    rule connect_arvalid; s.arvalid(m.arvalid); endrule
+    rule connect_arflit; s.arflit(m.araddr, m.arprot, m.aruser); endrule
     rule connect_arready; m.arready(s.arready); endrule
   endmodule
 endinstance
@@ -343,19 +286,13 @@ instance DetectLast#(AXI4Lite_RFlit#(data_, user_));
 endinstance
 
 // Master interfaces
-(* always_ready, always_enabled *)
 interface AXI4Lite_R_Master_Synth#(numeric type data_, numeric type user_);
-  (* prefix="" *) method Action rdata (Bit#(data_) rdata);
-  (* prefix="" *) method Action rresp (AXI4_Resp   rresp);
-  (* prefix="" *) method Action ruser (Bit#(user_) ruser);
-  (* prefix="" *) method Action rvalid(Bool        rvalid);
+  (* always_ready, enable="rvalid", prefix="" *)
+  method Action rflit (Bit#(data_) rdata,
+                       AXI4_Resp   rresp,
+                       Bit#(user_) ruser);
+  (* always_ready, always_enabled *)
   method Bool rready;
-endinterface
-
-interface AXI4Lite_R_Master_Xactor#(numeric type data_, numeric type user_);
-  method Action reset;
-  interface Source#(AXI4Lite_RFlit#(data_, user_)) source;
-  interface AXI4Lite_R_Master_Synth#(data_, user_) masterSynth;
 endinterface
 
 // Slave interfaces
@@ -368,21 +305,12 @@ interface AXI4Lite_R_Slave_Synth#(numeric type data_, numeric type user_);
   (* prefix="" *) method Action rready(Bool rready);
 endinterface
 
-interface AXI4Lite_R_Slave_Xactor#(numeric type data_, numeric type user_);
-  method Action reset;
-  interface Sink#(AXI4Lite_RFlit#(data_, user_))  sink;
-  interface AXI4Lite_R_Slave_Synth#(data_, user_) slaveSynth;
-endinterface
-
 // connectable instances
 instance Connectable#(AXI4Lite_R_Master_Synth#(a, b),
                       AXI4Lite_R_Slave_Synth#(a, b));
   module mkConnection#(AXI4Lite_R_Master_Synth#(a, b) m,
                        AXI4Lite_R_Slave_Synth#(a, b) s)(Empty);
-    rule connect_rdata;  m.rdata(s.rdata);   endrule
-    rule connect_rresp;  m.rresp(s.rresp);   endrule
-    rule connect_ruser;  m.ruser(s.ruser);   endrule
-    rule connect_rvalid; m.rvalid(s.rvalid); endrule
+    rule connect_rflit; m.rflit(s.rdata, s.rresp, s.ruser); endrule
     rule connect_rready; s.rready(m.rready); endrule
   endmodule
 endinstance
@@ -436,14 +364,14 @@ interface AXI4Lite_Master_Xactor#(
   numeric type buser_,
   numeric type aruser_,
   numeric type ruser_);
-  method Action reset;
-  interface AXI4Lite_Master#(addr_,
+  method Action clear;
+  interface AXI4Lite_Slave#(addr_,
                              data_,
                              awuser_,
                              wuser_,
                              buser_,
                              aruser_,
-                             ruser_)       master;
+                             ruser_) slave;
   interface AXI4Lite_Master_Synth#(addr_,
                                    data_,
                                    awuser_,
@@ -495,14 +423,14 @@ interface AXI4Lite_Slave_Xactor#(
   numeric type buser_,
   numeric type aruser_,
   numeric type ruser_);
-  method Action reset;
-  interface AXI4Lite_Slave#(addr_,
+  method Action clear;
+  interface AXI4Lite_Master#(addr_,
                             data_,
                             awuser_,
                             wuser_,
                             buser_,
                             aruser_,
-                            ruser_)       slave;
+                            ruser_) master;
   interface AXI4Lite_Slave_Synth#(addr_,
                                   data_,
                                   awuser_,
@@ -524,6 +452,7 @@ interface AXI4Lite_Shim#(
   numeric type buser_,
   numeric type aruser_,
   numeric type ruser_);
+  method Action clear;
   interface AXI4Lite_Master#(
     addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_
   ) master;

@@ -47,6 +47,7 @@ module axiMaster (AXI4_Master_Synth#(`PARAMS));
 
   // AXI master shim
   AXI4_Shim#(`PARAMS) shim <- mkAXI4Shim;
+  let u_master <- toUnguarded_AXI4_Master(shim.master);
 
   // arbitrary work for each channel
   rule putAXI4_AWFlit; shim.slave.aw.put(?); endrule
@@ -56,8 +57,7 @@ module axiMaster (AXI4_Master_Synth#(`PARAMS));
   rule dropAXI4_RFlit; shim.slave.r.drop; endrule
 
   // return AXI interface
-  let ifcSynth <- toAXI4_Master_Synth(shim.master);
-  return ifcSynth;
+  return toAXI4_Master_Synth(u_master);
 
 endmodule
 
@@ -66,6 +66,7 @@ module axiLiteMaster (AXI4Lite_Master_Synth#(`LITEPARAMS));
 
   // AXI master shim
   AXI4Lite_Shim#(`LITEPARAMS) shim <- mkAXI4LiteShim;
+  let u_master <- toUnguarded_AXI4Lite_Master(shim.master);
 
   // arbitrary work for each channel
   rule putAWFlit; shim.slave.aw.put(?); endrule
@@ -75,8 +76,7 @@ module axiLiteMaster (AXI4Lite_Master_Synth#(`LITEPARAMS));
   rule dropRFlit; shim.slave.r.drop; endrule
 
   // return AXI interface
-  let ifcSynth <- toAXI4Lite_Master_Synth(shim.master);
-  return ifcSynth;
+  return toAXI4Lite_Master_Synth(u_master);
 
 endmodule
 
@@ -85,6 +85,7 @@ module axiSlave (AXI4_Slave_Synth#(`PARAMS));
 
   // AXI slave shim
   AXI4_Shim#(`PARAMS) shim <- mkAXI4Shim;
+  let u_slave <- toUnguarded_AXI4_Slave(shim.slave);
 
   // arbitrary work for each channel
   rule dropAXI4_AWFlit; shim.master.aw.drop; endrule
@@ -94,8 +95,7 @@ module axiSlave (AXI4_Slave_Synth#(`PARAMS));
   rule putAXI4_RFlit; shim.master.r.put(?); endrule
 
   // return AXI interface
-  let ifcSynth <- toAXI4_Slave_Synth(shim.slave);
-  return ifcSynth;
+  return toAXI4_Slave_Synth(u_slave);
 
 endmodule
 
@@ -104,6 +104,7 @@ module axiLiteSlave (AXI4Lite_Slave_Synth#(`LITEPARAMS));
 
   // AXI slave shim
   AXI4Lite_Shim#(`LITEPARAMS) shim <- mkAXI4LiteShim;
+  let u_slave <- toUnguarded_AXI4Lite_Slave(shim.slave);
 
   // arbitrary work for each channel
   rule dropAWFlit; shim.master.aw.drop; endrule
@@ -113,8 +114,7 @@ module axiLiteSlave (AXI4Lite_Slave_Synth#(`LITEPARAMS));
   rule putRFlit; shim.master.r.put(?); endrule
 
   // return AXI interface
-  let ifcSynth <- toAXI4Lite_Slave_Synth(shim.slave);
-  return ifcSynth;
+  return toAXI4Lite_Slave_Synth(u_slave);
 
 endmodule
 

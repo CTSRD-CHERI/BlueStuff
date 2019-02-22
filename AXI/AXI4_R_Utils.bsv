@@ -60,153 +60,56 @@ endinstance
 // convert to/from Synth Master interface
 ////////////////////////////////////////////////////////////////////////////////
 
-typeclass ToAXI4_R_Master_Synth#(type t);
-  module toAXI4_R_Master_Synth#(t#(x) ifc)
-  (AXI4_R_Master_Synth#(id_, data_, user_))
-  provisos (FromAXI4_RFlit#(x, id_, data_, user_));
-endtypeclass
+function AXI4_R_Master_Synth#(id_, data_, user_)
+  toAXI4_R_Master_Synth(snk_t s)
+  provisos (ToSink#(snk_t, t), FromAXI4_RFlit#(t, id_, data_, user_)) =
+  interface AXI4_R_Master_Synth;
+    method rflit(rid,
+                 rdata,
+                 rresp,
+                 rlast,
+                 ruser) = toSink(s).put(fromAXI4_RFlit(AXI4_RFlit{
+      rid: rid, rdata: rdata, rresp: rresp, rlast: rlast, ruser: ruser
+    }));
+    method rready = toSink(s).canPut;
+  endinterface;
 
-instance ToAXI4_R_Master_Synth#(Sink);
-  module toAXI4_R_Master_Synth#(Sink#(t) snk)
-  (AXI4_R_Master_Synth#(id_, data_, user_))
-  provisos (FromAXI4_RFlit#(t, id_, data_, user_));
-
-    let w_rid   <- mkDWire(?);
-    let w_rdata <- mkDWire(?);
-    let w_rresp <- mkDWire(?);
-    let w_rlast <- mkDWire(?);
-    let w_ruser <- mkDWire(?);
-    PulseWire putWire <- mkPulseWire;
-    rule doPut (putWire && snk.canPut);
-      snk.put(fromAXI4_RFlit(AXI4_RFlit{
-        rid:   w_rid,
-        rdata: w_rdata,
-        rresp: w_rresp,
-        rlast: w_rlast,
-        ruser: w_ruser
-      }));
-    endrule
-
-    method rid(id)       = action w_rid   <= id; endaction;
-    method rdata(data)   = action w_rdata <= data; endaction;
-    method rresp(resp)   = action w_rresp <= resp; endaction;
-    method rlast(last)   = action w_rlast <= last; endaction;
-    method ruser(user)   = action w_ruser <= user; endaction;
-    method rvalid(valid) = action if (valid) putWire.send; endaction;
-    method rready        = snk.canPut;
-
-  endmodule
-endinstance
-
-instance ToAXI4_R_Master_Synth#(FIFOF);
-  module toAXI4_R_Master_Synth#(FIFOF#(t) ff)
-  (AXI4_R_Master_Synth#(id_, data_, user_))
-  provisos (FromAXI4_RFlit#(t, id_, data_, user_));
-
-    let w_rid   <- mkDWire(?);
-    let w_rdata <- mkDWire(?);
-    let w_rresp <- mkDWire(?);
-    let w_rlast <- mkDWire(?);
-    let w_ruser <- mkDWire(?);
-    PulseWire enqWire <- mkPulseWire;
-    rule doEnq (enqWire && ff.notFull);
-      ff.enq(fromAXI4_RFlit(AXI4_RFlit{
-        rid:   w_rid,
-        rdata: w_rdata,
-        rresp: w_rresp,
-        rlast: w_rlast,
-        ruser: w_ruser
-      }));
-    endrule
-
-    method rid(id)       = action w_rid   <= id; endaction;
-    method rdata(data)   = action w_rdata <= data; endaction;
-    method rresp(resp)   = action w_rresp <= resp; endaction;
-    method rlast(last)   = action w_rlast <= last; endaction;
-    method ruser(user)   = action w_ruser <= user; endaction;
-    method rvalid(valid) = action if (valid) enqWire.send; endaction;
-    method rready        = ff.notFull;
-
-  endmodule
-endinstance
-
-module fromAXI4_R_Master_Synth#(AXI4_R_Master_Synth#(id_, data_, user_) m)
-  (Sink#(AXI4_RFlit#(id_, data_, user_)));
-
-  method canPut = m.rready;
-  method put(x) if (m.rready) = action
-    m.rid(x.rid);
-    m.rdata(x.rdata);
-    m.rresp(x.rresp);
-    m.rlast(x.rlast);
-    m.ruser(x.ruser);
-    m.rvalid(True);
-  endaction;
-
-endmodule
+function Sink#(AXI4_RFlit#(id_, data_, user_))
+  fromAXI4_R_Master_Synth(AXI4_R_Master_Synth#(id_, data_, user_) m) =
+  interface Sink;
+    method canPut = m.rready;
+    method put(x) = m.rflit(x.rid,
+                            x.rdata,
+                            x.rresp,
+                            x.rlast,
+                            x.ruser);
+  endinterface;
 
 // convert to/from Synth Slave interface
 ////////////////////////////////////////////////////////////////////////////////
 
-typeclass ToAXI4_R_Slave_Synth#(type t);
-  module toAXI4_R_Slave_Synth#(t#(x) ifc)
-  (AXI4_R_Slave_Synth#(id_, data_, user_))
-  provisos (ToAXI4_RFlit#(x, id_, data_, user_));
-endtypeclass
-
-instance ToAXI4_R_Slave_Synth#(Source);
-  module toAXI4_R_Slave_Synth#(Source#(t) src)
-  (AXI4_R_Slave_Synth#(id_, data_, user_))
-  provisos (ToAXI4_RFlit#(t, id_, data_, user_));
-
-    Wire#(AXI4_RFlit#(id_, data_, user_)) flit <- mkDWire(?);
-    rule peekFlit (src.canPeek); flit <= toAXI4_RFlit(src.peek); endrule
-    PulseWire dropWire <- mkPulseWire;
-    rule doDrop (dropWire && src.canPeek); src.drop; endrule
-
+function AXI4_R_Slave_Synth#(id_, data_, user_)
+  toAXI4_R_Slave_Synth(src_t#(t) s)
+  provisos (ToSource#(src_t#(t), t), ToAXI4_RFlit#(t, id_, data_, user_));
+  let src = toSource(s);
+  AXI4_RFlit#(id_, data_, user_) flit = toAXI4_RFlit(src.peek);
+  return interface AXI4_R_Slave_Synth;
     method rid    = flit.rid;
     method rdata  = flit.rdata;
     method rresp  = flit.rresp;
     method rlast  = flit.rlast;
     method ruser  = flit.ruser;
     method rvalid = src.canPeek;
-    method rready(rdy) = action if (rdy) dropWire.send; endaction;
+    method rready(rdy) = action if (src.canPeek && rdy) src.drop; endaction;
+  endinterface;
+endfunction
 
-  endmodule
-endinstance
-
-instance ToAXI4_R_Slave_Synth#(FIFOF);
-  module toAXI4_R_Slave_Synth#(FIFOF#(t) ff)
-  (AXI4_R_Slave_Synth#(id_, data_, user_))
-  provisos (ToAXI4_RFlit#(t, id_, data_, user_));
-
-    Wire#(AXI4_RFlit#(id_, data_, user_)) flit <- mkDWire(?);
-    rule peekFlit (ff.notEmpty); flit <= toAXI4_RFlit(ff.first); endrule
-    PulseWire deqWire <- mkPulseWire;
-    rule doDeq (deqWire && ff.notEmpty); ff.deq; endrule
-
-    method rid    = flit.rid;
-    method rdata  = flit.rdata;
-    method rresp  = flit.rresp;
-    method rlast  = flit.rlast;
-    method ruser  = flit.ruser;
-    method rvalid = ff.notEmpty;
-    method rready(rdy) = action if (rdy) deqWire.send; endaction;
-
-  endmodule
-endinstance
-
-module fromAXI4_R_Slave_Synth#(AXI4_R_Slave_Synth#(id_, data_, user_) s)
-  (Source#(AXI4_RFlit#(id_, data_, user_)));
-
-  method canPeek = s.rvalid;
-  method peek = AXI4_RFlit {
-    rid:   s.rid,
-    rdata: s.rdata,
-    rresp: s.rresp,
-    rlast: s.rlast,
-    ruser: s.ruser
-  };
-  method drop if (s.rvalid) = s.rready(True);
-
-endmodule
+function Source#(AXI4_RFlit#(id_, data_, user_))
+  fromAXI4_R_Slave_Synth(AXI4_R_Slave_Synth#(id_, data_, user_) s) =
+  interface Source;
+    method canPeek = s.rvalid;
+    method peek = AXI4_RFlit {
+      rid: s.rid, rdata: s.rdata, rresp: s.rresp, rlast: s.rlast, ruser: s.ruser
+    };
+    method drop = action if (s.rvalid) s.rready(True); endaction;
+  endinterface;

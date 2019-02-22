@@ -77,9 +77,9 @@ module mkAXI4Bus_Synth#(
     Add#(1, b__, nSlaves), // at least one slave is needed
     Add#(nRoutes, 0, nSlaves) // nRoutes == nSlaves
   );
-  let ms <- mapM(fromAXI4_Master_Synth, masters);
-  let ss <- mapM(fromAXI4_Slave_Synth, slaves);
-  mkAXI4Bus(maptab, ms, ss);
+  mkAXI4Bus(maptab,
+            map(fromAXI4_Master_Synth, masters),
+            map(fromAXI4_Slave_Synth, slaves));
 endmodule
 
 module mkAXI4Bus#(
