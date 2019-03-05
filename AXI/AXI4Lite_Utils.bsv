@@ -95,18 +95,18 @@ function AXI4Lite_Slave#(a, b, c, d, e, f, g) offsetSlave(
 // drop user fields helpers //
 ////////////////////////////////////////////////////////////////////////////////
 
-function AXI4Lite_Slave#(a, b, c, d, e, f, g) dropUserFields(
-  AXI4Lite_Slave#(a, b, 0, 0, 0, 0, 0) s) = interface AXI4Lite_Slave;
+function AXI4Lite_Slave#(a, b, c0, d0, e0, f0, g0) zeroUserFields(
+  AXI4Lite_Slave#(a, b, c1, d1, e1, f1, g1) s) = interface AXI4Lite_Slave;
     interface aw = interface Sink;
       method canPut = s.aw.canPut;
       method put(x) = s.aw.put(AXI4Lite_AWFlit {
-        awaddr: x.awaddr, awprot: x.awprot, awuser: ?
+        awaddr: x.awaddr, awprot: x.awprot, awuser: unpack(0)
       });
     endinterface;
     interface w = interface Sink;
       method canPut = s.w.canPut;
       method put(x) = s.w.put(AXI4Lite_WFlit {
-        wdata: x.wdata, wstrb: x.wstrb, wuser: ?
+        wdata: x.wdata, wstrb: x.wstrb, wuser: unpack(0)
       });
     endinterface;
     interface b = interface Source;
@@ -119,7 +119,7 @@ function AXI4Lite_Slave#(a, b, c, d, e, f, g) dropUserFields(
     interface ar = interface Sink;
       method canPut = s.ar.canPut;
       method put(x) = s.ar.put(AXI4Lite_ARFlit {
-        araddr: x.araddr, arprot: x.arprot, aruser: ?
+        araddr: x.araddr, arprot: x.arprot, aruser: unpack(0)
       });
     endinterface;
     interface r = interface Source;
