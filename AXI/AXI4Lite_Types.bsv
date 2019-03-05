@@ -50,8 +50,8 @@ typedef struct {
 instance DefaultValue#(AXI4Lite_AWFlit#(addr_, user_));
   function defaultValue = AXI4Lite_AWFlit { awaddr: ?, awprot: 0, awuser: ? };
 endinstance
-instance Routable#(AXI4Lite_AWFlit#(addr_, user_),
-                   AXI4Lite_BFlit#(user_),
+instance Routable#(AXI4Lite_AWFlit#(addr_, awuser_),
+                   AXI4Lite_BFlit#(wuser_),
                    Bit#(addr_));
   function routingField(x) = x.awaddr;
   function noRouteFound(x) = AXI4Lite_BFlit { bresp: DECERR, buser: ? };
@@ -218,8 +218,8 @@ instance DefaultValue#(AXI4Lite_ARFlit#(addr_, user_));
   function defaultValue = AXI4Lite_ARFlit { araddr: ?, arprot: 0, aruser: ? };
 endinstance
 instance Routable#(
-  AXI4Lite_ARFlit#(addr_, user_),
-  AXI4Lite_RFlit#(data_, user_),
+  AXI4Lite_ARFlit#(addr_, aruser_),
+  AXI4Lite_RFlit#(data_, ruser_),
   Bit#(addr_));
   function routingField(x) = x.araddr;
   function noRouteFound(x) = AXI4Lite_RFlit {
@@ -535,7 +535,7 @@ instance Routable#(
               AXI4Lite_BFlit#(buser_),
               Bit#(addr_))
   );
-  function routingField(x) = routingField(x.aw);
+  function routingField(x) = x.aw.awaddr; // XXX routingField(aw); XXX THIS SHOULD JUST WORK BUT DOESN'T ?!
   function noRouteFound(x) = noRouteFound(x.aw);
 endinstance
 instance DetectLast#(AXI4Lite_WriteFlit#(addr_, data_, awuser_, wuser_));
