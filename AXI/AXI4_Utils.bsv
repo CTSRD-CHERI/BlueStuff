@@ -223,6 +223,7 @@ endmodule
 `defAXI4ShimFIFOF(BypassFF1, mkSizedBypassFIFOF(1))
 `defAXI4ShimFIFOF(FF1, mkFIFOF1)
 `defAXI4ShimFIFOF(SizedFIFOF4, mkSizedFIFOF(4))
+`defAXI4ShimFIFOF(UGSizedFIFOF4, mkUGSizedFIFOF(4))
 
 module mkAXI4Shim (AXI4_Shim#(a, b, c, d, e, f, g, h));
   AXI4_Shim#(a, b, c, d, e, f, g, h) shim <- mkAXI4ShimBypassFIFOF;
@@ -278,6 +279,16 @@ function AXI4_Slave#(a, b, c, d, e, f, g, h)
 /////////////////////////////
 // to unguarded interfaces //
 ////////////////////////////////////////////////////////////////////////////////
+// XXX
+// See SourceSink.bsv for details on shortcomings of the toUnguardedSource and
+// the toUnguardedSink modules
+
+module mkAXI4_Master_Xactor (AXI4_Master_Xactor#(a, b, c, d, e, f, g, h));
+  let shim <- mkAXI4ShimUGSizedFIFOF4;
+  method clear = shim.clear;
+  interface slave = shim.slave;
+  interface masterSynth = toAXI4_Master_Synth(shim.master);
+endmodule
 
 module toUnguarded_AXI4_Master#(AXI4_Master#(a, b, c, d, e, f, g, h) m)
   (AXI4_Master#(a, b, c, d, e, f, g, h));
@@ -295,6 +306,7 @@ module toUnguarded_AXI4_Master#(AXI4_Master#(a, b, c, d, e, f, g, h) m)
   endinterface;
 endmodule
 
+/*
 module mkAXI4_Master_Xactor (AXI4_Master_Xactor#(a, b, c, d, e, f, g, h));
   let shim <- mkAXI4ShimSizedFIFOF4;
   let u_master <- toUnguarded_AXI4_Master(shim.master);
@@ -302,6 +314,14 @@ module mkAXI4_Master_Xactor (AXI4_Master_Xactor#(a, b, c, d, e, f, g, h));
   method clear = noAction;
   interface slave = shim.slave;
   interface masterSynth = toAXI4_Master_Synth(u_master);
+endmodule
+*/
+
+module mkAXI4_Slave_Xactor (AXI4_Slave_Xactor#(a, b, c, d, e, f, g, h));
+  let shim <- mkAXI4ShimUGSizedFIFOF4;
+  method clear = shim.clear;
+  interface master = shim.master;
+  interface slaveSynth = toAXI4_Slave_Synth(shim.slave);
 endmodule
 
 module toUnguarded_AXI4_Slave#(AXI4_Slave#(a, b, c, d, e, f, g, h) s)
@@ -320,10 +340,34 @@ module toUnguarded_AXI4_Slave#(AXI4_Slave#(a, b, c, d, e, f, g, h) s)
   endinterface;
 endmodule
 
+/*
 module mkAXI4_Slave_Xactor (AXI4_Slave_Xactor#(a, b, c, d, e, f, g, h));
   let shim <- mkAXI4ShimSizedFIFOF4;
-  let u_slave <- toUnguarded_AXI4_Slave(shim.slave);
+  //let shim <- mkAXI4ShimFF;
+  let debug_slave = interface AXI4_Slave;
+    interface aw = shim.slave.aw;
+    interface w  = shim.slave.w;
+    interface b  = shim.slave.b;
+    interface ar = debugSink(shim.slave.ar, $format("Slave XActor - AR - shim G slave side"));
+    interface r  = shim.slave.r;
+  endinterface;
+  let u_slave <- toUnguarded_AXI4_Slave(debug_slave);
+  let debug_u_slave = interface AXI4_Slave;
+    interface aw = u_slave.aw;
+    interface w  = u_slave.w;
+    interface b  = u_slave.b;
+    interface ar = debugSink(u_slave.ar, $format("Slave XActor - AR - shim UG slave side"));
+    interface r  = u_slave.r;
+  endinterface;
+  let debug_synth_slave = interface AXI4_Slave_Synth;
+    interface aw = toAXI4_AW_Slave_Synth(debug_u_slave.aw);
+    interface w  = toAXI4_W_Slave_Synth(debug_u_slave.w);
+    interface b  = toAXI4_B_Slave_Synth(debug_u_slave.b);
+    interface ar = onArFlit(toAXI4_AR_Slave_Synth(debug_u_slave.ar), $format("Slave XActor - AR - Synth slave side"));
+    interface r  = toAXI4_R_Slave_Synth(debug_u_slave.r);
+  endinterface;
   method clear = shim.clear;
   interface master = shim.master;
-  interface slaveSynth = toAXI4_Slave_Synth(u_slave);
+  interface slaveSynth = debug_synth_slave;
 endmodule
+*/
