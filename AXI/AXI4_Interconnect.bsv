@@ -47,7 +47,7 @@ import Routable :: *;
 `define SPARAMS sid_, `PARAMS
 
 module mkAXI4Bus_Synth#(
-    MappingTable#(nRoutes, addr_) maptab,
+    function Vector#(nRoutes, Bool) route (Bit#(addr_) val),
     Vector#(nMasters, AXI4_Master_Synth#(`MPARAMS)) masters,
     Vector#(nSlaves, AXI4_Slave_Synth#(`SPARAMS)) slaves
   ) (Empty) provisos (
@@ -77,13 +77,13 @@ module mkAXI4Bus_Synth#(
     Add#(1, b__, nSlaves), // at least one slave is needed
     Add#(nRoutes, 0, nSlaves) // nRoutes == nSlaves
   );
-  mkAXI4Bus(maptab,
+  mkAXI4Bus(route,
             map(fromAXI4_Master_Synth, masters),
             map(fromAXI4_Slave_Synth, slaves));
 endmodule
 
 module mkAXI4Bus#(
-    MappingTable#(nRoutes, addr_) maptab,
+    function Vector#(nRoutes, Bool) route (Bit#(addr_) val),
     Vector#(nMasters, AXI4_Master#(`MPARAMS)) masters,
     Vector#(nSlaves, AXI4_Slave#(`SPARAMS)) slaves
   ) (Empty) provisos (
@@ -158,7 +158,7 @@ module mkAXI4Bus#(
   end
 
   // connect with standard busses
-  mkTwoWayBus(routeFromMappingTable(maptab), write_masters, write_slaves);
-  mkTwoWayBus(routeFromMappingTable(maptab), read_masters, read_slaves);
+  mkTwoWayBus(route, write_masters, write_slaves);
+  mkTwoWayBus(route, read_masters, read_slaves);
 
 endmodule

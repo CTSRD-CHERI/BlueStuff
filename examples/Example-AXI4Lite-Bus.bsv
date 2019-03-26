@@ -132,7 +132,7 @@ module top (Empty);
     maptab[i] = Range{base: fromInteger(i*valueOf(SlaveWidth)), size: fromInteger(valueOf(SlaveWidth))};
     ss[i] <- axiSlave;
   end
-  mkAXI4LiteBus(maptab, ms, ss);
+  mkAXI4LiteBus(routeFromMappingTable(maptab), ms, ss);
 endmodule
 
 `undef PARAMS

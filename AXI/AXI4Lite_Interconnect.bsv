@@ -45,7 +45,7 @@ import Routable :: *;
 `define PARAMS addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_
 
 module mkAXI4LiteBus#(
-    MappingTable#(nRoutes, addr_) maptab,
+    function Vector#(nRoutes, Bool) route (Bit#(addr_) val),
     Vector#(nMasters, AXI4Lite_Master#(`PARAMS)) masters,
     Vector#(nSlaves, AXI4Lite_Slave#(`PARAMS)) slaves
   ) (Empty) provisos (
@@ -107,8 +107,8 @@ module mkAXI4LiteBus#(
   end
 
   // connect with standard busses
-  mkInOrderTwoWayBus(routeFromMappingTable(maptab), write_masters, write_slaves);
-  mkInOrderTwoWayBus(routeFromMappingTable(maptab), read_masters, read_slaves);
+  mkInOrderTwoWayBus(route, write_masters, write_slaves);
+  mkInOrderTwoWayBus(route, read_masters, read_slaves);
 
 endmodule
 
