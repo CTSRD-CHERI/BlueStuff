@@ -589,11 +589,11 @@ interface AXI4_Master_Synth#(
   numeric type buser_,
   numeric type aruser_,
   numeric type ruser_);
-  interface AXI4_AW_Master_Synth#(id_, addr_, awuser_) aw;
-  interface AXI4_W_Master_Synth#(data_, wuser_)        w;
-  interface AXI4_B_Master_Synth#(id_, buser_)          b;
-  interface AXI4_AR_Master_Synth#(id_, addr_, aruser_) ar;
-  interface AXI4_R_Master_Synth#(id_, data_, ruser_)   r;
+  (* prefix = "" *) interface AXI4_AW_Master_Synth#(id_, addr_, awuser_) aw;
+  (* prefix = "" *) interface AXI4_W_Master_Synth#(data_, wuser_)        w;
+  (* prefix = "" *) interface AXI4_B_Master_Synth#(id_, buser_)          b;
+  (* prefix = "" *) interface AXI4_AR_Master_Synth#(id_, addr_, aruser_) ar;
+  (* prefix = "" *) interface AXI4_R_Master_Synth#(id_, data_, ruser_)   r;
 endinterface
 
 instance CulDeSac#(AXI4_Master_Synth#(id_,
