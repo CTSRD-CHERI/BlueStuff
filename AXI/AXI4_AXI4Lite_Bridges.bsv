@@ -54,7 +54,7 @@ module fromAXI4Lite_Master#(
     function AXI4_AWFlit#(id_, addr_, awuser_) f(AXI4Lite_AWFlit#(addr_, awuser_) x) =
     AXI4_AWFlit {
       awid: 0, awaddr: x.awaddr, awlen: 0,
-      awsize: fromInteger(log2(valueOf(data_)/8)),
+      awsize: fromInteger(valueOf(data_)/8),
       awburst: FIXED, awlock: NORMAL, awcache: 0,
       awprot: x.awprot, awqos: 0, awregion: 0, awuser: x.awuser
     };
@@ -87,7 +87,7 @@ module fromAXI4Lite_Master#(
     function AXI4_ARFlit#(id_, addr_, aruser_) f(AXI4Lite_ARFlit#(addr_, aruser_) x) =
     AXI4_ARFlit {
       arid: 0, araddr: x.araddr, arlen: 0,
-      arsize: fromInteger(log2(valueOf(data_)/8)),
+      arsize: fromInteger(valueOf(data_)/8),
       arburst: FIXED, arlock: NORMAL, arcache: 0,
       arprot: x.arprot, arqos: 0, arregion: 0, aruser: x.aruser
     };
@@ -134,7 +134,7 @@ module fromAXI4Lite_Slave#(
     method put(x) = action
       if (x.awid != 0) abort($format("Unsupported awid (0x%0x)", x.awid));
       if (x.awlen != 0) abort($format("Unsupported awlen (0x%0x)", x.awlen));
-      if (x.awsize != fromInteger(log2(valueOf(data_)/8)))
+      if (x.awsize != fromInteger(valueOf(data_)/8))
         abort($format("Unsupported awsize (0x%0x)", x.awsize));
       if (x.awburst != FIXED)
         abort($format("Unsupported awburst (", fshow(x.awburst), ")"));
@@ -177,7 +177,7 @@ module fromAXI4Lite_Slave#(
     method put(x) = action
       if (x.arid != 0) abort($format("Unsupported arid (0x%0x)", x.arid));
       if (x.arlen != 0) abort($format("Unsupported arlen (0x%0x)", x.arlen));
-      if (x.arsize != fromInteger(log2(valueOf(data_)/8)))
+      if (x.arsize != fromInteger(valueOf(data_)/8))
         abort($format("Unsupported arsize (0x%0x)", x.arsize));
       if (x.arburst != FIXED)
         abort($format("Unsupported arburst (", fshow(x.arburst), ")"));
