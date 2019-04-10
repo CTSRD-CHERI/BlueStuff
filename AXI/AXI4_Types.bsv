@@ -66,7 +66,7 @@ typedef struct {
 deriving (Bits, FShow);
 instance DefaultValue#(AXI4_AWFlit#(id_, addr_, user_));
   function defaultValue = AXI4_AWFlit {
-    awid: 0, awaddr: ?, awlen: 0, awsize: 0,
+    awid: 0, awaddr: ?, awlen: 0, awsize: 1,
     awburst: INCR, awlock: NORMAL, awcache: 0,
     awprot: 0, awqos: 0, awregion: 0, awuser: ?
   };
@@ -343,7 +343,7 @@ typedef struct {
 deriving (Bits, FShow);
 instance DefaultValue#(AXI4_ARFlit#(id_, addr_, user_));
   function defaultValue = AXI4_ARFlit {
-    arid: 0, araddr: ?, arlen: 0, arsize: 0,
+    arid: 0, araddr: ?, arlen: 0, arsize: 1,
     arburst: INCR, arlock: NORMAL, arcache: 0,
     arprot: 0, arqos: 0, arregion: 0, aruser: ?
   };
