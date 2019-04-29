@@ -27,6 +27,7 @@
  */
 
 // AXI4 imports
+import AXI4_AXI4Lite_Types :: *;
 import AXI4_Types :: *;
 import AXI4_AW_Utils :: *;
 import AXI4_W_Utils :: *;
@@ -181,6 +182,139 @@ function AXI4_Slave#(a, addr_out, c, d, e, f, g, h) expandAXI4_Slave_Addr
     interface  r = s.r;
   endinterface;
 endfunction
+
+//////////////////////////////////////////
+// AXI4 Burst Master <-> NonBurst Slave //
+////////////////////////////////////////////////////////////////////////////////
+
+module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
+  provisos(Add#(a__, SizeOf#(AXI4_Len), b));
+
+  // Shims
+  let inShim <- mkAXI4ShimBypassFIFOF;
+  let outShim <- mkAXI4ShimBypassFIFOF;
+  // To guaranty atomicity of bursts, require that we only deal with one read or
+  // one write at a time...
+  // Dynamic priority handling
+  Reg#(Bool) lastWasRead <- mkReg(False);
+  // Current number of processed flits
+  Reg#(Bit#(SizeOf#(AXI4_Len))) flitSent <- mkReg(0);
+  Reg#(Bit#(SizeOf#(AXI4_Len))) flitLeft <- mkReg(0);
+  // waiting for responses
+  Reg#(Bool) waitRsp <- mkReg(False);
+  // current allocation status
+  Reg#(Bool) handleWrite <- mkReg(False);
+  Reg#(Bool) handleRead  <- mkReg(False);
+
+  // shorthands on AXI input/output flits
+  let inAW = inShim.master.aw.peek;
+  let inW  = inShim.master.w.peek;
+  let outB = inShim.slave.b.peek;
+  let inAR = inShim.master.ar.peek;
+  let outR = inShim.slave.r.peek;
+  // shorthands on AXI valid signals
+  let inAWVALID = inShim.master.aw.canPeek;
+  let inWVALID  = inShim.master.w.canPeek;
+  let inARVALID = inShim.master.ar.canPeek;
+
+  // helper functions
+  function getFlitAddr(addr, size, burst, cnt) = case (burst)
+    INCR: return addr + (zeroExtend(cnt) << pack(size));
+    default: return addr;
+  endcase;
+
+  // Writes
+  //////////////////////////////////////////////////////////////////////////////
+  rule forward_write_req (!handleRead && !waitRsp &&
+                          (!inARVALID || lastWasRead));
+    // prepare output flits
+    let outAW = inAW;
+    outAW.awaddr  = getFlitAddr(inAW.awaddr, inAW.awsize, inAW.awburst,
+                                flitSent);
+    outAW.awlen   = 1;
+    outAW.awburst = FIXED;
+    let outW  = inW;
+    outW.wlast = True;
+    // drop from W input and produce a AW/W output
+    inShim.master.w.drop;
+    outShim.slave.aw.put(outAW);
+    outShim.slave.w.put(outW);
+    // book keeping
+    handleWrite <= True;
+    if (inW.wlast) begin
+      waitRsp <= True;
+      inShim.master.aw.drop;
+    end
+    if (flitSent == 0) flitLeft <= inAW.awlen;
+    if (flitSent < inAW.awlen) flitSent <= flitSent + 1;
+  endrule
+  rule drop_write_rsp (flitLeft > 1 && lastWasRead);
+    outShim.slave.b.drop;
+    flitLeft <= flitLeft - 1;
+  endrule
+  rule forward_write_rsp (flitLeft == 1 && lastWasRead);
+    outShim.slave.b.drop;
+    inShim.master.b.put(outShim.slave.b.peek);
+    flitSent <= 0;
+    flitLeft <= 0;
+    waitRsp <= False;
+    handleWrite <= False;
+    lastWasRead <= False;
+  endrule
+
+  // Reads
+  //////////////////////////////////////////////////////////////////////////////
+  // allow handling of a read
+  rule forward_read (!handleWrite && !waitRsp &&
+                     (!(inAWVALID && inWVALID) || !lastWasRead));
+    // prepare output flits
+    let outAR = inAR;
+    outAR.araddr  = getFlitAddr(inAR.araddr, inAR.arsize, inAR.arburst,
+                                flitSent);
+    outAR.arlen   = 1;
+    outAR.arburst = FIXED;
+    // produce a AR output
+    outShim.slave.ar.put(outAR);
+    // book keeping
+    handleRead <= True;
+    if (flitSent == 0) flitLeft <= inAR.arlen;
+    if (flitSent < inAR.arlen) flitSent <= flitSent + 1;
+    if (flitSent == inAR.arlen - 1) begin
+      waitRsp <= True;
+      inShim.master.ar.drop;
+    end
+  endrule
+  rule forward_read_rsp (flitLeft > 1 && !lastWasRead);
+    let tmp = outShim.slave.r.peek;
+    tmp.rlast = False;
+    inShim.master.r.put(tmp);
+    outShim.slave.r.drop;
+    flitLeft <= flitLeft - 1;
+  endrule
+  rule forward_last_read_rsp (flitLeft == 1 && !lastWasRead);
+    inShim.master.r.put(outShim.slave.r.peek);
+    outShim.slave.r.drop;
+    flitSent <= 0;
+    flitLeft <= 0;
+    waitRsp <= False;
+    handleWrite <= False;
+    lastWasRead <= True;
+  endrule
+
+  method clear = action
+    inShim.clear;
+    outShim.clear;
+    lastWasRead <= False;
+    flitSent    <= 0;
+    flitLeft    <= 0;
+    waitRsp     <= False;
+    handleWrite <= False;
+    handleRead  <= False;
+  endaction;
+  interface slave  = inShim.slave;
+  interface master = outShim.master;
+
+endmodule
 
 ////////////////////////////////
 // AXI4 Shim Master <-> Slave //
