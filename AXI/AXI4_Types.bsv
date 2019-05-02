@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2018-2019 Alexandre Joannou
+ * Copyright (c) 2019 Peter Rugg
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -242,7 +243,7 @@ endinstance
 instance Connectable#(AXI4_W_Master_Synth#(a, b), AXI4_W_Slave_Synth#(a, b));
   module mkConnection#(AXI4_W_Master_Synth#(a, b) m,
                        AXI4_W_Slave_Synth#(a, b) s)(Empty);
-    rule connect_wflit; s.wflit(m.wdata, m.wstrb, m.wlast, m.wuser); endrule
+    rule connect_wflit (m.wvalid); s.wflit(m.wdata, m.wstrb, m.wlast, m.wuser); endrule
     rule connect_wready; m.wready(s.wready); endrule
   endmodule
 endinstance
@@ -431,7 +432,7 @@ instance Connectable#(AXI4_AR_Master_Synth#(a, b, c),
                       AXI4_AR_Slave_Synth#(a, b, c));
   module mkConnection#(AXI4_AR_Master_Synth#(a, b, c) m,
                        AXI4_AR_Slave_Synth#(a, b, c) s)(Empty);
-    rule connect_arflit;
+   rule connect_arflit (m.arvalid);
       s.arflit(m.arid,
                m.araddr,
                m.arlen,
@@ -529,7 +530,7 @@ instance Connectable#(AXI4_R_Master_Synth#(a, b, c),
                       AXI4_R_Slave_Synth#(a, b, c));
   module mkConnection#(AXI4_R_Master_Synth#(a, b, c) m,
                        AXI4_R_Slave_Synth#(a, b, c) s)(Empty);
-    rule connect_rflit;
+    rule connect_rflit (s.rvalid);
       m.rflit(s.rid, s.rdata, s.rresp, s.rlast, s.ruser);
     endrule
     rule connect_rready; s.rready(m.rready); endrule
