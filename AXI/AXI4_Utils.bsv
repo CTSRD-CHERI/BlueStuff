@@ -216,7 +216,15 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
   // shorthands on AXI valid signals
   let inAWVALID = inShim.master.aw.canPeek;
   let inWVALID  = inShim.master.w.canPeek;
+  let outBVALID = outShim.slave.b.canPeek;
   let inARVALID = inShim.master.ar.canPeek;
+  let outRVALID = outShim.slave.r.canPeek;
+  // shorthands on AXI ready signals
+  let outAWREADY = outShim.slave.aw.canPut;
+  let outWREADY  = outShim.slave.w.canPut;
+  let inBREADY   = inShim.master.b.canPut;
+  let outARREADY = outShim.slave.ar.canPut;
+  let inRREADY   = inShim.master.r.canPut;
 
   // helper functions
   function getFlitAddr(addr, size, burst, cnt) = case (burst)
@@ -227,7 +235,9 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
   // Writes
   //////////////////////////////////////////////////////////////////////////////
   rule forward_write_req (!handleRead && !waitRsp &&
-                          (!inARVALID || lastWasRead));
+                          (!inARVALID || lastWasRead) &&
+                          (inAWVALID && inWVALID) &&
+                          (outAWREADY && outWREADY));
     // prepare output flits
     let outAW = inAW;
     outAW.awaddr  = getFlitAddr(inAW.awaddr, inAW.awsize, inAW.awburst,
@@ -249,11 +259,11 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
     if (flitSent == 0) flitLeft <= inAW.awlen;
     if (flitSent < inAW.awlen) flitSent <= flitSent + 1;
   endrule
-  rule drop_write_rsp (flitLeft > 1 && lastWasRead);
+  rule drop_write_rsp (flitLeft > 1 && lastWasRead && outBVALID);
     outShim.slave.b.drop;
     flitLeft <= flitLeft - 1;
   endrule
-  rule forward_write_rsp (flitLeft == 1 && lastWasRead);
+  rule forward_write_rsp (flitLeft == 1 && lastWasRead && outBVALID && inBREADY);
     outShim.slave.b.drop;
     inShim.master.b.put(outShim.slave.b.peek);
     flitSent <= 0;
@@ -267,7 +277,9 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
   //////////////////////////////////////////////////////////////////////////////
   // allow handling of a read
   rule forward_read (!handleWrite && !waitRsp &&
-                     (!(inAWVALID && inWVALID) || !lastWasRead));
+                     (!(inAWVALID && inWVALID) || !lastWasRead) &&
+                     inARVALID &&
+                     outARREADY);
     // prepare output flits
     let outAR = inAR;
     outAR.araddr  = getFlitAddr(inAR.araddr, inAR.arsize, inAR.arburst,
@@ -285,14 +297,14 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
       inShim.master.ar.drop;
     end
   endrule
-  rule forward_read_rsp (flitLeft > 1 && !lastWasRead);
+  rule forward_read_rsp (flitLeft > 1 && !lastWasRead && outRVALID && inRREADY);
     let tmp = outShim.slave.r.peek;
     tmp.rlast = False;
     inShim.master.r.put(tmp);
     outShim.slave.r.drop;
     flitLeft <= flitLeft - 1;
   endrule
-  rule forward_last_read_rsp (flitLeft == 1 && !lastWasRead);
+  rule forward_last_read_rsp (flitLeft == 1 && !lastWasRead && outRVALID && inRREADY);
     inShim.master.r.put(outShim.slave.r.peek);
     outShim.slave.r.drop;
     flitSent <= 0;
