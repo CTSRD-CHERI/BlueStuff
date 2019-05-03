@@ -188,141 +188,167 @@ endfunction
 // AXI4 Burst Master <-> NonBurst Slave //
 ////////////////////////////////////////////////////////////////////////////////
 
-module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
+module mkBurstToNoBurst#(Bool debug) (AXI4_Shim#(a, b, c, d, e, f, g, h))
   provisos(Add#(a__, SizeOf#(AXI4_Len), b));
 
   // Shims
+  //let inShim <- mkAXI4ShimUGSizedFIFOF4;
+  //let outShim <- mkAXI4ShimUGSizedFIFOF4;
   let inShim <- mkAXI4ShimBypassFIFOF;
   let outShim <- mkAXI4ShimBypassFIFOF;
+  // handy names
+  let inAW = inShim.master.aw;
+  let inW  = inShim.master.w;
+  let inB  = inShim.master.b;
+  let inAR = inShim.master.ar;
+  let inR  = inShim.master.r;
+  let outAW = outShim.slave.aw;
+  let outW  = outShim.slave.w;
+  let outB  = outShim.slave.b;
+  let outAR = outShim.slave.ar;
+  let outR  = outShim.slave.r;
+  // internal state
+  let lastReadRspFF   <- mkSizedFIFOF(4);
+  let countWriteRspFF <- mkSizedFIFOF(4);
+  Reg#(Bit#(SizeOf#(AXI4_Len))) flitSent <- mkReg(0);
+  Reg#(Bit#(SizeOf#(AXI4_Len))) flitReceived <- mkReg(0);
+
   // To guaranty atomicity of bursts, require that we only deal with one read or
   // one write at a time...
   // Dynamic priority handling
   Reg#(Bool) lastWasRead <- mkReg(False);
-  // Current number of processed flits
-  Reg#(Bit#(SizeOf#(AXI4_Len))) flitSent <- mkReg(0);
-  Reg#(Bit#(SizeOf#(AXI4_Len))) flitLeft <- mkReg(0);
-  // waiting for responses
-  Reg#(Bool) waitRsp <- mkReg(False);
-  // current allocation status
-  Reg#(Bool) handleWrite <- mkReg(False);
-  Reg#(Bool) handleRead  <- mkReg(False);
-
-  // shorthands on AXI input/output flits
-  let inAW = inShim.master.aw.peek;
-  let inW  = inShim.master.w.peek;
-  let outB = inShim.slave.b.peek;
-  let inAR = inShim.master.ar.peek;
-  let outR = inShim.slave.r.peek;
-  // shorthands on AXI valid signals
-  let inAWVALID = inShim.master.aw.canPeek;
-  let inWVALID  = inShim.master.w.canPeek;
-  let outBVALID = outShim.slave.b.canPeek;
-  let inARVALID = inShim.master.ar.canPeek;
-  let outRVALID = outShim.slave.r.canPeek;
-  // shorthands on AXI ready signals
-  let outAWREADY = outShim.slave.aw.canPut;
-  let outWREADY  = outShim.slave.w.canPut;
-  let inBREADY   = inShim.master.b.canPut;
-  let outARREADY = outShim.slave.ar.canPut;
-  let inRREADY   = inShim.master.r.canPut;
 
   // helper functions
   function getFlitAddr(addr, size, burst, cnt) = case (burst)
     INCR: return addr + (zeroExtend(cnt) << pack(size));
     default: return addr;
   endcase;
+  Bool allowWrites = !inAR.canPeek || lastWasRead;
+  //Bool allowWrites = (!inAR.canPeek || lastWasRead) && !lastReadRspFF.notEmpty;
+  Bool allowReads  = (!inAW.canPeek && !inW.canPeek) || !lastWasRead;
 
+  (* fire_when_enabled *)
+  rule dbg (debug);
+    Fmt dbg_str = $format("inAW.canPeek:\t ", fshow(inAW.canPeek))
+                + $format("\toutAW.canPut:\t ", fshow(outAW.canPut))
+                + $format("\n\tinW.canPeek:\t ", fshow(inW.canPeek))
+                + $format("\toutW.canPut:\t ", fshow(outW.canPut))
+                + $format("\n\tinB.canPut:\t ", fshow(inB.canPut))
+                + $format("\toutB.canPeek:\t ", fshow(outB.canPeek))
+                + $format("\n\tinAR.canPeek:\t ", fshow(inAR.canPeek))
+                + $format("\toutAR.canPut:\t ", fshow(outAR.canPut))
+                + $format("\n\tinR.canPut:\t ", fshow(inR.canPut))
+                + $format("\toutR.canPeek:\t ", fshow(outR.canPeek));
+    Fmt state_str = $format("lastWasRead: ", fshow(lastWasRead),
+                            " allowReads: ", fshow(allowReads),
+                            " allowWrites: ", fshow(allowWrites),
+                            "\nflitSent: %d", flitSent,
+                            " flitReceived: %d", flitReceived);
+    $display("%0t: ", $time, dbg_str);
+    $display("%0t: ", $time, state_str);
+  endrule
+  (* fire_when_enabled *)
+  rule dbgff (debug);
+    Fmt state_str = $format("countWriteRspFF - notFull: ", fshow(countWriteRspFF.notFull),
+                            " notEmpty: ", fshow(countWriteRspFF.notEmpty),
+                            " first: %d", countWriteRspFF.first)
+                  + $format("\n\tlastReadRspFF - notFull: ", fshow(lastReadRspFF.notFull),
+                            " notEmpty: ", fshow(lastReadRspFF.notEmpty),
+                            " first: ", fshow(lastReadRspFF.first));
+    $display("%0t: ", $time, state_str);
+  endrule
   // Writes
   //////////////////////////////////////////////////////////////////////////////
-  rule forward_write_req (!handleRead && !waitRsp &&
-                          (!inARVALID || lastWasRead) &&
-                          (inAWVALID && inWVALID) &&
-                          (outAWREADY && outWREADY));
-    // prepare output flits
-    let outAW = inAW;
-    outAW.awaddr  = getFlitAddr(inAW.awaddr, inAW.awsize, inAW.awburst,
-                                flitSent);
-    outAW.awlen   = 1;
-    outAW.awburst = FIXED;
-    let outW  = inW;
-    outW.wlast = True;
+  rule forward_write_req (allowWrites
+                          && inAW.canPeek && inW.canPeek
+                          && outAW.canPut && outW.canPut);
+    // prepare new AW request flit
+    let awflit = inAW.peek;
+    let newawflit = awflit;
+    newawflit.awaddr = getFlitAddr(awflit.awaddr, awflit.awsize, awflit.awburst,
+                                   flitSent);
+    newawflit.awlen = 0;
+    newawflit.awburst = FIXED;
+    // prepare new W request flit
+    let newwflit = inW.peek;
+    newwflit.wlast = True;
     // drop from W input and produce a AW/W output
-    inShim.master.w.drop;
-    outShim.slave.aw.put(outAW);
-    outShim.slave.w.put(outW);
+    inW.drop;
+    outAW.put(newawflit);
+    outW.put(newwflit);
     // book keeping
-    handleWrite <= True;
-    if (inW.wlast) begin
-      waitRsp <= True;
-      inShim.master.aw.drop;
+    if (inW.peek.wlast) begin
+      inAW.drop;
+      countWriteRspFF.enq(awflit.awlen);
+      flitSent <= 0;
+    end else flitSent <= flitSent + 1;
+    if (debug) $display("%0t: forward_write_req", $time,
+                        "\n", fshow(awflit), "\n", fshow(inW.peek),
+                        "\n", fshow(newawflit), "\n", fshow(newwflit));
+  endrule
+  rule handle_write_rsp (allowWrites && outB.canPeek && inB.canPut);
+    // always consume the response
+    outB.drop;
+    // count up if not last
+    if (countWriteRspFF.first > flitReceived) flitReceived <= flitReceived + 1;
+    // on last response, forward it and reset book keeping
+    else begin
+      countWriteRspFF.deq;
+      inB.put(outB.peek);
+      flitReceived <= 0;
+      lastWasRead <= False;
     end
-    if (flitSent == 0) flitLeft <= inAW.awlen;
-    if (flitSent < inAW.awlen) flitSent <= flitSent + 1;
-  endrule
-  rule drop_write_rsp (flitLeft > 1 && lastWasRead && outBVALID);
-    outShim.slave.b.drop;
-    flitLeft <= flitLeft - 1;
-  endrule
-  rule forward_write_rsp (flitLeft == 1 && lastWasRead && outBVALID && inBREADY);
-    outShim.slave.b.drop;
-    inShim.master.b.put(outShim.slave.b.peek);
-    flitSent <= 0;
-    flitLeft <= 0;
-    waitRsp <= False;
-    handleWrite <= False;
-    lastWasRead <= False;
+    if (debug) $display("%0t: handle_write_rsp - ", $time, fshow(outB.peek));
   endrule
 
   // Reads
   //////////////////////////////////////////////////////////////////////////////
-  // allow handling of a read
-  rule forward_read (!handleWrite && !waitRsp &&
-                     (!(inAWVALID && inWVALID) || !lastWasRead) &&
-                     inARVALID &&
-                     outARREADY);
-    // prepare output flits
-    let outAR = inAR;
-    outAR.araddr  = getFlitAddr(inAR.araddr, inAR.arsize, inAR.arburst,
-                                flitSent);
-    outAR.arlen   = 1;
-    outAR.arburst = FIXED;
+  rule forward_read_req (allowReads
+                         && inAR.canPeek && outAR.canPut);
+    // prepare new request flit
+    let arflit = inAR.peek;
+    let newflit = arflit;
+    newflit.araddr = getFlitAddr(arflit.araddr, arflit.arsize, arflit.arburst,
+                                 flitSent);
+    newflit.arlen = 0;
+    newflit.arburst = FIXED;
+    // is this te last request ?
+    let isLast = (flitSent == arflit.arlen);
     // produce a AR output
-    outShim.slave.ar.put(outAR);
+    outAR.put(newflit);
+    lastReadRspFF.enq(isLast);
     // book keeping
-    handleRead <= True;
-    if (flitSent == 0) flitLeft <= inAR.arlen;
-    if (flitSent < inAR.arlen) flitSent <= flitSent + 1;
-    if (flitSent == inAR.arlen - 1) begin
-      waitRsp <= True;
-      inShim.master.ar.drop;
-    end
+    if (isLast) begin
+      inAR.drop;
+      flitSent <= 0;
+    end else flitSent <= flitSent + 1;
+    if (debug) $display("%0t: forward_read_req", $time,
+                        "\n", fshow(arflit), "\n", fshow(newflit),
+                        "\nisLast: ", fshow(isLast));
   endrule
-  rule forward_read_rsp (flitLeft > 1 && !lastWasRead && outRVALID && inRREADY);
-    let tmp = outShim.slave.r.peek;
-    tmp.rlast = False;
-    inShim.master.r.put(tmp);
-    outShim.slave.r.drop;
-    flitLeft <= flitLeft - 1;
-  endrule
-  rule forward_last_read_rsp (flitLeft == 1 && !lastWasRead && outRVALID && inRREADY);
-    inShim.master.r.put(outShim.slave.r.peek);
-    outShim.slave.r.drop;
-    flitSent <= 0;
-    flitLeft <= 0;
-    waitRsp <= False;
-    handleWrite <= False;
-    lastWasRead <= True;
+  rule forward_read_rsp (allowReads && outR.canPeek && inR.canPut);
+    let isLast = lastReadRspFF.first;
+    // prepare new response flit
+    let newflit   = outR.peek;
+    newflit.rlast = isLast;
+    // consume and produce on AXI
+    outR.drop;
+    inR.put(newflit);
+    // book keeping
+    lastReadRspFF.deq;
+    if (isLast) lastWasRead <= True;
+    if (debug) $display("%0t: forward_read_rsp - ", $time, fshow(newflit));
   endrule
 
+  // Interface
+  //////////////////////////////////////////////////////////////////////////////
   method clear = action
     inShim.clear;
     outShim.clear;
-    lastWasRead <= False;
-    flitSent    <= 0;
-    flitLeft    <= 0;
-    waitRsp     <= False;
-    handleWrite <= False;
-    handleRead  <= False;
+    lastReadRspFF.clear;
+    countWriteRspFF.clear;
+    flitSent <= 0;
+    flitReceived <= 0;
   endaction;
   interface slave  = inShim.slave;
   interface master = outShim.master;
@@ -369,6 +395,7 @@ endmodule
 `defAXI4ShimFIFOF(BypassFIFOF, mkBypassFIFOF)
 `defAXI4ShimFIFOF(BypassFF1, mkSizedBypassFIFOF(1))
 `defAXI4ShimFIFOF(FF1, mkFIFOF1)
+`defAXI4ShimFIFOF(FF, mkFIFOF)
 `defAXI4ShimFIFOF(SizedFIFOF4, mkSizedFIFOF(4))
 `defAXI4ShimFIFOF(UGSizedFIFOF4, mkUGSizedFIFOF(4))
 
