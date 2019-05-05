@@ -261,9 +261,8 @@ module mkBurstToNoBurst#(Bool debug) (AXI4_Shim#(a, b, c, d, e, f, g, h))
   endrule
   // Writes
   //////////////////////////////////////////////////////////////////////////////
-  rule forward_write_req (allowWrites
-                          && inAW.canPeek && inW.canPeek
-                          && outAW.canPut && outW.canPut);
+  rule forward_write_req (allowWrites && inAW.canPeek && inW.canPeek
+                                      && outAW.canPut && outW.canPut);
     // prepare new AW request flit
     let awflit = inAW.peek;
     let newawflit = awflit;
@@ -305,8 +304,7 @@ module mkBurstToNoBurst#(Bool debug) (AXI4_Shim#(a, b, c, d, e, f, g, h))
 
   // Reads
   //////////////////////////////////////////////////////////////////////////////
-  rule forward_read_req (allowReads
-                         && inAR.canPeek && outAR.canPut);
+  rule forward_read_req (allowReads && inAR.canPeek && outAR.canPut);
     // prepare new request flit
     let arflit = inAR.peek;
     let newflit = arflit;
