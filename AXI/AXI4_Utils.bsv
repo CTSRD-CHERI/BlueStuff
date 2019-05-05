@@ -188,12 +188,10 @@ endfunction
 // AXI4 Burst Master <-> NonBurst Slave //
 ////////////////////////////////////////////////////////////////////////////////
 
-module mkBurstToNoBurst#(Bool debug) (AXI4_Shim#(a, b, c, d, e, f, g, h))
+module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
   provisos(Add#(a__, SizeOf#(AXI4_Len), b));
 
   // Shims
-  //let inShim <- mkAXI4ShimUGSizedFIFOF4;
-  //let outShim <- mkAXI4ShimUGSizedFIFOF4;
   let inShim <- mkAXI4ShimBypassFIFOF;
   let outShim <- mkAXI4ShimBypassFIFOF;
   // handy names
@@ -225,9 +223,11 @@ module mkBurstToNoBurst#(Bool debug) (AXI4_Shim#(a, b, c, d, e, f, g, h))
     default: return addr;
   endcase;
   Bool allowWrites = !inAR.canPeek || lastWasRead;
-  //Bool allowWrites = (!inAR.canPeek || lastWasRead) && !lastReadRspFF.notEmpty;
   Bool allowReads  = (!inAW.canPeek && !inW.canPeek) || !lastWasRead;
 
+  // DEBUG //
+  //////////////////////////////////////////////////////////////////////////////
+  Bool debug = False;
   (* fire_when_enabled *)
   rule dbg (debug);
     Fmt dbg_str = $format("inAW.canPeek:\t ", fshow(inAW.canPeek))
@@ -283,6 +283,7 @@ module mkBurstToNoBurst#(Bool debug) (AXI4_Shim#(a, b, c, d, e, f, g, h))
       countWriteRspFF.enq(awflit.awlen);
       writesSent <= 0;
     end else writesSent <= writesSent + 1;
+    // DEBUG //
     if (debug) $display("%0t: forward_write_req", $time,
                         "\n", fshow(awflit), "\n", fshow(inW.peek),
                         "\n", fshow(newawflit), "\n", fshow(newwflit));
@@ -299,6 +300,7 @@ module mkBurstToNoBurst#(Bool debug) (AXI4_Shim#(a, b, c, d, e, f, g, h))
       flitReceived <= 0;
       lastWasRead <= False;
     end
+    // DEBUG //
     if (debug) $display("%0t: handle_write_rsp - ", $time, fshow(outB.peek));
   endrule
 
@@ -322,6 +324,7 @@ module mkBurstToNoBurst#(Bool debug) (AXI4_Shim#(a, b, c, d, e, f, g, h))
       inAR.drop;
       readsSent <= 0;
     end else readsSent <= readsSent + 1;
+    // DEBUG //
     if (debug) $display("%0t: forward_read_req", $time,
                         "\n", fshow(arflit), "\n", fshow(newflit),
                         "\nisLast: ", fshow(isLast),
@@ -338,6 +341,7 @@ module mkBurstToNoBurst#(Bool debug) (AXI4_Shim#(a, b, c, d, e, f, g, h))
     // book keeping
     lastReadRspFF.deq;
     if (isLast) lastWasRead <= True;
+    // DEBUG //
     if (debug) $display("%0t: forward_read_rsp - ", $time, fshow(newflit));
   endrule
 
@@ -348,8 +352,8 @@ module mkBurstToNoBurst#(Bool debug) (AXI4_Shim#(a, b, c, d, e, f, g, h))
     outShim.clear;
     lastReadRspFF.clear;
     countWriteRspFF.clear;
-    writesSent <= 0;
-    readsSent <= 0;
+    writesSent   <= 0;
+    readsSent    <= 0;
     flitReceived <= 0;
   endaction;
   interface slave  = inShim.slave;
@@ -488,21 +492,25 @@ module toUnguarded_AXI4_Slave#(AXI4_Slave#(a, b, c, d, e, f, g, h) s)
   endinterface;
 endmodule
 
-function AXI4_Master#(a,b,c,d,e,f,g,h) guard_AXI4_Master (AXI4_Master#(a,b,c,d,e,f,g,h) raw, Bool block) = interface AXI4_Master;
-  interface aw = guardSource(raw.aw, block);
-  interface w  = guardSource(raw.w, block);
-  interface b  = guardSink(raw.b, block);
-  interface ar = guardSource(raw.ar, block);
-  interface r  = guardSink(raw.r, block);
-endinterface;
+function AXI4_Master#(a,b,c,d,e,f,g,h) guard_AXI4_Master
+        (AXI4_Master#(a,b,c,d,e,f,g,h) raw, Bool block) =
+  interface AXI4_Master;
+    interface aw = guardSource(raw.aw, block);
+    interface w  = guardSource(raw.w, block);
+    interface b  = guardSink(raw.b, block);
+    interface ar = guardSource(raw.ar, block);
+    interface r  = guardSink(raw.r, block);
+  endinterface;
 
-function AXI4_Slave#(a,b,c,d,e,f,g,h) guard_AXI4_Slave (AXI4_Slave#(a,b,c,d,e,f,g,h) raw, Bool block) = interface AXI4_Slave;
-  interface aw = guardSink(raw.aw, block);
-  interface w  = guardSink(raw.w, block);
-  interface b  = guardSource(raw.b, block);
-  interface ar = guardSink(raw.ar, block);
-  interface r  = guardSource(raw.r, block);
-endinterface;
+function AXI4_Slave#(a,b,c,d,e,f,g,h) guard_AXI4_Slave
+        (AXI4_Slave#(a,b,c,d,e,f,g,h) raw, Bool block) =
+  interface AXI4_Slave;
+    interface aw = guardSink(raw.aw, block);
+    interface w  = guardSink(raw.w, block);
+    interface b  = guardSource(raw.b, block);
+    interface ar = guardSink(raw.ar, block);
+    interface r  = guardSource(raw.r, block);
+  endinterface;
 
 module mkAXI4_Master_Xactor (AXI4_Master_Xactor#(a, b, c, d, e, f, g, h));
   let shim <- mkAXI4ShimSizedFIFOF4;
