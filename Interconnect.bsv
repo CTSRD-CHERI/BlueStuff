@@ -201,9 +201,10 @@ module mkTwoWayBus#(
     FIFOF#(m2s_b)                  innerReq   <- mkFIFOF;
     FIFOF#(Vector#(nSlaves, Bool)) innerRoute <- mkFIFOF;
     FIFOF#(s2m_b)                  noRouteRsp <- mkFIFOF;
-    Reg#(MasterWrapperState) state <- mkReg(UNALLOCATED);
-    PulseWire drainingNoRoute <- mkPulseWire;
-    Wire#(s2m_b)       rspFwd <- mkWire;
+    NoRouteFoundIfc#(m2s_a, s2m_b) noRoute    <- mkNoRouteFound;
+    Reg#(MasterWrapperState)       state      <- mkReg(UNALLOCATED);
+    PulseWire                      drainingNoRoute <- mkPulseWire;
+    Wire#(s2m_b)                   rspFwd     <- mkWire;
     // inner signals
     Source#(m2s_a) src = m.source;
     Sink#(s2m_b) snk = m.sink;
@@ -213,6 +214,7 @@ module mkTwoWayBus#(
     Bool isRoutable = countIf(id, dest) == 1;
     // consume different kinds of flits
     (* mutually_exclusive = "firstFlit, followFlits, nonRoutableFlit, drainFlits" *)
+    (* mutually_exclusive = "firstFlit, followFlits, nonRoutableGenRsp, drainFlits" *)
     rule firstFlit (state == UNALLOCATED && src.canPeek && isRoutable);
       src.drop;
       innerReq.enq(fatReq);
@@ -225,9 +227,15 @@ module mkTwoWayBus#(
       if (detectLast(fatReq)) state <= UNALLOCATED;
     endrule
     rule nonRoutableFlit (state == UNALLOCATED && src.canPeek && !isRoutable);
-      src.drop;
-      noRouteRsp.enq(noRouteFound(req));
-      if (!detectLast(fatReq)) state <= DRAIN;
+      noRoute.pushReq(req);
+    endrule
+    rule nonRoutableGenRsp;
+      match {.isLast, .rsp} <- noRoute.getRsp;
+      noRouteRsp.enq(rsp);
+      if (isLast) begin
+        src.drop;
+        if (!detectLast(fatReq)) state <= DRAIN;
+      end
     endrule
     rule drainFlits (state == DRAIN);
       src.drop;
@@ -344,7 +352,8 @@ module mkInOrderTwoWayBus#(
     FIFOF#(UpFlit#(m2s_t, nMasters)) innerReq   <- mkFIFOF;
     FIFOF#(Vector#(nSlaves, Bool))   innerRoute <- mkFIFOF;
     FIFOF#(Maybe#(s2m_t))            innerRsp   <- mkFIFOF;
-    Reg#(MasterWrapperState) state <- mkReg(UNALLOCATED);
+    NoRouteFoundIfc#(m2s_t, s2m_t)   noRoute    <- mkNoRouteFound;
+    Reg#(MasterWrapperState)         state      <- mkReg(UNALLOCATED);
     // inner signals
     Source#(m2s_t) src = m.source;
     Sink#(s2m_t) snk = m.sink;
@@ -352,6 +361,7 @@ module mkInOrderTwoWayBus#(
     Bool isRoutable = countIf(id, dest) == 1;
     // consume different kinds of flits
     (* mutually_exclusive = "firstFlit, followFlits, nonRoutableFlit, drainFlits" *)
+    (* mutually_exclusive = "firstFlit, followFlits, nonRoutableGenRsp, drainFlits" *)
     rule firstFlit (state == UNALLOCATED && src.canPeek && isRoutable);
       let req <- get(src);
       innerReq.enq(UpFlit {path: orig, flit: req});
@@ -365,9 +375,15 @@ module mkInOrderTwoWayBus#(
       if (detectLast(req)) state <= UNALLOCATED;
     endrule
     rule nonRoutableFlit (state == UNALLOCATED && src.canPeek && !isRoutable);
-      let req <- get(src);
-      innerRsp.enq(Valid(noRouteFound(req)));
-      if (!detectLast(req)) state <= DRAIN;
+      noRoute.pushReq(src.peek);
+    endrule
+    rule nonRoutableGenRsp;
+      match {.isLast, .rsp} <- noRoute.getRsp;
+      innerRsp.enq(Valid(rsp));
+      if (isLast) begin
+        src.drop;
+        if (!detectLast(src.peek)) state <= DRAIN;
+      end
     endrule
     rule drainFlits (state == DRAIN);
       let req <- get(src);

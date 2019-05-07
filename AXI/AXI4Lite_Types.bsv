@@ -54,7 +54,19 @@ instance Routable#(AXI4Lite_AWFlit#(addr_, awuser_),
                    AXI4Lite_BFlit#(wuser_),
                    Bit#(addr_));
   function routingField(x) = x.awaddr;
-  function noRouteFound(x) = AXI4Lite_BFlit { bresp: DECERR, buser: ? };
+  module mkNoRouteFound(NoRouteFoundIfc#(AXI4Lite_AWFlit#(addr_, awuser_),
+                                         AXI4Lite_BFlit#(buser_)));
+    Reg#(AXI4Lite_AWFlit#(addr_, awuser_)) currentReq[2] <- mkCReg(2, ?);
+    Reg#(Bool)                             pendingReq[2] <- mkCReg(2, False);
+    method pushReq (req) if (!pendingReq[0]) = action
+      currentReq[0] <= req;
+      pendingReq[0] <= True;
+    endaction;
+    method getRsp if (pendingReq[1]) = actionvalue
+      pendingReq[1] <= False;
+      return tuple2(True, AXI4Lite_BFlit {bresp: DECERR, buser: ?});
+    endactionvalue;
+  endmodule
 endinstance
 instance DetectLast#(AXI4Lite_AWFlit#(addr_, user_));
   function detectLast(x) = True;
@@ -222,9 +234,19 @@ instance Routable#(
   AXI4Lite_RFlit#(data_, ruser_),
   Bit#(addr_));
   function routingField(x) = x.araddr;
-  function noRouteFound(x) = AXI4Lite_RFlit {
-    rdata: ?, rresp: DECERR, ruser: ?
-  };
+  module mkNoRouteFound(NoRouteFoundIfc#(AXI4Lite_ARFlit#(addr_, aruser_),
+                                         AXI4Lite_RFlit#(data_, ruser_)));
+    Reg#(AXI4Lite_ARFlit#(addr_, aruser_)) currentReq[2] <- mkCReg(2, ?);
+    Reg#(Bool)                             pendingReq[2] <- mkCReg(2, False);
+    method pushReq (req) if (!pendingReq[0]) = action
+      currentReq[0] <= req;
+      pendingReq[0] <= True;
+    endaction;
+    method getRsp if (pendingReq[1]) = actionvalue
+      pendingReq[1] <= False;
+      return tuple2(True, AXI4Lite_RFlit {rdata: ?, rresp: DECERR, ruser: ?});
+    endactionvalue;
+  endmodule
 endinstance
 instance DetectLast#(AXI4Lite_ARFlit#(addr_, user_));
   function detectLast(x) = True;
@@ -536,7 +558,14 @@ instance Routable#(
               Bit#(addr_))
   );
   function routingField(x) = x.aw.awaddr; // XXX routingField(aw); XXX THIS SHOULD JUST WORK BUT DOESN'T ?!
-  function noRouteFound(x) = noRouteFound(x.aw);
+  module mkNoRouteFound(NoRouteFoundIfc#(
+                          AXI4Lite_WriteFlit#(addr_, data_, awuser_, wuser_),
+                          AXI4Lite_BFlit#(buser_)));
+    NoRouteFoundIfc#(AXI4Lite_AWFlit#(addr_, awuser_), AXI4Lite_BFlit#(buser_))
+      inner <- mkNoRouteFound;
+    method pushReq (req) = inner.pushReq(req.aw);
+    method getRsp = inner.getRsp;
+  endmodule
 endinstance
 instance DetectLast#(AXI4Lite_WriteFlit#(addr_, data_, awuser_, wuser_));
   function detectLast(x) = detectLast(x.w);

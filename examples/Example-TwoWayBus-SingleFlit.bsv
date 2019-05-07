@@ -64,7 +64,14 @@ typedef struct {
 
 instance Routable#(Req, Rsp, Vector#(NSlaves, Bool));
   function routingField (x) = x.to;
-  function noRouteFound (x) = Rsp { status: KO };
+  module mkNoRouteFound (NoRouteFoundIfc#(Req, Rsp));
+    FIFOF#(Bit#(0)) ff <- mkFIFOF1;
+    method pushReq (x) = ff.enq(?);
+    method getRsp = actionvalue
+      ff.deq;
+      return tuple2(True, Rsp { status: KO });
+    endactionvalue;
+  endmodule
 endinstance
 
 instance DetectLast#(Req); function detectLast = constFn(True); endinstance
