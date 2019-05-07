@@ -513,7 +513,7 @@ function AXI4_Slave#(a,b,c,d,e,f,g,h) guard_AXI4_Slave
   endinterface;
 
 module mkAXI4_Master_Xactor (AXI4_Master_Xactor#(a, b, c, d, e, f, g, h));
-  let shim <- mkAXI4ShimSizedFIFOF4;
+  let shim <- mkAXI4ShimBypassFIFOF;
   let ug_master <- toUnguarded_AXI4_Master(shim.master);
   let clearing <- mkReg(False);
   rule do_clear (clearing);
@@ -526,7 +526,7 @@ module mkAXI4_Master_Xactor (AXI4_Master_Xactor#(a, b, c, d, e, f, g, h));
 endmodule
 
 module mkAXI4_Slave_Xactor (AXI4_Slave_Xactor#(a, b, c, d, e, f, g, h));
-  let shim <- mkAXI4ShimSizedFIFOF4;
+  let shim <- mkAXI4ShimBypassFIFOF;
   let ug_slave <- toUnguarded_AXI4_Slave(shim.slave);
   let clearing <- mkReg(False);
   rule do_clear(clearing);
