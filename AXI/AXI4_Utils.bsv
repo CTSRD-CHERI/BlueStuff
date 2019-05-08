@@ -457,6 +457,87 @@ function AXI4_Slave#(a, b, c, d, e, f, g, h)
   endinterface;
 
 ///////////////////////
+// User field utils //
+////////////////////////////////////////////////////////////////////////////////
+
+// Transform a slave that expects zeroed user fields to a slave that ignores user fields
+function AXI4_Slave#(a,b,c,d,e,f,g,h) zeroUserFields (AXI4_Slave#(a,b,c,d_,e_,f_,g_,h_) slv);
+  return interface AXI4_Slave;
+    interface Sink aw;
+      method canPut = slv.aw.canPut;
+      method Action put (x);
+        slv.aw.put(AXI4_AWFlit {
+          awid: x.awid,
+          awaddr: x.awaddr,
+          awlen: x.awlen,
+          awsize: x.awsize,
+          awburst: x.awburst,
+          awlock: x.awlock,
+          awcache: x.awcache,
+          awprot: x.awprot,
+          awqos: x.awqos,
+          awregion: x.awregion,
+          awuser: 0
+          });
+      endmethod
+    endinterface
+    interface Sink w;
+      method canPut = slv.w.canPut;
+      method Action put (x);
+        slv.w.put(AXI4_WFlit {
+          wdata: x.wdata,
+          wstrb: x.wstrb,
+          wlast: x.wlast,
+          wuser: 0
+        });
+      endmethod
+    endinterface
+    interface Source b;
+      method canPeek = slv.b.canPeek;
+      method peek;
+        return AXI4_BFlit {
+          bid: slv.b.peek.bid,
+          bresp: slv.b.peek.bresp,
+          buser: 0
+          };
+      endmethod
+      method drop = slv.b.drop;
+    endinterface
+    interface Sink ar;
+      method canPut = slv.ar.canPut;
+      method Action put (x);
+        slv.ar.put(AXI4_ARFlit {
+          arid: x.arid,
+          araddr: x.araddr,
+          arlen: x.arlen,
+          arsize: x.arsize,
+          arburst: x.arburst,
+          arlock: x.arlock,
+          arcache: x.arcache,
+          arprot: x.arprot,
+          arqos: x.arqos,
+          arregion: x.arregion,
+          aruser: 0
+          });
+      endmethod
+    endinterface
+    interface Source r;
+      method canPeek = slv.r.canPeek;
+      method peek;
+        return AXI4_RFlit {
+          rid: slv.r.peek.rid,
+          rdata: slv.r.peek.rdata,
+          rresp: slv.r.peek.rresp,
+          rlast: slv.r.peek.rlast,
+          ruser: 0
+          };
+      endmethod
+      method drop = slv.b.drop;
+    endinterface
+  endinterface;
+endfunction
+
+///////////////////////
 // Width conversions //
 ////////////////////////////////////////////////////////////////////////////////
 
