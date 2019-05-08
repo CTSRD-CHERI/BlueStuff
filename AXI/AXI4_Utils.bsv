@@ -867,3 +867,17 @@ module mkAXI4_Slave_Xactor (AXI4_Slave_Xactor#(a, b, c, d, e, f, g, h));
   interface master = guard_AXI4_Master(shim.master, clearing);
   interface slaveSynth = toAXI4_Slave_Synth(ug_slave);
 endmodule
+
+module mkAXI4_Slave_Widening_Xactor (AXI4_Slave_Width_Xactor#(a, b, c, d, e, f, g, h, i, j, k, l, m, n)) provisos (Add#(c,c,d), Add#(d, _, 128));
+  let shim <- mkAXI4ShimSizedFIFOF4;
+  let widened_slave <- toWider_AXI4_Slave(shim.slave);
+  let ug_slave <- toUnguarded_AXI4_Slave(zeroUserFields(widened_slave));
+  let clearing <- mkReg(False);
+  rule do_clear(clearing);
+    shim.clear;
+    clearing <= False;
+  endrule
+  method clear if (!clearing) = action clearing <= True; endaction;
+  interface master = guard_AXI4_Master(shim.master, clearing);
+  interface slaveSynth = toAXI4_Slave_Synth(ug_slave);
+endmodule

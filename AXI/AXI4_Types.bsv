@@ -781,6 +781,41 @@ interface AXI4_Slave_Xactor#(
                               ruser_) slaveSynth;
 endinterface
 
+interface AXI4_Slave_Width_Xactor#(
+  numeric type id_,
+  numeric type addr_,
+  numeric type mdata_,
+  numeric type sdata_,
+  numeric type mawuser_,
+  numeric type mwuser_,
+  numeric type mbuser_,
+  numeric type maruser_,
+  numeric type mruser_,
+  numeric type sawuser_,
+  numeric type swuser_,
+  numeric type sbuser_,
+  numeric type saruser_,
+  numeric type sruser_);
+  method Action clear;
+  interface AXI4_Master#(id_,
+                         addr_,
+                         mdata_,
+                         mawuser_,
+                         mwuser_,
+                         mbuser_,
+                         maruser_,
+                         mruser_
+) master;
+  interface AXI4_Slave_Synth#(id_,
+                              addr_,
+                              sdata_,
+                              sawuser_,
+                              swuser_,
+                              sbuser_,
+                              saruser_,
+                              sruser_) slaveSynth;
+endinterface
+
 ////////////////////////////////
 // AXI4 Shim Master <-> Slave //
 ////////////////////////////////////////////////////////////////////////////////
