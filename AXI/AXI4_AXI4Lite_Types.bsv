@@ -65,6 +65,21 @@ instance Literal#(AXI4_Size);
     default: return False;
   endcase;
 endinstance
+typedef Bit#(TExp#(SizeOf#(AXI4_Size))) AXI4_Size_Bits;
+function AXI4_Size_Bits fromAXI4_Size (AXI4_Size sz) = (1 << pack(sz));
+function Maybe#(AXI4_Size) toAXI4_Size(AXI4_Size_Bits sz);
+  case (sz)
+    1: return Valid(1);
+    2: return Valid(2);
+    4: return Valid(4);
+    8: return Valid(8);
+    16: return Valid(16);
+    32: return Valid(32);
+    64: return Valid(64);
+    128: return Valid(128);
+    default: return Invalid;
+  endcase
+endfunction
 /*
 instance Arith#(AXI4_Size);
   function   \+ (x, y) = unpack(\+ (pack(x), pack(y)));
