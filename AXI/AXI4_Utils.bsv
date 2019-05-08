@@ -456,6 +456,255 @@ function AXI4_Slave#(a, b, c, d, e, f, g, h)
     interface r  = fromAXI4_R_Slave_Synth(slave.r);
   endinterface;
 
+///////////////////////
+// Width conversions //
+////////////////////////////////////////////////////////////////////////////////
+
+typedef enum { COMBINE, PAD_FIRST, PAD_LAST } ReadSplitOption deriving (Bits, Eq, FShow);
+
+//Module to double the data width of a slave. Assumes no bursts, data address aligned to data size.
+module toWider_AXI4_Slave #(AXI4_Slave#(id_, addr_,  narrow_, awuser_, wuser_, buser_, aruser_, ruser_) narrow)
+  (AXI4_Slave#(id_, addr_, wide_, awuser_, wuser_, buser_, aruser_, ruser_)) provisos (Add#(narrow_, narrow_, wide_), Add#(wide_, _, 128));
+
+  let debug = False;
+
+  //TODO make more general: currently only works to double width
+  //TODO out-of-order responses - allow multiple outstanding with same ID
+  //TODO give error response if either response is an error?
+
+  //Transactions pending at wide side
+  let shim <- mkAXI4ShimBypassFIFOF;
+  let in = shim.master;
+
+  //Buffers for second halves of wide write flits (will be sent next)
+  let second_aw  <- mkSizedBypassFIFOF(1);
+  let second_w   <- mkSizedBypassFIFOF(1);
+
+  //Records whether responses should be dropped (i.e. first half of what was originally 1 xaction)
+  let drop_b     <- mkSizedBypassFIFOF(1);
+
+  //Buffer for second half of ar request (will be sent next)
+  let second_ar  <- mkSizedBypassFIFOF(1);
+
+  //Records whether read responses should be combined with another response, or represent an entire
+  //xaction with the first or last bits to be zero-filled
+  let split_ar   <- mkSizedBypassFIFOF(1);
+
+  //Buffers the first half of a read response (will be recombined next)
+  let first_r    <- mkSizedBypassFIFOF(1);
+
+
+  //Dynamic arbitration: alternate between reads and writes
+  let lastWasRead <- mkReg(False);
+
+  //Control signals
+  let busy = drop_b.notEmpty || split_ar.notEmpty;
+  let noPendingWrite = !in.aw.canPeek || !in.w.canPeek;
+  let noPendingRead = !in.ar.canPeek;
+  let allowRead = (lastWasRead || noPendingWrite) && !busy;
+  let allowWrite = (!lastWasRead || noPendingRead) && !busy;
+
+  //useful bindings
+  let halfBitIdx = valueOf(TLog#(narrow_)); //Index of bit which determines which half is referred to by an address
+
+  //determines whether a request requires two half-width requests to be sent on the narrow bus
+  function Bool crossesBoundary (Bit #(addr_) addr, AXI4_Size size);
+    return addr[halfBitIdx] == 1'b0 && ((addr[halfBitIdx:0] + fromAXI4_Size(size))[halfBitIdx] == 1'b1);
+  endfunction
+
+  rule send_first_aw_w (allowWrite);
+    lastWasRead <= False;
+    let old_aw = in.aw.peek;
+    let old_w = in.w.peek;
+    let requiresSplit = crossesBoundary(old_aw.awaddr, old_aw.awsize);
+    let firstSize = requiresSplit ? toAXI4_Size(fromInteger(valueOf(narrow_)) - old_aw.awaddr[halfBitIdx-1:0]) : Valid(old_aw.awsize);
+    let secondSize = toAXI4_Size(fromAXI4_Size(old_aw.awsize) - fromInteger(valueOf(narrow_)) + old_aw.awaddr[halfBitIdx:0]);
+
+    if (!isValid(firstSize) || (!isValid(secondSize) && requiresSplit)) begin
+      $display("Error in toWider_AXI4_Slave: split aw transactions would not have power of two size.");
+      $finish(0);
+    end
+
+    if (!(old_aw.awlen == 0 && old_w.wlast)) begin
+      $display("Error in toWider_AXI4_Slave: aw burst transaction attempted - not supported");
+    end
+
+    let new_aw = old_aw;
+    new_aw.awsize = firstSize.Valid;
+    narrow.aw.put(new_aw);
+
+    AXI4_WFlit #(narrow_, wuser_) new_w = AXI4_WFlit {
+        wdata: requiresSplit ? old_w.wdata[valueOf(narrow_)-1:0] : (old_aw.awaddr[halfBitIdx] == 1'b0 ? old_w.wdata [valueOf(narrow_)-1:0] : old_w.wdata [valueOf(wide_)-1:valueOf(narrow_)]),
+        wstrb: requiresSplit ? old_w.wstrb[(fromInteger(valueOf(narrow_)) >> 3) -1 : 0] : (old_aw.awaddr[halfBitIdx] == 1'b0 ? old_w.wstrb [(fromInteger(valueOf(narrow_)) >> 3) -1:0] : old_w.wstrb[(fromInteger(valueOf(wide_)) >> 3) -1 : fromInteger(valueOf(narrow_)) >>3]),
+        wlast: True,
+        wuser: old_w.wuser
+      };
+
+    narrow.w.put(new_w);
+
+    if (requiresSplit) begin
+      let new_aw_2 = old_aw;
+      new_aw_2.awsize = secondSize.Valid;
+      new_aw_2.awaddr = old_aw.awaddr + (fromInteger(valueOf(narrow_)) >> 3);
+      second_aw.enq(new_aw_2);
+
+      second_w.enq(AXI4_WFlit {
+        wdata: old_w.wdata[valueOf(wide_)-1:valueOf(narrow_)],
+        wstrb: old_w.wstrb[(fromInteger(valueOf(wide_))>>3)-1: fromInteger(valueOf(narrow_))>>3],
+        wlast: True,
+        wuser: old_w.wuser
+        });
+
+      drop_b.enq(True);
+    end else begin
+      drop_b.enq(False);
+    end
+    in.w.drop;
+    in.aw.drop;
+    if (debug) begin
+      $display("send_first_aw_w fired");
+      $display("\told_aw: ", fshow(old_aw));
+      $display("\tnew_aw: ", fshow(new_aw));
+      $display("\told_w: ", fshow(old_w));
+      $display("\tnew_w: ", fshow(new_w));
+      $display("\trequiresSplit: ", fshow(requiresSplit));
+    end
+  endrule
+
+  rule send_second_aw;
+    narrow.aw.put(second_aw.first);
+    second_aw.deq;
+    drop_b.enq(False);
+    if (debug) begin
+      $display("send_second_aw fired");
+      $display("\tsecond_aw.first: ", fshow(second_aw.first));
+    end
+  endrule
+
+  rule send_second_w;
+    narrow.w.put(second_w.first);
+    second_w.deq;
+    if (debug) begin
+      $display("send_second_w fired");
+      $display("\tsecond_w.first: ", fshow(second_w.first));
+    end
+  endrule
+
+  rule take_b;
+    drop_b.deq;
+    narrow.b.drop;
+    if (!drop_b.first) begin
+      in.b.put(narrow.b.peek);
+    end
+    if (debug) begin
+      $display("take_b fired");
+      $display("\tnarrow.b.peek: ", fshow(narrow.b.peek));
+      $display("\tdrop_b.first: ", fshow(drop_b.first));
+    end
+  endrule
+
+  rule send_first_ar(allowRead);
+    lastWasRead <= True;
+    let old_ar = in.ar.peek;
+    let requiresSplit = crossesBoundary(old_ar.araddr, old_ar.arsize);
+    let firstSize = requiresSplit ? toAXI4_Size((fromInteger(valueOf(narrow_)) >> 3) - old_ar.araddr[halfBitIdx:0]) : Valid(old_ar.arsize);
+    let secondSize = toAXI4_Size(fromAXI4_Size(old_ar.arsize) - fromInteger(valueOf(narrow_)) + old_ar.araddr[halfBitIdx:0]);
+
+    if (!isValid(firstSize) || (!isValid(secondSize) && requiresSplit)) begin
+      $display("Error in toWider_AXI4_Slave: split ar transactions would not have power of two size.");
+      $finish(0);
+    end
+    if (!(old_ar.arlen == 0)) begin
+      $display("Error in toWider_AXI4_Slave: ar burst transaction attempted - not supported");
+    end
+
+    let new_ar = old_ar;
+    new_ar.arsize = firstSize.Valid;
+    narrow.ar.put(new_ar);
+
+    if (requiresSplit) begin
+      let new_ar_2 = old_ar;
+      new_ar_2.arsize = secondSize.Valid;
+      new_ar_2.araddr = old_ar.araddr + fromInteger(valueOf(narrow_));
+      second_ar.enq(new_ar_2);
+      split_ar.enq(COMBINE);
+    end else if (old_ar.araddr[halfBitIdx] == 1'b1) begin
+      split_ar.enq(PAD_FIRST);
+    end else begin
+      split_ar.enq(PAD_LAST);
+    end
+    in.ar.drop;
+    if (debug) begin
+      $display("send_first_ar fired");
+      $display("\told_ar: ", fshow(old_ar));
+      $display("\tnew_ar: ", fshow(new_ar));
+      $display("\trequiresSplit: ", fshow(requiresSplit));
+    end
+  endrule
+
+  rule send_second_ar;
+    narrow.ar.put(second_ar.first);
+    second_ar.deq;
+    if (debug) begin
+      $display("send_second_ar fired");
+      $display("\tsecond_ar.first: ", fshow(second_ar.first));
+    end
+  endrule
+
+  rule receive_first_r(!first_r.notEmpty);
+    narrow.r.drop;
+    if (!narrow.r.peek.rlast) begin
+      $display("Error in toWider_AXI4_Slave: r burst transaction attempted - not supported.");
+      $finish(0);
+    end
+    case (split_ar.first)
+      COMBINE: first_r.enq(narrow.r.peek.rdata);
+      PAD_FIRST: in.r.put(AXI4_RFlit {
+        rid: narrow.r.peek.rid,
+        rdata: {narrow.r.peek.rdata, 0},
+        rresp: narrow.r.peek.rresp,
+        rlast: narrow.r.peek.rlast,
+        ruser: narrow.r.peek.ruser
+        });
+      PAD_LAST: in.r.put(AXI4_RFlit {
+        rid: narrow.r.peek.rid,
+        rdata: {0, narrow.r.peek.rdata},
+        rresp: narrow.r.peek.rresp,
+        rlast: narrow.r.peek.rlast,
+        ruser: narrow.r.peek.ruser
+        });
+    endcase
+    if (debug) begin
+      $display("receive_first_r fired");
+      $display("\tnarrow.r.peek ", fshow(narrow.r.peek));
+      $display("\tsplit_ar.first ", fshow(split_ar.first));
+    end
+  endrule
+
+  rule receive_second_r(!split_ar.notEmpty);
+    first_r.deq;
+    narrow.r.drop;
+    if (!narrow.r.peek.rlast) begin
+      $display("Error in toWider_AXI4_Slave: r burst transaction attempted - not supported.");
+      $finish(0);
+    end
+    AXI4_RFlit #(id_, wide_, ruser_) new_r = AXI4_RFlit {
+      rid: narrow.r.peek.rid,
+      rdata: {narrow.r.peek.rdata, first_r.first},
+      rresp: narrow.r.peek.rresp,
+      rlast: narrow.r.peek.rlast,
+      ruser: narrow.r.peek.ruser
+      };
+    in.r.put(new_r);
+    if (debug) begin
+      $display("receive_second_r fired");
+      $display("\tnarrow.r.peek ", fshow(narrow.r.peek));
+    end
+  endrule
+
+  return shim.slave;
+endmodule
+
 /////////////////////////////
 // to unguarded interfaces //
 ////////////////////////////////////////////////////////////////////////////////
