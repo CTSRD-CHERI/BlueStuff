@@ -532,7 +532,7 @@ function AXI4_Slave#(a,b,c,d,e,f,g,h) zeroUserFields (AXI4_Slave#(a,b,c,d_,e_,f_
           ruser: 0
           };
       endmethod
-      method drop = slv.b.drop;
+      method drop = slv.r.drop;
     endinterface
   endinterface;
 endfunction
