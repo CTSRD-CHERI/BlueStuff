@@ -545,7 +545,7 @@ typedef enum { COMBINE, PAD_FIRST, PAD_LAST } ReadSplitOption deriving (Bits, Eq
 
 //Module to double the data width of a slave. Assumes no bursts, data address aligned to data size.
 module toWider_AXI4_Slave #(AXI4_Slave#(id_, addr_,  narrow_, awuser_, wuser_, buser_, aruser_, ruser_) narrow)
-  (AXI4_Slave#(id_, addr_, wide_, awuser_, wuser_, buser_, aruser_, ruser_)) provisos (Add#(narrow_, narrow_, wide_), Add#(wide_, _, 128));
+  (AXI4_Slave#(id_, addr_, wide_, awuser_, wuser_, buser_, aruser_, ruser_)) provisos (Add#(narrow_, narrow_, wide_), Add#(wide_, a__, 128), Add#(b__, SizeOf#(AXI4_Size_Bits), addr_));
 
   let debug = False;
 
@@ -582,24 +582,27 @@ module toWider_AXI4_Slave #(AXI4_Slave#(id_, addr_,  narrow_, awuser_, wuser_, b
   let busy = drop_b.notEmpty || split_ar.notEmpty;
   let noPendingWrite = !in.aw.canPeek || !in.w.canPeek;
   let noPendingRead = !in.ar.canPeek;
-  let allowRead = (lastWasRead || noPendingWrite) && !busy;
-  let allowWrite = (!lastWasRead || noPendingRead) && !busy;
+  let allowRead = (!lastWasRead || noPendingWrite) && !busy;
+  let allowWrite = (lastWasRead || noPendingRead) && !busy;
 
   //useful bindings
-  let halfBitIdx = valueOf(TLog#(narrow_)); //Index of bit which determines which half is referred to by an address
+  let halfBitIdx = valueOf(TSub#(TLog#(narrow_), 3)); //Index of bit which determines which half is referred to by an address
 
   //determines whether a request requires two half-width requests to be sent on the narrow bus
   function Bool crossesBoundary (Bit #(addr_) addr, AXI4_Size size);
-    return addr[halfBitIdx] == 1'b0 && ((addr[halfBitIdx:0] + fromAXI4_Size(size))[halfBitIdx] == 1'b1);
+    return addr[halfBitIdx] == 1'b0 && (addr + zeroExtend(fromAXI4_Size(size)) > (addr[valueOf(addr_)-1:halfBitIdx] << halfBitIdx) + (fromInteger(valueOf(narrow_)) >> 3));
   endfunction
+
+  function getFirstSize (addr, size) = crossesBoundary(addr, size) ? toAXI4_Size((fromInteger(valueOf(narrow_)) >> 3) - addr[halfBitIdx-1:0]) : Valid(size);
+  function getSecondSize (addr, size) = toAXI4_Size(fromAXI4_Size(size) - (fromInteger(valueOf(narrow_)) >> 3) + addr[halfBitIdx:0]);
 
   rule send_first_aw_w (allowWrite);
     lastWasRead <= False;
     let old_aw = in.aw.peek;
     let old_w = in.w.peek;
     let requiresSplit = crossesBoundary(old_aw.awaddr, old_aw.awsize);
-    let firstSize = requiresSplit ? toAXI4_Size(fromInteger(valueOf(narrow_)) - old_aw.awaddr[halfBitIdx-1:0]) : Valid(old_aw.awsize);
-    let secondSize = toAXI4_Size(fromAXI4_Size(old_aw.awsize) - fromInteger(valueOf(narrow_)) + old_aw.awaddr[halfBitIdx:0]);
+    let firstSize = getFirstSize(old_aw.awaddr, old_aw.awsize);
+    let secondSize = getSecondSize(old_aw.awaddr, old_aw.awsize);
 
     if (!isValid(firstSize) || (!isValid(secondSize) && requiresSplit)) begin
       $display("Error in toWider_AXI4_Slave: split aw transactions would not have power of two size.");
@@ -616,7 +619,7 @@ module toWider_AXI4_Slave #(AXI4_Slave#(id_, addr_,  narrow_, awuser_, wuser_, b
 
     AXI4_WFlit #(narrow_, wuser_) new_w = AXI4_WFlit {
         wdata: requiresSplit ? old_w.wdata[valueOf(narrow_)-1:0] : (old_aw.awaddr[halfBitIdx] == 1'b0 ? old_w.wdata [valueOf(narrow_)-1:0] : old_w.wdata [valueOf(wide_)-1:valueOf(narrow_)]),
-        wstrb: requiresSplit ? old_w.wstrb[(fromInteger(valueOf(narrow_)) >> 3) -1 : 0] : (old_aw.awaddr[halfBitIdx] == 1'b0 ? old_w.wstrb [(fromInteger(valueOf(narrow_)) >> 3) -1:0] : old_w.wstrb[(fromInteger(valueOf(wide_)) >> 3) -1 : fromInteger(valueOf(narrow_)) >>3]),
+        wstrb: requiresSplit ? old_w.wstrb[(fromInteger(valueOf(narrow_)) >> 3) -1 : 0] : (old_aw.awaddr[halfBitIdx] == 1'b0 ? old_w.wstrb [(fromInteger(valueOf(narrow_)) >> 3) -1:0] : old_w.wstrb[(fromInteger(valueOf(wide_)) >> 3) -1 : fromInteger(valueOf(narrow_)) >> 3]),
         wlast: True,
         wuser: old_w.wuser
       };
@@ -631,7 +634,7 @@ module toWider_AXI4_Slave #(AXI4_Slave#(id_, addr_,  narrow_, awuser_, wuser_, b
 
       second_w.enq(AXI4_WFlit {
         wdata: old_w.wdata[valueOf(wide_)-1:valueOf(narrow_)],
-        wstrb: old_w.wstrb[(fromInteger(valueOf(wide_))>>3)-1: fromInteger(valueOf(narrow_))>>3],
+        wstrb: old_w.wstrb[(fromInteger(valueOf(wide_)) >> 3)-1: fromInteger(valueOf(narrow_))>>3],
         wlast: True,
         wuser: old_w.wuser
         });
@@ -688,8 +691,8 @@ module toWider_AXI4_Slave #(AXI4_Slave#(id_, addr_,  narrow_, awuser_, wuser_, b
     lastWasRead <= True;
     let old_ar = in.ar.peek;
     let requiresSplit = crossesBoundary(old_ar.araddr, old_ar.arsize);
-    let firstSize = requiresSplit ? toAXI4_Size((fromInteger(valueOf(narrow_)) >> 3) - old_ar.araddr[halfBitIdx:0]) : Valid(old_ar.arsize);
-    let secondSize = toAXI4_Size(fromAXI4_Size(old_ar.arsize) - fromInteger(valueOf(narrow_)) + old_ar.araddr[halfBitIdx:0]);
+    let firstSize = getFirstSize(old_ar.araddr, old_ar.arsize);
+    let secondSize = getSecondSize(old_ar.araddr, old_ar.arsize);
 
     if (!isValid(firstSize) || (!isValid(secondSize) && requiresSplit)) begin
       $display("Error in toWider_AXI4_Slave: split ar transactions would not have power of two size.");
@@ -706,7 +709,7 @@ module toWider_AXI4_Slave #(AXI4_Slave#(id_, addr_,  narrow_, awuser_, wuser_, b
     if (requiresSplit) begin
       let new_ar_2 = old_ar;
       new_ar_2.arsize = secondSize.Valid;
-      new_ar_2.araddr = old_ar.araddr + fromInteger(valueOf(narrow_));
+      new_ar_2.araddr = old_ar.araddr + (fromInteger(valueOf(narrow_)) >> 3);
       second_ar.enq(new_ar_2);
       split_ar.enq(COMBINE);
     end else if (old_ar.araddr[halfBitIdx] == 1'b1) begin
@@ -740,20 +743,26 @@ module toWider_AXI4_Slave #(AXI4_Slave#(id_, addr_,  narrow_, awuser_, wuser_, b
     end
     case (split_ar.first)
       COMBINE: first_r.enq(narrow.r.peek.rdata);
-      PAD_FIRST: in.r.put(AXI4_RFlit {
+      PAD_FIRST: begin
+        in.r.put(AXI4_RFlit {
         rid: narrow.r.peek.rid,
         rdata: {narrow.r.peek.rdata, 0},
         rresp: narrow.r.peek.rresp,
         rlast: narrow.r.peek.rlast,
         ruser: narrow.r.peek.ruser
         });
-      PAD_LAST: in.r.put(AXI4_RFlit {
+        split_ar.deq;
+      end
+      PAD_LAST: begin
+        in.r.put(AXI4_RFlit {
         rid: narrow.r.peek.rid,
         rdata: {0, narrow.r.peek.rdata},
         rresp: narrow.r.peek.rresp,
         rlast: narrow.r.peek.rlast,
         ruser: narrow.r.peek.ruser
         });
+        split_ar.deq;
+      end
     endcase
     if (debug) begin
       $display("receive_first_r fired");
@@ -762,9 +771,10 @@ module toWider_AXI4_Slave #(AXI4_Slave#(id_, addr_,  narrow_, awuser_, wuser_, b
     end
   endrule
 
-  rule receive_second_r(!split_ar.notEmpty);
+  rule receive_second_r;
     first_r.deq;
     narrow.r.drop;
+    split_ar.deq;
     if (!narrow.r.peek.rlast) begin
       $display("Error in toWider_AXI4_Slave: r burst transaction attempted - not supported.");
       $finish(0);
@@ -868,7 +878,7 @@ module mkAXI4_Slave_Xactor (AXI4_Slave_Xactor#(a, b, c, d, e, f, g, h));
   interface slaveSynth = toAXI4_Slave_Synth(ug_slave);
 endmodule
 
-module mkAXI4_Slave_Widening_Xactor (AXI4_Slave_Width_Xactor#(a, b, c, d, e, f, g, h, i, j, k, l, m, n)) provisos (Add#(c,c,d), Add#(d, _, 128));
+module mkAXI4_Slave_Widening_Xactor (AXI4_Slave_Width_Xactor#(a, b, c, d, e, f, g, h, i, j, k, l, m, n)) provisos (Add#(c,c,d), Add#(d, _, 128), Add#(a__, SizeOf#(AXI4_Size_Bits), b));
   let shim <- mkAXI4ShimSizedFIFOF4;
   let widened_slave <- toWider_AXI4_Slave(shim.slave);
   let ug_slave <- toUnguarded_AXI4_Slave(zeroUserFields(widened_slave));
