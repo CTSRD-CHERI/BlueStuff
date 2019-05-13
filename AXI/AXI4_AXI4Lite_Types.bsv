@@ -57,7 +57,7 @@ instance Literal#(AXI4_Size);
     128:     return AXI4_Size { val: 3'b111 };
     default: return error(sprintf(
         "Unsupported AXI4_Size %0d. "
-      + "Supported AXI4_Size values are {1, 2, 8, 16, 32, 64, 128}.",
+      + "Supported AXI4_Size values are {1, 2, 4, 8, 16, 32, 64, 128}.",
       x));
   endcase;
   function inLiteralRange(_, x) = case (x)
