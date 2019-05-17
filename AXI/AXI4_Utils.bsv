@@ -502,6 +502,82 @@ endfunction
 // User field utils //
 ////////////////////////////////////////////////////////////////////////////////
 
+function AXI4_Master#(a,b,c,d,e,f,g,h) zeroMasterUserFields (AXI4_Master#(a,b,c,d_,e_,f_,g_,h_) m);
+  return interface AXI4_Master;
+    interface Source aw;
+      method drop = m.aw.drop;
+      method canPeek = m.aw.canPeek;
+      method peek;
+        let x = m.aw.peek;
+        return AXI4_AWFlit {
+          awid:     x.awid,
+          awaddr:   x.awaddr,
+          awlen:    x.awlen,
+          awsize:   x.awsize,
+          awburst:  x.awburst,
+          awlock:   x.awlock,
+          awcache:  x.awcache,
+          awprot:   x.awprot,
+          awqos:    x.awqos,
+          awregion: x.awregion,
+          awuser:   0
+          };
+      endmethod
+    endinterface
+    interface Source w;
+      method drop = m.w.drop;
+      method canPeek = m.w.canPeek;
+      method peek;
+        let x = m.w.peek;
+        return AXI4_WFlit {
+          wdata: x.wdata,
+          wstrb: x.wstrb,
+          wlast: x.wlast,
+          wuser: 0
+        };
+      endmethod
+    endinterface
+    interface Sink b;
+      method canPut = m.b.canPut;
+      method put(x) = m.b.put(AXI4_BFlit {
+        bid:   x.bid,
+        bresp: x.bresp,
+        buser: 0
+      });
+    endinterface
+    interface Source ar;
+      method drop = m.ar.drop;
+      method canPeek = m.ar.canPeek;
+      method peek;
+        let x = m.ar.peek;
+        return AXI4_ARFlit {
+          arid:     x.arid,
+          araddr:   x.araddr,
+          arlen:    x.arlen,
+          arsize:   x.arsize,
+          arburst:  x.arburst,
+          arlock:   x.arlock,
+          arcache:  x.arcache,
+          arprot:   x.arprot,
+          arqos:    x.arqos,
+          arregion: x.arregion,
+          aruser:   0
+          };
+      endmethod
+    endinterface
+    interface Sink r;
+      method canPut = m.r.canPut;
+      method put(x) = m.r.put(AXI4_RFlit {
+        rid:   x.rid,
+        rdata: x.rdata,
+        rresp: x.rresp,
+        rlast: x.rlast,
+        ruser: 0
+      });
+    endinterface
+  endinterface;
+endfunction
+
 // Transform a slave that expects zeroed user fields to a slave that ignores user fields
 function AXI4_Slave#(a,b,c,d,e,f,g,h) zeroUserFields (AXI4_Slave#(a,b,c,d_,e_,f_,g_,h_) slv);
   return interface AXI4_Slave;
