@@ -579,7 +579,7 @@ function AXI4_Master#(a,b,c,d,e,f,g,h) zeroMasterUserFields (AXI4_Master#(a,b,c,
 endfunction
 
 // Transform a slave that expects zeroed user fields to a slave that ignores user fields
-function AXI4_Slave#(a,b,c,d,e,f,g,h) zeroUserFields (AXI4_Slave#(a,b,c,d_,e_,f_,g_,h_) slv);
+function AXI4_Slave#(a,b,c,d,e,f,g,h) zeroSlaveUserFields (AXI4_Slave#(a,b,c,d_,e_,f_,g_,h_) slv);
   return interface AXI4_Slave;
     interface Sink aw;
       method canPut = slv.aw.canPut;
@@ -999,7 +999,7 @@ endmodule
 module mkAXI4_Slave_Widening_Xactor (AXI4_Slave_Width_Xactor#(a, b, c, d, e, f, g, h, i, j, k, l, m, n)) provisos (Add#(c,c,d), Add#(d, _, 128), Add#(a__, SizeOf#(AXI4_Size_Bits), b));
   let shim <- mkAXI4ShimSizedFIFOF4;
   let widened_slave <- toWider_AXI4_Slave(shim.slave);
-  let ug_slave <- toUnguarded_AXI4_Slave(zeroUserFields(widened_slave));
+  let ug_slave <- toUnguarded_AXI4_Slave(zeroSlaveUserFields(widened_slave));
   let clearing <- mkReg(False);
   rule do_clear(clearing);
     shim.clear;
