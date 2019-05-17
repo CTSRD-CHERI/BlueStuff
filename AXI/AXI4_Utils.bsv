@@ -723,12 +723,12 @@ module toWider_AXI4_Slave #(AXI4_Slave#(id_, addr_,  narrow_, awuser_, wuser_, b
     let secondSize = getSecondSize(old_aw.awaddr, old_aw.awsize);
 
     if (!isValid(firstSize) || (!isValid(secondSize) && requiresSplit)) begin
-      $display("Error in toWider_AXI4_Slave: split aw transactions would not have power of two size.");
+      $display("Error in toWider_AXI4_Slave: split aw transactions would not have power of two size - ", fshow(old_aw));
       $finish(0);
     end
 
     if (!(old_aw.awlen == 0 && old_w.wlast)) begin
-      $display("Error in toWider_AXI4_Slave: aw burst transaction attempted - not supported");
+      $display("Error in toWider_AXI4_Slave: aw burst transaction attempted - not supported\n", fshow(old_aw), "\n", fshow(old_w));
     end
 
     let new_aw = old_aw;
@@ -813,11 +813,11 @@ module toWider_AXI4_Slave #(AXI4_Slave#(id_, addr_,  narrow_, awuser_, wuser_, b
     let secondSize = getSecondSize(old_ar.araddr, old_ar.arsize);
 
     if (!isValid(firstSize) || (!isValid(secondSize) && requiresSplit)) begin
-      $display("Error in toWider_AXI4_Slave: split ar transactions would not have power of two size.");
+      $display("Error in toWider_AXI4_Slave: split ar transactions would not have power of two size - ", fshow(old_ar));
       $finish(0);
     end
     if (!(old_ar.arlen == 0)) begin
-      $display("Error in toWider_AXI4_Slave: ar burst transaction attempted - not supported");
+      $display("Error in toWider_AXI4_Slave: ar burst transaction attempted - not supported\n", fshow(old_ar));
     end
 
     let new_ar = old_ar;
