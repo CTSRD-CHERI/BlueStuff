@@ -456,6 +456,48 @@ function AXI4_Slave#(a, b, c, d, e, f, g, h)
     interface r  = fromAXI4_R_Slave_Synth(slave.r);
   endinterface;
 
+// Truncate addr field of incomming flits
+function AXI4_Slave#(a,b,c,d,e,f,g,h) truncateAddrFields (AXI4_Slave#(a,b_,c,d,e,f,g,h) slv)
+  provisos (Add#(a__, b_, b));
+  return interface AXI4_Slave;
+    interface aw = interface Sink;
+      method canPut = slv.aw.canPut;
+      method put (x) = slv.aw.put(AXI4_AWFlit {
+        awid:     x.awid,
+        awaddr:   truncate(x.awaddr),
+        awlen:    x.awlen,
+        awsize:   x.awsize,
+        awburst:  x.awburst,
+        awlock:   x.awlock,
+        awcache:  x.awcache,
+        awprot:   x.awprot,
+        awqos:    x.awqos,
+        awregion: x.awregion,
+        awuser:   x.awuser
+      });
+    endinterface;
+    interface w = slv.w;
+    interface b = slv.b;
+    interface ar = interface Sink;
+      method canPut = slv.ar.canPut;
+      method put (x) = slv.ar.put(AXI4_ARFlit {
+        arid:     x.arid,
+        araddr:   truncate(x.araddr),
+        arlen:    x.arlen,
+        arsize:   x.arsize,
+        arburst:  x.arburst,
+        arlock:   x.arlock,
+        arcache:  x.arcache,
+        arprot:   x.arprot,
+        arqos:    x.arqos,
+        arregion: x.arregion,
+        aruser:   x.aruser
+      });
+    endinterface;
+    interface r = slv.r;
+  endinterface;
+endfunction
+
 ///////////////////////
 // User field utils //
 ////////////////////////////////////////////////////////////////////////////////
