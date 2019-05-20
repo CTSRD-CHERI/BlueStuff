@@ -32,9 +32,14 @@ import "BDPI" function Bit#(64) sysTime ();
 // print ipc
 import "BDPI" function Action printIPC (Bit#(64) i, Bit#(64) c);
 
-////////////////////////
-// logging primitives //
-////////////////////////
+////////////////////////////////
+// debug / logging primitives //
+////////////////////////////////
+
+function Action printDbg (Maybe#(String) m_str, Fmt msg) = case (m_str) matches
+  tagged Valid .str: $display("<%0t, %0s> -- ", $time, str, msg);
+  default: noAction;
+endcase;
 
 typeclass PrintLog#(type a);
   function Action printLog(a msg);
