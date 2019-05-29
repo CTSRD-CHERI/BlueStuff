@@ -184,6 +184,74 @@ function AXI4_Slave#(a, addr_out, c, d, e, f, g, h) expandAXI4_Slave_Addr
   endinterface;
 endfunction
 
+//////////////////
+// AXI4 Limiter //
+////////////////////////////////////////////////////////////////////////////////
+
+module mkAXI4Limiter#(parameter Integer maxReqs) (AXI4_Shim#(a, b, c, d, e, f, g, h));
+
+  // req counting
+  FIFOF#(Bit#(0)) limWriteFF <- mkSizedFIFOF(maxReqs);
+  let pendingW <- mkReg(False);
+  FIFOF#(Bit#(0)) limReadFF <- mkSizedFIFOF(maxReqs);
+  // inner shim
+  let shim <- mkAXI4ShimFF;
+  let slv = shim.slave;
+  // interfaces
+  method clear = action
+    limWriteFF.clear;
+    pendingW <= False;
+    limReadFF.clear;
+    shim.clear;
+  endaction;
+  interface slave = interface AXI4_Slave;
+    interface aw = interface Sink;
+      method canPut = slv.aw.canPut && limWriteFF.notFull && !pendingW;
+      //method put = slv.aw.put;
+      method put if (slv.aw.canPut && limWriteFF.notFull && !pendingW) = slv.aw.put;
+    endinterface;
+    interface w = interface Sink;
+      method canPut = slv.w.canPut && limWriteFF.notFull;
+      //method put(x) = action
+      method put(x) if (slv.w.canPut && limWriteFF.notFull) = action
+        slv.w.put(x);
+        pendingW <= !x.wlast;
+        if (x.wlast) limWriteFF.enq(?);
+      endaction;
+    endinterface;
+    interface b = interface Source;
+      method canPeek = slv.b.canPeek && limWriteFF.notEmpty;
+      //method peek = slv.b.peek;
+      method peek if (slv.b.canPeek && limWriteFF.notEmpty) = slv.b.peek;
+      //method drop = action
+      method drop if (slv.b.canPeek && limWriteFF.notEmpty) = action
+        limWriteFF.deq;
+        slv.b.drop;
+      endaction;
+    endinterface;
+    interface ar = interface Sink;
+      method canPut = slv.ar.canPut && limReadFF.notFull;
+      //method put(x) = action
+      method put(x) if (slv.ar.canPut && limReadFF.notFull) = action
+        limReadFF.enq(?);
+        slv.ar.put(x);
+      endaction;
+    endinterface;
+    interface r = interface Source;
+      method canPeek = slv.r.canPeek && limReadFF.notEmpty;
+      //method peek = slv.r.peek;
+      method peek if (slv.r.canPeek && limReadFF.notEmpty) = slv.r.peek;
+      //method drop = action
+      method drop if (slv.r.canPeek && limReadFF.notEmpty) = action
+        if (slv.r.peek.rlast) limReadFF.deq;
+        slv.r.drop;
+      endaction;
+    endinterface;
+  endinterface;
+  interface master = shim.master;
+
+endmodule
+
 //////////////////////////////////////////
 // AXI4 Burst Master <-> NonBurst Slave //
 ////////////////////////////////////////////////////////////////////////////////
