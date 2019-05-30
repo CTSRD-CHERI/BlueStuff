@@ -59,22 +59,31 @@ endinstance
 ////////////////////////////////////////////////////////////////////////////////
 
 function AXI4_B_Master_Synth#(id_, user_)
-  toAXI4_B_Master_Synth(snk_t s)
+  toAXI4_B_Master_Synth(snk_t m)
   provisos (ToSink#(snk_t, t), FromAXI4_BFlit#(t, id_, user_)) =
   interface AXI4_B_Master_Synth;
-    //method bflit(bid, bresp, buser) if (toSink(s).canPut) =
-    method bflit(bid, bresp, buser) = toSink(s).put(fromAXI4_BFlit(AXI4_BFlit{
-      bid: bid, bresp: bresp, buser: buser
-    }));
-    method bready = toSink(s).canPut;
+    method bflit(bid, bresp, buser) = action
+      if (toSink(m).canPut) toSink(m).put(fromAXI4_BFlit(AXI4_BFlit{
+        bid: bid, bresp: bresp, buser: buser
+      }));
+    endaction;
+    method bready = toSink(m).canPut;
   endinterface;
 
-function Sink#(AXI4_BFlit#(id_, user_))
-  fromAXI4_B_Master_Synth(AXI4_B_Master_Synth#(id_, user_) m) =
-  interface Sink;
-    method canPut = m.bready;
-    method put(x) = m.bflit(x.bid, x.bresp, x.buser);
-  endinterface;
+module fromAXI4_B_Master_Synth#(AXI4_B_Master_Synth#(id_, user_) m) (Sink#(AXI4_BFlit#(id_, user_)));
+  //We rely on the buffer being guarded
+  FIFOF#(AXI4_BFlit#(id_, user_)) buffer <- mkSizedBypassFIFOF(1);
+  rule forwardFlit;
+    m.bflit(buffer.first.bid,
+            buffer.first.bresp,
+            buffer.first.buser);
+  endrule
+  //dropFlit only fires when both ready and canPeek, i.e. there is something to drop
+  rule dropFlit (m.bready);
+    buffer.deq;
+  endrule
+  return toSink(buffer);
+endmodule
 
 // convert to/from Synth Slave interface
 ////////////////////////////////////////////////////////////////////////////////
@@ -93,10 +102,18 @@ function AXI4_B_Slave_Synth#(id_, user_)
   endinterface;
 endfunction
 
-function Source#(AXI4_BFlit#(id_, user_))
-  fromAXI4_B_Slave_Synth(AXI4_B_Slave_Synth#(id_, user_) s) =
-  interface Source;
+module fromAXI4_B_Slave_Synth#(AXI4_B_Slave_Synth#(id_, user_) s) (Source#(AXI4_BFlit#(id_, user_)));
+  let dwReady <- mkDWire(False);
+  rule forwardReady;
+    s.bready(dwReady);
+  endrule
+  return interface Source;
     method canPeek = s.bvalid;
-    method peek = AXI4_BFlit {bid: s.bid, bresp: s.bresp, buser: s.buser};
-    method drop = action if (s.bvalid) s.bready(True); endaction;
+    method peek if (s.bvalid) = AXI4_BFlit {
+      bid:     s.bid,
+      bresp:   s.bresp,
+      buser:   s.buser
+    };
+    method drop if (s.bvalid) = dwReady._write(True);
   endinterface;
+endmodule

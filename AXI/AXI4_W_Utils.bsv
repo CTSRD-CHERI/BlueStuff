@@ -74,15 +74,19 @@ function AXI4_W_Master_Synth#(data_, user_)
   endinterface;
 endfunction
 
-function Source#(AXI4_WFlit#(data_, user_))
-  fromAXI4_W_Master_Synth(AXI4_W_Master_Synth#(data_, user_) m) =
-  interface Source;
+module fromAXI4_W_Master_Synth#(AXI4_W_Master_Synth#(data_, user_) m) (Source#(AXI4_WFlit#(data_, user_)));
+  let dwReady <- mkDWire(False);
+  rule forwardReady;
+    m.wready(dwReady);
+  endrule
+  return interface Source;
     method canPeek = m.wvalid;
-    method peek = AXI4_WFlit {
+    method peek if (m.wvalid) = AXI4_WFlit {
       wdata: m.wdata, wstrb: m.wstrb, wlast: m.wlast, wuser: m.wuser
     };
-    method drop = action if (m.wvalid) m.wready(True); endaction;
+    method drop if (m.wvalid) = dwReady._write(True);
   endinterface;
+endmodule
 
 // convert to/from Synth Slave interface
 ////////////////////////////////////////////////////////////////////////////////
@@ -91,16 +95,23 @@ function AXI4_W_Slave_Synth#(data_, user_)
   toAXI4_W_Slave_Synth(snk_t s)
   provisos (ToSink#(snk_t, t), FromAXI4_WFlit#(t, data_, user_)) =
   interface AXI4_W_Slave_Synth;
-    method wflit(wdata, wstrb, wlast, wuser) =
-      toSink(s).put(fromAXI4_WFlit(AXI4_WFlit{
+    method wflit(wdata, wstrb, wlast, wuser) = action
+      if (toSink(s).canPut) toSink(s).put(fromAXI4_WFlit(AXI4_WFlit{
         wdata: wdata, wstrb: wstrb, wlast: wlast, wuser: wuser
       }));
+    endaction;
     method wready = toSink(s).canPut;
   endinterface;
 
-function Sink#(AXI4_WFlit#(data_, user_))
-  fromAXI4_W_Slave_Synth(AXI4_W_Slave_Synth#(data_, user_) s) =
-  interface Sink;
-    method canPut = s.wready;
-    method put(x) = s.wflit(x.wdata, x.wstrb, x.wlast, x.wuser);
-  endinterface;
+module fromAXI4_W_Slave_Synth#(AXI4_W_Slave_Synth#(data_, user_) s) (Sink#(AXI4_WFlit#(data_, user_)));
+  //We rely on the buffer being guarded
+  FIFOF#(AXI4_WFlit#(data_, user_)) buffer <- mkSizedBypassFIFOF(1);
+  rule forwardFlit;
+    s.wflit(buffer.first.wdata, buffer.first.wstrb, buffer.first.wlast, buffer.first.wuser);
+  endrule
+  //dropFlit only fires when both ready and canPeek, i.e. there is something to drop
+  rule dropFlit (s.wready);
+    buffer.deq;
+  endrule
+  return toSink(buffer);
+endmodule

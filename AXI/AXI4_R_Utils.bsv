@@ -61,29 +61,33 @@ endinstance
 ////////////////////////////////////////////////////////////////////////////////
 
 function AXI4_R_Master_Synth#(id_, data_, user_)
-  toAXI4_R_Master_Synth(snk_t s)
+  toAXI4_R_Master_Synth(snk_t m)
   provisos (ToSink#(snk_t, t), FromAXI4_RFlit#(t, id_, data_, user_)) =
   interface AXI4_R_Master_Synth;
-    method rflit(rid,
-                 rdata,
-                 rresp,
-                 rlast,
-                 ruser) = toSink(s).put(fromAXI4_RFlit(AXI4_RFlit{
-      rid: rid, rdata: rdata, rresp: rresp, rlast: rlast, ruser: ruser
-    }));
-    method rready = toSink(s).canPut;
+    method rflit(rid, rdata, rresp, rlast, ruser) = action
+      if (toSink(m).canPut) toSink(m).put(fromAXI4_RFlit(AXI4_RFlit{
+        rid: rid, rdata: rdata, rresp: rresp, rlast: rlast, ruser: ruser
+      }));
+    endaction;
+    method rready = toSink(m).canPut;
   endinterface;
 
-function Sink#(AXI4_RFlit#(id_, data_, user_))
-  fromAXI4_R_Master_Synth(AXI4_R_Master_Synth#(id_, data_, user_) m) =
-  interface Sink;
-    method canPut = m.rready;
-    method put(x) = m.rflit(x.rid,
-                            x.rdata,
-                            x.rresp,
-                            x.rlast,
-                            x.ruser);
-  endinterface;
+module fromAXI4_R_Master_Synth#(AXI4_R_Master_Synth#(id_, data_, user_) m) (Sink#(AXI4_RFlit#(id_, data_, user_)));
+  //We rely on the buffer being guarded
+  FIFOF#(AXI4_RFlit#(id_, data_, user_)) buffer <- mkSizedBypassFIFOF(1);
+  rule forwardFlit;
+    m.rflit(buffer.first.rid,
+            buffer.first.rdata,
+            buffer.first.rresp,
+            buffer.first.rlast,
+            buffer.first.ruser);
+  endrule
+  //dropFlit only fires when both ready and canPeek, i.e. there is something to drop
+  rule dropFlit (m.rready);
+    buffer.deq;
+  endrule
+  return toSink(buffer);
+endmodule
 
 // convert to/from Synth Slave interface
 ////////////////////////////////////////////////////////////////////////////////
@@ -104,12 +108,20 @@ function AXI4_R_Slave_Synth#(id_, data_, user_)
   endinterface;
 endfunction
 
-function Source#(AXI4_RFlit#(id_, data_, user_))
-  fromAXI4_R_Slave_Synth(AXI4_R_Slave_Synth#(id_, data_, user_) s) =
-  interface Source;
+module fromAXI4_R_Slave_Synth#(AXI4_R_Slave_Synth#(id_, data_, user_) s) (Source#(AXI4_RFlit#(id_, data_, user_)));
+  let dwReady <- mkDWire(False);
+  rule forwardReady;
+    s.rready(dwReady);
+  endrule
+  return interface Source;
     method canPeek = s.rvalid;
-    method peek = AXI4_RFlit {
-      rid: s.rid, rdata: s.rdata, rresp: s.rresp, rlast: s.rlast, ruser: s.ruser
+    method peek if (s.rvalid) = AXI4_RFlit {
+      rid:     s.rid,
+      rdata:   s.rdata,
+      rresp:   s.rresp,
+      rlast:   s.rlast,
+      ruser:   s.ruser
     };
-    method drop = action if (s.rvalid) s.rready(True); endaction;
+    method drop if (s.rvalid) = dwReady._write(True);
   endinterface;
+endmodule

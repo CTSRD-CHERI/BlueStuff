@@ -493,15 +493,20 @@ function AXI4_Master_Synth#(a, b, c, d, e, f, g, h)
     interface r  = toAXI4_R_Master_Synth(master.r);
   endinterface;
 
-function AXI4_Master#(a, b, c, d, e, f, g, h)
-  fromAXI4_Master_Synth (AXI4_Master_Synth#(a, b, c, d, e, f, g, h) master) =
-  interface AXI4_Master;
-    interface aw = fromAXI4_AW_Master_Synth(master.aw);
-    interface w  = fromAXI4_W_Master_Synth(master.w);
-    interface b  = fromAXI4_B_Master_Synth(master.b);
-    interface ar = fromAXI4_AR_Master_Synth(master.ar);
-    interface r  = fromAXI4_R_Master_Synth(master.r);
+module fromAXI4_Master_Synth#(AXI4_Master_Synth#(a, b, c, d, e, f, g, h) master) (AXI4_Master#(a, b, c, d, e, f, g, h));
+  let aw <- fromAXI4_AW_Master_Synth(master.aw);
+  let w  <- fromAXI4_W_Master_Synth(master.w);
+  let b  <- fromAXI4_B_Master_Synth(master.b);
+  let ar <- fromAXI4_AR_Master_Synth(master.ar);
+  let r  <- fromAXI4_R_Master_Synth(master.r);
+  return interface AXI4_Master;
+    interface aw = aw;
+    interface w  = w;
+    interface b  = b;
+    interface ar = ar;
+    interface r  = r;
   endinterface;
+endmodule
 
 // AXI4 Slave
 function AXI4_Slave_Synth#(a, b, c, d, e, f, g, h)
@@ -514,15 +519,20 @@ function AXI4_Slave_Synth#(a, b, c, d, e, f, g, h)
     interface r  = toAXI4_R_Slave_Synth(slave.r);
   endinterface;
 
-function AXI4_Slave#(a, b, c, d, e, f, g, h)
-  fromAXI4_Slave_Synth (AXI4_Slave_Synth#(a, b, c, d, e, f, g, h) slave) =
-  interface AXI4_Slave;
-    interface aw = fromAXI4_AW_Slave_Synth(slave.aw);
-    interface w  = fromAXI4_W_Slave_Synth(slave.w);
-    interface b  = fromAXI4_B_Slave_Synth(slave.b);
-    interface ar = fromAXI4_AR_Slave_Synth(slave.ar);
-    interface r  = fromAXI4_R_Slave_Synth(slave.r);
+module fromAXI4_Slave_Synth#(AXI4_Slave_Synth#(a, b, c, d, e, f, g, h) slave) (AXI4_Slave#(a, b, c, d, e, f, g, h));
+  let aw <- fromAXI4_AW_Slave_Synth(slave.aw);
+  let w  <- fromAXI4_W_Slave_Synth(slave.w);
+  let b  <- fromAXI4_B_Slave_Synth(slave.b);
+  let ar <- fromAXI4_AR_Slave_Synth(slave.ar);
+  let r  <- fromAXI4_R_Slave_Synth(slave.r);
+  return interface AXI4_Slave;
+    interface aw = aw;
+    interface w  = w;
+    interface b  = b;
+    interface ar = ar;
+    interface r  = r;
   endinterface;
+endmodule
 
 // Truncate addr field of incomming flits
 function AXI4_Slave#(a,b,c,d,e,f,g,h) truncateAddrFields (AXI4_Slave#(a,b_,c,d,e,f,g,h) slv)

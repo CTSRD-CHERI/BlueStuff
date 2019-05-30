@@ -31,6 +31,7 @@ import SourceSink :: *;
 import AXI4_Types :: *;
 
 import FIFOF :: *;
+import SpecialFIFOs :: *;
 
 ///////////////////////////////
 // AXI Address Write Channel //
@@ -82,11 +83,14 @@ function AXI4_AW_Master_Synth#(id_, addr_, user_)
   endinterface;
 endfunction
 
-function Source#(AXI4_AWFlit#(id_, addr_, user_))
-  fromAXI4_AW_Master_Synth(AXI4_AW_Master_Synth#(id_, addr_, user_) m) =
-  interface Source;
+module fromAXI4_AW_Master_Synth#(AXI4_AW_Master_Synth#(id_, addr_, user_) m) (Source#(AXI4_AWFlit#(id_, addr_, user_)));
+  let dwReady <- mkDWire(False);
+  rule forwardReady;
+    m.awready(dwReady);
+  endrule
+  return interface Source;
     method canPeek = m.awvalid;
-    method peek = AXI4_AWFlit {
+    method peek if (m.awvalid) = AXI4_AWFlit {
       awid:     m.awid,
       awaddr:   m.awaddr,
       awlen:    m.awlen,
@@ -99,8 +103,9 @@ function Source#(AXI4_AWFlit#(id_, addr_, user_))
       awregion: m.awregion,
       awuser:   m.awuser
     };
-    method drop = action if (m.awvalid) m.awready(True); endaction;
+    method drop if (m.awvalid) = dwReady._write(True);
   endinterface;
+endmodule
 
 // convert to/from Synth Slave interface
 ////////////////////////////////////////////////////////////////////////////////
@@ -119,35 +124,42 @@ function AXI4_AW_Slave_Synth#(id_, addr_, user_)
                   awprot,
                   awqos,
                   awregion,
-                  awuser) = toSink(s).put(fromAXI4_AWFlit(AXI4_AWFlit{
-      awid:     awid,
-      awaddr:   awaddr,
-      awlen:    awlen,
-      awsize:   awsize,
-      awburst:  awburst,
-      awlock:   awlock,
-      awcache:  awcache,
-      awprot:   awprot,
-      awqos:    awqos,
-      awregion: awregion,
-      awuser:   awuser
-    }));
+                  awuser) = action if (toSink(s).canPut) toSink(s).put(fromAXI4_AWFlit(AXI4_AWFlit{
+        awid:     awid,
+        awaddr:   awaddr,
+        awlen:    awlen,
+        awsize:   awsize,
+        awburst:  awburst,
+        awlock:   awlock,
+        awcache:  awcache,
+        awprot:   awprot,
+        awqos:    awqos,
+        awregion: awregion,
+        awuser:   awuser
+      }));
+    endaction;
     method awready = toSink(s).canPut;
   endinterface;
 
-function Sink#(AXI4_AWFlit#(id_, addr_, user_))
-  fromAXI4_AW_Slave_Synth(AXI4_AW_Slave_Synth#(id_, addr_, user_) s) =
-  interface Sink;
-    method canPut = s.awready;
-    method put(x) = s.awflit(x.awid,
-                             x.awaddr,
-                             x.awlen,
-                             x.awsize,
-                             x.awburst,
-                             x.awlock,
-                             x.awcache,
-                             x.awprot,
-                             x.awqos,
-                             x.awregion,
-                             x.awuser);
-  endinterface;
+module fromAXI4_AW_Slave_Synth#(AXI4_AW_Slave_Synth#(id_, addr_, user_) s) (Sink#(AXI4_AWFlit#(id_, addr_, user_)));
+  //We rely on the buffer being guarded
+  FIFOF#(AXI4_AWFlit#(id_, addr_, user_)) buffer <- mkSizedBypassFIFOF(1);
+  rule forwardFlit;
+    s.awflit(buffer.first.awid,
+             buffer.first.awaddr,
+             buffer.first.awlen,
+             buffer.first.awsize,
+             buffer.first.awburst,
+             buffer.first.awlock,
+             buffer.first.awcache,
+             buffer.first.awprot,
+             buffer.first.awqos,
+             buffer.first.awregion,
+             buffer.first.awuser);
+  endrule
+  //dropFlit only fires when both ready and canPeek, i.e. there is something to drop
+  rule dropFlit (s.awready);
+    buffer.deq;
+  endrule
+  return toSink(buffer);
+endmodule

@@ -82,11 +82,14 @@ function AXI4_AR_Master_Synth#(id_, addr_, user_)
   endinterface;
 endfunction
 
-function Source#(AXI4_ARFlit#(id_, addr_, user_))
-  fromAXI4_AR_Master_Synth(AXI4_AR_Master_Synth#(id_, addr_, user_) m) =
-  interface Source;
+module fromAXI4_AR_Master_Synth#(AXI4_AR_Master_Synth#(id_, addr_, user_) m) (Source#(AXI4_ARFlit#(id_, addr_, user_)));
+  let dwReady <- mkDWire(False);
+  rule forwardReady;
+    m.arready(dwReady);
+  endrule
+  return interface Source;
     method canPeek = m.arvalid;
-    method peek = AXI4_ARFlit {
+    method peek if (m.arvalid) = AXI4_ARFlit {
       arid:     m.arid,
       araddr:   m.araddr,
       arlen:    m.arlen,
@@ -99,8 +102,9 @@ function Source#(AXI4_ARFlit#(id_, addr_, user_))
       arregion: m.arregion,
       aruser:   m.aruser
     };
-    method drop = action if (m.arvalid) m.arready(True); endaction;
+    method drop if (m.arvalid) = dwReady._write(True);
   endinterface;
+endmodule
 
 // convert to/from Synth Slave interface
 ////////////////////////////////////////////////////////////////////////////////
@@ -119,35 +123,42 @@ function AXI4_AR_Slave_Synth#(id_, addr_, user_)
                   arprot,
                   arqos,
                   arregion,
-                  aruser) = toSink(s).put(fromAXI4_ARFlit(AXI4_ARFlit{
-      arid:     arid,
-      araddr:   araddr,
-      arlen:    arlen,
-      arsize:   arsize,
-      arburst:  arburst,
-      arlock:   arlock,
-      arcache:  arcache,
-      arprot:   arprot,
-      arqos:    arqos,
-      arregion: arregion,
-      aruser:   aruser
-    }));
+                  aruser) = action if (toSink(s).canPut) toSink(s).put(fromAXI4_ARFlit(AXI4_ARFlit{
+        arid:     arid,
+        araddr:   araddr,
+        arlen:    arlen,
+        arsize:   arsize,
+        arburst:  arburst,
+        arlock:   arlock,
+        arcache:  arcache,
+        arprot:   arprot,
+        arqos:    arqos,
+        arregion: arregion,
+        aruser:   aruser
+      }));
+    endaction;
     method arready = toSink(s).canPut;
   endinterface;
 
-function Sink#(AXI4_ARFlit#(id_, addr_, user_))
-  fromAXI4_AR_Slave_Synth(AXI4_AR_Slave_Synth#(id_, addr_, user_) s) =
-  interface Sink;
-    method canPut = s.arready;
-    method put(x) = s.arflit(x.arid,
-                             x.araddr,
-                             x.arlen,
-                             x.arsize,
-                             x.arburst,
-                             x.arlock,
-                             x.arcache,
-                             x.arprot,
-                             x.arqos,
-                             x.arregion,
-                             x.aruser);
-  endinterface;
+module fromAXI4_AR_Slave_Synth#(AXI4_AR_Slave_Synth#(id_, addr_, user_) s) (Sink#(AXI4_ARFlit#(id_, addr_, user_)));
+  //We rely on the buffer being guarded
+  FIFOF#(AXI4_ARFlit#(id_, addr_, user_)) buffer <- mkSizedBypassFIFOF(1);
+  rule forwardFlit;
+    s.arflit(buffer.first.arid,
+             buffer.first.araddr,
+             buffer.first.arlen,
+             buffer.first.arsize,
+             buffer.first.arburst,
+             buffer.first.arlock,
+             buffer.first.arcache,
+             buffer.first.arprot,
+             buffer.first.arqos,
+             buffer.first.arregion,
+             buffer.first.aruser);
+  endrule
+  //dropFlit only fires when both ready and canPeek, i.e. there is something to drop
+  rule dropFlit (s.arready);
+    buffer.deq;
+  endrule
+  return toSink(buffer);
+endmodule
