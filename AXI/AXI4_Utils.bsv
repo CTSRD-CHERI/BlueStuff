@@ -818,6 +818,127 @@ endfunction
 // Width conversions //
 ////////////////////////////////////////////////////////////////////////////////
 
+module toWider_AXI4_Master #(AXI4_Master#(id_, addr_, narrow_, awuser_, wuser_, buser_, aruser_, ruser_) narrow)
+  (AXI4_Master#(id_, addr_, wide_, awuser_, wuser_, buser_, aruser_, ruser_)) provisos (Add#(narrow_, narrow_, wide_), Add#(TDiv#(narrow_, 8), TDiv#(narrow_, 8), TDiv#(wide_, 8)));
+
+  //TODO will not tolerate bursts
+  //TODO will only allow one ID to have outstanding xactions at a time
+
+  let takeUpperW <- mkSizedFIFOF(8);
+  let takeUpperR <- mkSizedFIFOF(8);
+
+  let currentRID <- mkRegU;
+  let currentWID <- mkRegU;
+
+  let awCanPeek <- mkDWire(False);
+  let wCanPeek <- mkDWire(False);
+  let arCanPeek <- mkDWire(False);
+  let bCanPut <- mkDWire(False);
+  let rCanPut <- mkDWire(False);
+
+  rule canAW;
+    awCanPeek <= narrow.aw.canPeek && (!takeUpperW.notEmpty || (narrow.aw.peek.awid == currentWID)) && takeUpperW.notFull;
+  endrule
+  rule canW;
+    wCanPeek <= narrow.w.canPeek && takeUpperW.notEmpty;
+  endrule
+  rule canAR;
+    arCanPeek <= narrow.ar.canPeek && (!takeUpperR.notEmpty || (narrow.ar.peek.arid == currentRID)) && takeUpperR.notFull;
+  endrule
+  rule canB;
+    bCanPut <= narrow.b.canPut;
+  endrule
+  rule canR;
+    rCanPut <= narrow.r.canPut;
+  endrule
+
+  interface Source aw;
+    method Action drop if (awCanPeek);
+      narrow.aw.drop;
+      currentWID <= narrow.aw.peek.awid;
+      takeUpperW.enq(narrow.aw.peek.awaddr[valueOf(TLog#(narrow_))]);
+    endmethod
+    method canPeek = awCanPeek;
+    method peek if (awCanPeek);
+      let x = narrow.aw.peek;
+      return AXI4_AWFlit {
+        awid:     x.awid,
+        awaddr:   x.awaddr,
+        awlen:    x.awlen,
+        awsize:   x.awsize,
+        awburst:  x.awburst,
+        awlock:   x.awlock,
+        awcache:  x.awcache,
+        awprot:   x.awprot,
+        awqos:    x.awqos,
+        awregion: x.awregion,
+        awuser:   x.awuser
+        };
+    endmethod
+  endinterface
+  interface Source w;
+    method Action drop if (wCanPeek);
+      narrow.w.drop;
+      takeUpperW.deq;
+    endmethod
+    method canPeek = wCanPeek;
+    method peek if (wCanPeek);
+      let x = narrow.w.peek;
+      return AXI4_WFlit {
+        wdata: takeUpperW.first == 1'b1 ? {x.wdata, 0} : {0, x.wdata},
+        wstrb: takeUpperW.first == 1'b1 ? {x.wstrb, 0} : {0, x.wstrb},
+        wlast: x.wlast,
+        wuser: x.wuser
+      };
+    endmethod
+  endinterface
+  interface Sink b;
+    method canPut = bCanPut;
+    method put(x) if (bCanPut) = narrow.b.put(AXI4_BFlit {
+      bid:   x.bid,
+      bresp: x.bresp,
+      buser: x.buser
+    });
+  endinterface
+  interface Source ar;
+    method Action drop if (arCanPeek);
+      narrow.ar.drop;
+      currentRID <= narrow.ar.peek.arid;
+      takeUpperR.enq(narrow.ar.peek.araddr[valueOf(TLog#(narrow_))]);
+    endmethod
+    method canPeek = arCanPeek;
+    method peek if (arCanPeek);
+      let x = narrow.ar.peek;
+      return AXI4_ARFlit {
+        arid:     x.arid,
+        araddr:   x.araddr,
+        arlen:    x.arlen,
+        arsize:   x.arsize,
+        arburst:  x.arburst,
+        arlock:   x.arlock,
+        arcache:  x.arcache,
+        arprot:   x.arprot,
+        arqos:    x.arqos,
+        arregion: x.arregion,
+        aruser:   x.aruser
+        };
+    endmethod
+  endinterface
+  interface Sink r;
+    method canPut = rCanPut;
+    method Action put(x) if (rCanPut);
+      narrow.r.put(AXI4_RFlit {
+        rid:   x.rid,
+        rdata: takeUpperR.first == 1'b1 ? truncateLSB(x.rdata) : truncate(x.rdata),
+        rresp: x.rresp,
+        rlast: x.rlast,
+        ruser: x.ruser
+      });
+      takeUpperR.deq;
+    endmethod
+  endinterface
+endmodule
+
 typedef enum { COMBINE, PAD_FIRST, PAD_LAST } ReadSplitOption deriving (Bits, Eq, FShow);
 
 //Module to double the data width of a slave. Assumes no bursts, data address aligned to data size.
