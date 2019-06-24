@@ -856,7 +856,7 @@ module toWider_AXI4_Master #(AXI4_Master#(id_, addr_, narrow_, awuser_, wuser_, 
     method Action drop if (awCanPeek);
       narrow.aw.drop;
       currentWID <= narrow.aw.peek.awid;
-      takeUpperW.enq(narrow.aw.peek.awaddr[valueOf(TLog#(narrow_))]);
+      takeUpperW.enq(narrow.aw.peek.awaddr[valueOf(TLog#(TDiv#(narrow_,8)))]);
     endmethod
     method canPeek = awCanPeek;
     method peek if (awCanPeek);
@@ -904,7 +904,7 @@ module toWider_AXI4_Master #(AXI4_Master#(id_, addr_, narrow_, awuser_, wuser_, 
     method Action drop if (arCanPeek);
       narrow.ar.drop;
       currentRID <= narrow.ar.peek.arid;
-      takeUpperR.enq(narrow.ar.peek.araddr[valueOf(TLog#(narrow_))]);
+      takeUpperR.enq(narrow.ar.peek.araddr[valueOf(TLog#(TDiv#(narrow_,8)))]);
     endmethod
     method canPeek = arCanPeek;
     method peek if (arCanPeek);
