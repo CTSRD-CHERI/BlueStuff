@@ -260,8 +260,8 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
   provisos(Add#(a__, SizeOf#(AXI4_Len), b));
 
   // Shims
-  let inShim <- mkAXI4ShimBypassFIFOF;
-  let outShim <- mkAXI4ShimBypassFIFOF;
+  let inShim <- mkAXI4ShimFF;
+  let outShim <- mkAXI4ShimFF;
   // handy names
   let inAW = inShim.master.aw;
   let inW  = inShim.master.w;
