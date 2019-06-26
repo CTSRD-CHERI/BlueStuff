@@ -833,6 +833,8 @@ module toWider_AXI4_Master #(AXI4_Master#(id_, addr_, narrow_, awuser_, wuser_, 
   let takeUpperW <- mkSizedFIFOF(8);
   let takeUpperR <- mkSizedFIFOF(8);
 
+  let awFF <- mkBypassFIFOF;
+
   let currentRID <- mkRegU;
   let currentWID <- mkRegU;
 
@@ -843,7 +845,7 @@ module toWider_AXI4_Master #(AXI4_Master#(id_, addr_, narrow_, awuser_, wuser_, 
   let rCanPut <- mkDWire(False);
 
   rule canAW;
-    awCanPeek <= narrow.aw.canPeek && (!takeUpperW.notEmpty || (narrow.aw.peek.awid == currentWID)) && takeUpperW.notFull;
+    awCanPeek <= narrow.aw.canPeek && (!takeUpperW.notEmpty || (narrow.aw.peek.awid == currentWID)) && takeUpperW.notFull && awFF.notFull;
   endrule
   rule canW;
     wCanPeek <= narrow.w.canPeek && takeUpperW.notEmpty;
@@ -855,36 +857,20 @@ module toWider_AXI4_Master #(AXI4_Master#(id_, addr_, narrow_, awuser_, wuser_, 
     bCanPut <= narrow.b.canPut;
   endrule
   rule canR;
-    rCanPut <= narrow.r.canPut;
+    rCanPut <= narrow.r.canPut && takeUpperR.notEmpty;
   endrule
 
-  interface Source aw;
-    method Action drop if (awCanPeek);
-      narrow.aw.drop;
-      currentWID <= narrow.aw.peek.awid;
-      takeUpperW.enq(narrow.aw.peek.awaddr[valueOf(TLog#(TDiv#(narrow_,8)))]);
-    endmethod
-    method canPeek = awCanPeek;
-    method peek if (awCanPeek);
-      let x = narrow.aw.peek;
-      return AXI4_AWFlit {
-        awid:     x.awid,
-        awaddr:   x.awaddr,
-        awlen:    x.awlen,
-        awsize:   x.awsize,
-        awburst:  x.awburst,
-        awlock:   x.awlock,
-        awcache:  x.awcache,
-        awprot:   x.awprot,
-        awqos:    x.awqos,
-        awregion: x.awregion,
-        awuser:   x.awuser
-        };
-    endmethod
-  endinterface
+  rule consumeAW (awCanPeek);
+    let flit <- get(narrow.aw);
+    currentWID <= flit.awid;
+    takeUpperW.enq(flit.awaddr[valueOf(TLog#(TDiv#(narrow_,8)))]);
+    awFF.enq(flit);
+  endrule
+
+  interface aw = toSource(awFF);
   interface Source w;
     method Action drop if (wCanPeek);
-      narrow.w.drop;
+      let flit <- get(narrow.w);
       takeUpperW.deq;
     endmethod
     method canPeek = wCanPeek;
@@ -900,35 +886,18 @@ module toWider_AXI4_Master #(AXI4_Master#(id_, addr_, narrow_, awuser_, wuser_, 
   endinterface
   interface Sink b;
     method canPut = bCanPut;
-    method put(x) if (bCanPut) = narrow.b.put(AXI4_BFlit {
-      bid:   x.bid,
-      bresp: x.bresp,
-      buser: x.buser
-    });
+    method Action put(x) if (bCanPut);
+        narrow.b.put(x);
+    endmethod
   endinterface
   interface Source ar;
     method Action drop if (arCanPeek);
-      narrow.ar.drop;
-      currentRID <= narrow.ar.peek.arid;
-      takeUpperR.enq(narrow.ar.peek.araddr[valueOf(TLog#(TDiv#(narrow_,8)))]);
+      let flit <- get(narrow.ar);
+      currentRID <= flit.arid;
+      takeUpperR.enq(flit.araddr[valueOf(TLog#(TDiv#(narrow_,8)))]);
     endmethod
     method canPeek = arCanPeek;
-    method peek if (arCanPeek);
-      let x = narrow.ar.peek;
-      return AXI4_ARFlit {
-        arid:     x.arid,
-        araddr:   x.araddr,
-        arlen:    x.arlen,
-        arsize:   x.arsize,
-        arburst:  x.arburst,
-        arlock:   x.arlock,
-        arcache:  x.arcache,
-        arprot:   x.arprot,
-        arqos:    x.arqos,
-        arregion: x.arregion,
-        aruser:   x.aruser
-        };
-    endmethod
+    method peek if (arCanPeek) = narrow.ar.peek;
   endinterface
   interface Sink r;
     method canPut = rCanPut;
