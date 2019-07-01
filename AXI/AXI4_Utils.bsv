@@ -284,16 +284,14 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
   // one write at a time...
   // Dynamic priority handling
   Reg#(Bool) lastWasRead <- mkReg(False);
-  Reg#(Bool) writeBusy   <- mkReg(False);
-  Reg#(Bool) readBusy    <- mkReg(False);
 
   // helper functions
   function getFlitAddr(addr, size, burst, cnt) = case (burst)
     INCR: return addr + (zeroExtend(cnt) << pack(size));
     default: return addr;
   endcase;
-  Bool allowWrites = (!inAR.canPeek || lastWasRead) && !readBusy;
-  Bool allowReads  = ((!inAW.canPeek && !inW.canPeek) || !lastWasRead) && !writeBusy;
+  Bool allowWrites = !inAR.canPeek || lastWasRead;
+  Bool allowReads  = (!inAW.canPeek && !inW.canPeek) || !lastWasRead;
 
   // DEBUG //
   //////////////////////////////////////////////////////////////////////////////
@@ -333,7 +331,6 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
   //////////////////////////////////////////////////////////////////////////////
   rule forward_write_req (allowWrites && inAW.canPeek && inW.canPeek
                                       && outAW.canPut && outW.canPut);
-    writeBusy <= True;
     // prepare new AW request flit
     let awflit = inAW.peek;
     let newawflit = awflit;
@@ -350,7 +347,6 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
     outW.put(newwflit);
     // book keeping
     if (inW.peek.wlast) begin
-      lastWasRead <= False;
       inAW.drop;
       countWriteRspFF.enq(awflit.awlen);
       writesSent <= 0;
@@ -370,7 +366,7 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
       countWriteRspFF.deq;
       inB.put(outB.peek);
       flitReceived <= 0;
-      writeBusy <= False;
+      lastWasRead <= False;
     end
     // DEBUG //
     if (debug) $display("%0t: handle_write_rsp - ", $time, fshow(outB.peek));
@@ -379,7 +375,6 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
   // Reads
   //////////////////////////////////////////////////////////////////////////////
   rule forward_read_req (allowReads && inAR.canPeek && outAR.canPut);
-    readBusy <= True;
     // prepare new request flit
     let arflit = inAR.peek;
     let newflit = arflit;
@@ -394,7 +389,6 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
     lastReadRspFF.enq(isLast);
     // book keeping
     if (isLast) begin
-      lastWasRead <= True;
       inAR.drop;
       readsSent <= 0;
     end else readsSent <= readsSent + 1;
@@ -414,7 +408,7 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
     inR.put(newflit);
     // book keeping
     lastReadRspFF.deq;
-    if (isLast) readBusy <= False;
+    if (isLast) lastWasRead <= True;
     // DEBUG //
     if (debug) $display("%0t: forward_read_rsp - ", $time, fshow(newflit));
   endrule
