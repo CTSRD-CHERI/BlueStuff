@@ -252,6 +252,71 @@ module mkAXI4Limiter#(parameter Integer maxReqs) (AXI4_Shim#(a, b, c, d, e, f, g
 
 endmodule
 
+//////////////////////////////////////
+// Arbiter between reads and writes //
+////////////////////////////////////////////////////////////////////////////////
+
+typedef enum {IDLE, BURST_WRITE, WAITING} SerialiserState deriving (FShow, Bits, Eq);
+
+module mkSerialiser #(AXI4_Master#(a, b, c, d, e, f, g, h) m)
+  (AXI4_Master#(a, b, c, d, e, f, g, h));
+
+  let shim <- mkAXI4ShimBypassFIFOF;
+  let slv = shim.slave;
+
+  let lastWasRead <- mkReg(False);
+  let state <- mkCReg(2, IDLE);
+
+  let writeWaiting = m.aw.canPeek && m.w.canPeek;
+  let readWaiting = m.ar.canPeek;
+
+  let allowNewRead = state[0] == IDLE && (!lastWasRead || (!writeWaiting));
+  let allowNewWrite = state[0] == IDLE && (lastWasRead || (!readWaiting));
+
+  // Requests //
+  //////////////////////////////////////////////////////////////////////////////
+
+  rule takeAW(allowNewWrite);
+    let awFlit <- get(m.aw);
+    state[0] <= BURST_WRITE;
+    lastWasRead <= False;
+    slv.aw.put(awFlit);
+  endrule
+
+  rule takeW(state[1] == BURST_WRITE);
+    let wFlit <- get(m.w);
+    if (wFlit.wlast) state[1] <= WAITING;
+    slv.w.put(wFlit);
+  endrule
+
+  rule takeAR(allowNewRead);
+    let arFlit <- get(m.ar);
+    state[0] <= WAITING;
+    lastWasRead <= True;
+    slv.ar.put(arFlit);
+  endrule
+
+  // Responses //
+  //////////////////////////////////////////////////////////////////////////////
+
+  (* mutually_exclusive = "takeR, takeB" *)
+
+  rule takeB;
+    let bFlit <- get(slv.b);
+    m.b.put(bFlit);
+    state[1] <= IDLE;
+  endrule
+
+  rule takeR;
+    let rFlit <- get(slv.r);
+    m.r.put(rFlit);
+    if (rFlit.rlast) state[1] <= IDLE;
+  endrule
+
+  return shim.master;
+
+endmodule
+
 //////////////////////////////////////////
 // AXI4 Burst Master <-> NonBurst Slave //
 ////////////////////////////////////////////////////////////////////////////////
@@ -261,13 +326,14 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
 
   // Shims
   let inShim <- mkAXI4ShimFF;
+  let inSerial <- mkSerialiser(inShim.master);
   let outShim <- mkAXI4ShimFF;
   // handy names
-  let inAW = inShim.master.aw;
-  let inW  = inShim.master.w;
-  let inB  = inShim.master.b;
-  let inAR = inShim.master.ar;
-  let inR  = inShim.master.r;
+  let inAW = inSerial.aw;
+  let inW  = inSerial.w;
+  let inB  = inSerial.b;
+  let inAR = inSerial.ar;
+  let inR  = inSerial.r;
   let outAW = outShim.slave.aw;
   let outW  = outShim.slave.w;
   let outB  = outShim.slave.b;
@@ -280,18 +346,11 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
   Reg#(Bit#(SizeOf#(AXI4_Len))) readsSent <- mkReg(0);
   Reg#(Bit#(SizeOf#(AXI4_Len))) flitReceived <- mkReg(0);
 
-  // To guaranty atomicity of bursts, require that we only deal with one read or
-  // one write at a time...
-  // Dynamic priority handling
-  Reg#(Bool) lastWasRead <- mkReg(False);
-
   // helper functions
   function getFlitAddr(addr, size, burst, cnt) = case (burst)
     INCR: return addr + (zeroExtend(cnt) << pack(size));
     default: return addr;
   endcase;
-  Bool allowWrites = !inAR.canPeek || lastWasRead;
-  Bool allowReads  = (!inAW.canPeek && !inW.canPeek) || !lastWasRead;
 
   // DEBUG //
   //////////////////////////////////////////////////////////////////////////////
@@ -308,10 +367,7 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
                 + $format("\toutAR.canPut:\t ", fshow(outAR.canPut))
                 + $format("\n\tinR.canPut:\t ", fshow(inR.canPut))
                 + $format("\toutR.canPeek:\t ", fshow(outR.canPeek));
-    Fmt state_str = $format("lastWasRead: ", fshow(lastWasRead),
-                            " allowReads: ", fshow(allowReads),
-                            " allowWrites: ", fshow(allowWrites),
-                            "\nwritesSent: %d", writesSent,
+    Fmt state_str = $format(" writesSent: %d", writesSent,
                             " readsSent: %d", readsSent,
                             " flitReceived: %d", flitReceived);
     $display("%0t: ", $time, dbg_str);
@@ -329,8 +385,7 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
   endrule
   // Writes
   //////////////////////////////////////////////////////////////////////////////
-  rule forward_write_req (allowWrites && inAW.canPeek && inW.canPeek
-                                      && outAW.canPut && outW.canPut);
+  rule forward_write_req;
     // prepare new AW request flit
     let awflit = inAW.peek;
     let newawflit = awflit;
@@ -339,10 +394,9 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
     newawflit.awlen = 0;
     newawflit.awburst = FIXED;
     // prepare new W request flit
-    let newwflit = inW.peek;
+    let newwflit <- get(inW);
     newwflit.wlast = True;
-    // drop from W input and produce a AW/W output
-    inW.drop;
+    // produce a AW/W output
     outAW.put(newawflit);
     outW.put(newwflit);
     // book keeping
@@ -356,7 +410,7 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
                         "\n", fshow(awflit), "\n", fshow(inW.peek),
                         "\n", fshow(newawflit), "\n", fshow(newwflit));
   endrule
-  rule handle_write_rsp (allowWrites && outB.canPeek && inB.canPut);
+  rule handle_write_rsp;
     // always consume the response
     outB.drop;
     // count up if not last
@@ -366,7 +420,6 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
       countWriteRspFF.deq;
       inB.put(outB.peek);
       flitReceived <= 0;
-      lastWasRead <= False;
     end
     // DEBUG //
     if (debug) $display("%0t: handle_write_rsp - ", $time, fshow(outB.peek));
@@ -374,7 +427,7 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
 
   // Reads
   //////////////////////////////////////////////////////////////////////////////
-  rule forward_read_req (allowReads && inAR.canPeek && outAR.canPut);
+  rule forward_read_req;
     // prepare new request flit
     let arflit = inAR.peek;
     let newflit = arflit;
@@ -398,17 +451,13 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
                         "\nisLast: ", fshow(isLast),
                         " readsSent: %0d", readsSent);
   endrule
-  rule forward_read_rsp (allowReads && outR.canPeek && inR.canPut);
-    let isLast = lastReadRspFF.first;
+  rule forward_read_rsp;
     // prepare new response flit
     let newflit   = outR.peek;
-    newflit.rlast = isLast;
+    newflit.rlast <- get(lastReadRspFF);
     // consume and produce on AXI
     outR.drop;
     inR.put(newflit);
-    // book keeping
-    lastReadRspFF.deq;
-    if (isLast) lastWasRead <= True;
     // DEBUG //
     if (debug) $display("%0t: forward_read_rsp - ", $time, fshow(newflit));
   endrule
