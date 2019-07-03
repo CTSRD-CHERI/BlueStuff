@@ -63,7 +63,7 @@ module axiMaster (AXI4_Master#(`WIDEPARAMS));
       awid:     0,
       awaddr:   0,
       awlen:    0,
-      awsize:   2,
+      awsize:   16,
       awburst:  INCR,
       awlock:   NORMAL,
       awcache:  0,
@@ -77,7 +77,7 @@ module axiMaster (AXI4_Master#(`WIDEPARAMS));
   endrule
   rule putAXI4_WFlit (sendWrite);
     AXI4_WFlit#(WIDEDATA_sz, WUSER_sz) f = AXI4_WFlit {
-      wdata: cnt, wstrb: 'h3, wlast: True, wuser: 0
+      wdata: cnt, wstrb: 'hf00f, wlast: True, wuser: 0
     };
     shim.slave.w.put(f);
     $display("%0t - MASTER - sending ", $time, fshow(f));
@@ -129,9 +129,11 @@ endmodule
 
 module top (Empty);
   AXI4_Master#(`WIDEPARAMS) widemaster <- axiMaster;
+  AXI4_Shim#(`WIDEPARAMS) dbrst <- mkBurstToNoBurst;
+  mkConnection(widemaster, dbrst.slave);
   AXI4_Slave#(`PARAMS)      slave  <- axiSlave;
   AXI4_Slave#(`WIDEPARAMS)  wideslave <- toWider_AXI4_Slave(slave);
-  mkConnection(widemaster, wideslave);
+  mkConnection(dbrst.master, wideslave);
 endmodule
 
 `undef PARAMS
