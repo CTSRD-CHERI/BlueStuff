@@ -527,6 +527,29 @@ module mkAXI4Shim (AXI4_Shim#(a, b, c, d, e, f, g, h));
   return shim;
 endmodule
 
+module mkAXI4DebugShimSynth #(String debugTag) (AXI4_Shim_Synth#(a,b,c,d,e,f,g,h));
+  let shim <- mkAXI4DebugShim(debugTag);
+  let ug_master <- toUnguarded_AXI4_Master(shim.master);
+  let ug_slave <- toUnguarded_AXI4_Slave(shim.slave);
+  interface master = toAXI4_Master_Synth(ug_master);
+  interface slave = toAXI4_Slave_Synth(ug_slave);
+  interface clear = shim.clear;
+endmodule
+
+module mkAXI4DebugShim #(String debugTag) (AXI4_Shim#(a,b,c,d,e,f,g,h));
+  let shim <- mkAXI4Shim;
+  let m = shim.master;
+  interface slave = shim.slave;
+  interface AXI4_Master master;
+    interface aw = debugSource(m.aw, $format(debugTag, " aw"));
+    interface w  = debugSource( m.w, $format(debugTag, "  w"));
+    interface b  = debugSink  ( m.b, $format(debugTag, "  b"));
+    interface ar = debugSource(m.ar, $format(debugTag, " ar"));
+    interface r  = debugSink  ( m.r, $format(debugTag, "  r"));
+  endinterface
+  interface clear = shim.clear;
+endmodule
+
 /////////////////////////////////////
 // to/from "Synth" interface utils //
 ////////////////////////////////////////////////////////////////////////////////
