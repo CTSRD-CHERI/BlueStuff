@@ -528,27 +528,44 @@ module mkAXI4Shim (AXI4_Shim#(a, b, c, d, e, f, g, h));
   return shim;
 endmodule
 
+//////////////////////////////
+// AXI4 Debug / Trace utils //
+////////////////////////////////////////////////////////////////////////////////
+
+function AXI4_Master#(a,b,c,d,e,f,g,h)
+         debugAXI4_Master(AXI4_Master#(a,b,c,d,e,f,g,h) m, Fmt msg) =
+  interface AXI4_Master;
+    interface aw = debugSource(m.aw, $format(msg, " aw"));
+    interface w  = debugSource( m.w, $format(msg, "  w"));
+    interface b  = debugSink  ( m.b, $format(msg, "  b"));
+    interface ar = debugSource(m.ar, $format(msg, " ar"));
+    interface r  = debugSink  ( m.r, $format(msg, "  r"));
+  endinterface;
+
+function AXI4_Slave#(a,b,c,d,e,f,g,h)
+         debugAXI4_Slave(AXI4_Slave#(a,b,c,d,e,f,g,h) s, Fmt msg) =
+  interface AXI4_Slave;
+    interface aw = debugSink  (s.aw, $format(msg, " aw"));
+    interface w  = debugSink  ( s.w, $format(msg, "  w"));
+    interface b  = debugSource( s.b, $format(msg, "  b"));
+    interface ar = debugSink  (s.ar, $format(msg, " ar"));
+    interface r  = debugSource( s.r, $format(msg, "  r"));
+  endinterface;
+
 module mkAXI4DebugShimSynth #(String debugTag) (AXI4_Shim_Synth#(a,b,c,d,e,f,g,h));
   let shim <- mkAXI4DebugShim(debugTag);
   let ug_master <- toUnguarded_AXI4_Master(shim.master);
-  let ug_slave <- toUnguarded_AXI4_Slave(shim.slave);
+  let  ug_slave <- toUnguarded_AXI4_Slave(shim.slave);
   interface master = toAXI4_Master_Synth(ug_master);
-  interface slave = toAXI4_Slave_Synth(ug_slave);
-  interface clear = shim.clear;
+  interface  slave = toAXI4_Slave_Synth(ug_slave);
+  interface  clear = shim.clear;
 endmodule
 
 module mkAXI4DebugShim #(String debugTag) (AXI4_Shim#(a,b,c,d,e,f,g,h));
   let shim <- mkAXI4Shim;
-  let m = shim.master;
-  interface slave = shim.slave;
-  interface AXI4_Master master;
-    interface aw = debugSource(m.aw, $format(debugTag, " aw"));
-    interface w  = debugSource( m.w, $format(debugTag, "  w"));
-    interface b  = debugSink  ( m.b, $format(debugTag, "  b"));
-    interface ar = debugSource(m.ar, $format(debugTag, " ar"));
-    interface r  = debugSink  ( m.r, $format(debugTag, "  r"));
-  endinterface
-  interface clear = shim.clear;
+  interface  slave = shim.slave;
+  interface master = debugAXI4_Master(shim.master, $format(debugTag));
+  interface  clear = shim.clear;
 endmodule
 
 /////////////////////////////////////
