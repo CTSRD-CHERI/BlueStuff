@@ -267,7 +267,7 @@ module mkSerialiser #(AXI4_Master#(a, b, c, d, e, f, g, h) m)
   let lastWasRead <- mkReg(False);
   let state <- mkCReg(2, IDLE);
 
-  let writeWaiting = m.aw.canPeek && m.w.canPeek;
+  let writeWaiting = m.aw.canPeek;
   let readWaiting = m.ar.canPeek;
 
   let allowNewRead = state[0] == IDLE && (!lastWasRead || (!writeWaiting));
