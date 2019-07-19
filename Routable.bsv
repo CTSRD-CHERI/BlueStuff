@@ -77,7 +77,7 @@ function Bit#(n) rangeBase(Range#(n) range) = range.base;
 function Bit#(n) rangeSize(Range#(n) range) = range.size;
 function Bit#(n) rangeTop (Range#(n) range) = range.base + range.size;
 function Bool inRange(Range#(n) range, Bit#(n) addr) =
-  (addr >= range.base && addr < rangeTop(range));
+  (addr >= rangeBase(range) && (addr - rangeBase(range)) < rangeSize(range));
 
 ////////////////////////
 // Mapping table type //
