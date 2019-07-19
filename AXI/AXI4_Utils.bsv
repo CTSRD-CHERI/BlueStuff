@@ -43,6 +43,8 @@ import SourceSink :: *;
 import FIFOF :: *;
 import SpecialFIFOs :: *;
 import ConfigReg :: *;
+import Connectable :: *;
+
 
 ////////////////////////////////
 // AXI4 Write channel helpers //
@@ -912,12 +914,17 @@ module toWider_AXI4_Master #(AXI4_Master#(id_, addr_, narrow_, awuser_, wuser_, 
   (AXI4_Master#(id_, addr_, wide_, awuser_, wuser_, buser_, aruser_, ruser_)) provisos (Add#(narrow_, narrow_, wide_), Add#(TDiv#(narrow_, 8), TDiv#(narrow_, 8), TDiv#(wide_, 8)));
 
   //TODO will not tolerate bursts
-  //TODO will only allow one ID to have outstanding xactions at a time
+  //TODO will handle only one outstanding ID at a time
+  
+  AXI4_Shim#(id_, addr_, narrow_, awuser_, wuser_, buser_, aruser_, ruser_) bufferShim <- mkAXI4ShimUGSizedFIFOF4;
+  mkConnection(bufferShim.slave, narrow);
+  
+  let inMaster = bufferShim.master;
 
-  let takeUpperW <- mkSizedFIFOF(8);
+  let takeUpperW <- mkFIFOF;
   let takeUpperR <- mkSizedFIFOF(8);
 
-  let awFF <- mkBypassFIFOF;
+  let awFF <- mkFIFOF;
 
   let currentRID <- mkRegU;
   let currentWID <- mkRegU;
@@ -929,23 +936,23 @@ module toWider_AXI4_Master #(AXI4_Master#(id_, addr_, narrow_, awuser_, wuser_, 
   let rCanPut <- mkDWire(False);
 
   rule canAW;
-    awCanPeek <= narrow.aw.canPeek && (!takeUpperW.notEmpty || (narrow.aw.peek.awid == currentWID)) && takeUpperW.notFull && awFF.notFull;
+    awCanPeek <= inMaster.aw.canPeek && (!takeUpperW.notEmpty || (inMaster.aw.peek.awid == currentWID)) && takeUpperW.notFull && awFF.notFull;
   endrule
   rule canW;
-    wCanPeek <= narrow.w.canPeek && takeUpperW.notEmpty;
+    wCanPeek <= inMaster.w.canPeek && takeUpperW.notEmpty;
   endrule
   rule canAR;
-    arCanPeek <= narrow.ar.canPeek && (!takeUpperR.notEmpty || (narrow.ar.peek.arid == currentRID)) && takeUpperR.notFull;
+    arCanPeek <= inMaster.ar.canPeek && (!takeUpperR.notEmpty || (inMaster.ar.peek.arid == currentRID)) && takeUpperR.notFull;
   endrule
   rule canB;
-    bCanPut <= narrow.b.canPut;
+    bCanPut <= inMaster.b.canPut;
   endrule
   rule canR;
-    rCanPut <= narrow.r.canPut && takeUpperR.notEmpty;
+    rCanPut <= inMaster.r.canPut && takeUpperR.notEmpty;
   endrule
 
   rule consumeAW (awCanPeek);
-    let flit <- get(narrow.aw);
+    let flit <- get(inMaster.aw);
     currentWID <= flit.awid;
     takeUpperW.enq(flit.awaddr[valueOf(TLog#(TDiv#(narrow_,8)))]);
     awFF.enq(flit);
@@ -954,15 +961,17 @@ module toWider_AXI4_Master #(AXI4_Master#(id_, addr_, narrow_, awuser_, wuser_, 
   interface aw = toSource(awFF);
   interface Source w;
     method Action drop if (wCanPeek);
-      let flit <- get(narrow.w);
+      let flit <- get(inMaster.w);
       takeUpperW.deq;
     endmethod
     method canPeek = wCanPeek;
     method peek if (wCanPeek);
-      let x = narrow.w.peek;
+      let x = inMaster.w.peek;
+      Bit#(narrow_) zeroDat = 0;
+      Bit#(TDiv#(narrow_, 8)) zeroStrb = 0;
       return AXI4_WFlit {
-        wdata: takeUpperW.first == 1'b1 ? {x.wdata, 0} : {0, x.wdata},
-        wstrb: takeUpperW.first == 1'b1 ? {x.wstrb, 0} : {0, x.wstrb},
+        wdata: takeUpperW.first == 1'b1 ? {x.wdata, zeroDat} : {zeroDat, x.wdata},
+        wstrb: takeUpperW.first == 1'b1 ? {x.wstrb, zeroStrb} : {zeroStrb, x.wstrb},
         wlast: x.wlast,
         wuser: x.wuser
       };
@@ -971,22 +980,22 @@ module toWider_AXI4_Master #(AXI4_Master#(id_, addr_, narrow_, awuser_, wuser_, 
   interface Sink b;
     method canPut = bCanPut;
     method Action put(x) if (bCanPut);
-        narrow.b.put(x);
+        inMaster.b.put(x);
     endmethod
   endinterface
   interface Source ar;
     method Action drop if (arCanPeek);
-      let flit <- get(narrow.ar);
+      let flit <- get(inMaster.ar);
       currentRID <= flit.arid;
       takeUpperR.enq(flit.araddr[valueOf(TLog#(TDiv#(narrow_,8)))]);
     endmethod
     method canPeek = arCanPeek;
-    method peek if (arCanPeek) = narrow.ar.peek;
+    method peek if (arCanPeek) = inMaster.ar.peek;
   endinterface
   interface Sink r;
     method canPut = rCanPut;
     method Action put(x) if (rCanPut);
-      narrow.r.put(AXI4_RFlit {
+      inMaster.r.put(AXI4_RFlit {
         rid:   x.rid,
         rdata: takeUpperR.first == 1'b1 ? truncateLSB(x.rdata) : truncate(x.rdata),
         rresp: x.rresp,
