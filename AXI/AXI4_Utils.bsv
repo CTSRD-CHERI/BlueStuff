@@ -523,6 +523,8 @@ endmodule
 `defAXI4ShimFIFOF(FF1, mkFIFOF1)
 `defAXI4ShimFIFOF(FF, mkFIFOF)
 `defAXI4ShimFIFOF(SizedFIFOF4, mkSizedFIFOF(4))
+`defAXI4ShimFIFOF(SizedFIFOF32, mkSizedFIFOF(32))
+`defAXI4ShimFIFOF(UGSizedFIFOF32, mkUGSizedFIFOF(32))
 `defAXI4ShimFIFOF(UGSizedFIFOF4, mkUGSizedFIFOF(4))
 
 module mkAXI4Shim (AXI4_Shim#(a, b, c, d, e, f, g, h));
