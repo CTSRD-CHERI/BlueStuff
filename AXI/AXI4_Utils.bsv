@@ -1359,3 +1359,16 @@ module mkAXI4_Slave_Widening_Xactor (AXI4_Slave_Width_Xactor#(a, b, c, d, e, f, 
   interface master = guard_AXI4_Master(shim.master, clearing);
   interface slaveSynth = toAXI4_Slave_Synth(ug_slave);
 endmodule
+
+module mkAXI4_Slave_Zeroing_Xactor (AXI4_Slave_Width_Xactor#(a, b, c, d, e, f, g, h, i, j, k, l, m, n)) provisos (Add#(c,0,d), Add#(d, _, 128), Add#(a__, SizeOf#(AXI4_Size_Bits), b));
+  let shim <- mkAXI4ShimSizedFIFOF4;
+  let ug_slave <- toUnguarded_AXI4_Slave(zeroSlaveUserFields(shim.slave));
+  let clearing <- mkConfigReg(False);
+  rule do_clear(clearing);
+    shim.clear;
+    clearing <= False;
+  endrule
+  method clear if (!clearing) = action clearing <= True; endaction;
+  interface master = guard_AXI4_Master(shim.master, clearing);
+  interface slaveSynth = toAXI4_Slave_Synth(ug_slave);
+endmodule
