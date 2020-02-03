@@ -116,9 +116,8 @@ module mkOneWayBus#(
           let flit <- get(sources[i]);
           let dest = paths[i].peek;
           if (countIf(id, dest) != 1) begin // XXX THIS SHOULD NEVER HAPPEN
-            $display("%0t -- mkOneWayBus error: input %0d was selected but the",
-                     " requested path ", $time, i, fshow(dest),
-                     " is not a valid one-hot path.");
+            $display("%0t -- mkOneWayBus error: input %0d was selected but the requested path ",
+            $time, i, fshow(dest), " is not a valid one-hot path.");
             $finish(0);
           end
           zipWithM_(forwardFlit(flit), dest, flitToSink);
@@ -127,8 +126,8 @@ module mkOneWayBus#(
             state <= ALLOCATED;
           end else drainSource(paths[i]);
         end else begin // XXX THIS SHOULD NEVER HAPPEN
-          $display("%0t -- mkOneWayBus error: input %0d was selected but there",
-                   " was no requested path.", $time, i);
+          $display("%0t -- mkOneWayBus error: input %0d was selected but there was no requested path.",
+            $time, i);
           $finish(0);
         end
       endrule
