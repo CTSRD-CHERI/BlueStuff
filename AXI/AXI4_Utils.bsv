@@ -345,9 +345,9 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
   // internal state
   let lastReadRspFF   <- mkSizedFIFOF(4);
   let countWriteRspFF <- mkSizedFIFOF(4);
-  Reg#(Bit#(SizeOf#(AXI4_Len))) writesSent <- mkReg(0);
-  Reg#(Bit#(SizeOf#(AXI4_Len))) readsSent <- mkReg(0);
-  Reg#(Bit#(SizeOf#(AXI4_Len))) flitReceived <- mkReg(0);
+  Reg#(Bit#(SizeOf#(AXI4_Len))) writesSent[2] <- mkCReg(2, 0);
+  Reg#(Bit#(SizeOf#(AXI4_Len))) readsSent[2] <- mkCReg(2, 0);
+  Reg#(Bit#(SizeOf#(AXI4_Len))) flitReceived[2] <- mkCReg(2, 0);
 
   // helper functions
   function getFlitAddr(addr, size, burst, cnt) = case (burst)
@@ -370,9 +370,9 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
                 + $format("\toutAR.canPut:\t ", fshow(outAR.canPut))
                 + $format("\n\tinR.canPut:\t ", fshow(inR.canPut))
                 + $format("\toutR.canPeek:\t ", fshow(outR.canPeek));
-    Fmt state_str = $format(" writesSent: %d", writesSent,
-                            " readsSent: %d", readsSent,
-                            " flitReceived: %d", flitReceived);
+    Fmt state_str = $format(" writesSent: %d", writesSent[0],
+                            " readsSent: %d", readsSent[0],
+                            " flitReceived: %d", flitReceived[0]);
     $display("%0t: ", $time, dbg_str);
     $display("%0t: ", $time, state_str);
   endrule
@@ -393,7 +393,7 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
     let awflit = inAW.peek;
     let newawflit = awflit;
     newawflit.awaddr = getFlitAddr(awflit.awaddr, awflit.awsize, awflit.awburst,
-                                   writesSent);
+                                   writesSent[0]);
     newawflit.awlen = 0;
     newawflit.awburst = FIXED;
     // prepare new W request flit
@@ -406,8 +406,8 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
     if (inW.peek.wlast) begin
       inAW.drop;
       countWriteRspFF.enq(awflit.awlen);
-      writesSent <= 0;
-    end else writesSent <= writesSent + 1;
+      writesSent[0] <= 0;
+    end else writesSent[0] <= writesSent[0] + 1;
     // DEBUG //
     if (debug) $display("%0t: forward_write_req", $time,
                         "\n", fshow(awflit), "\n", fshow(inW.peek),
@@ -417,12 +417,12 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
     // always consume the response
     outB.drop;
     // count up if not last
-    if (countWriteRspFF.first > flitReceived) flitReceived <= flitReceived + 1;
+    if (countWriteRspFF.first > flitReceived[0]) flitReceived[0] <= flitReceived[0] + 1;
     // on last response, forward it and reset book keeping
     else begin
       countWriteRspFF.deq;
       inB.put(outB.peek);
-      flitReceived <= 0;
+      flitReceived[0] <= 0;
     end
     // DEBUG //
     if (debug) $display("%0t: handle_write_rsp - ", $time, fshow(outB.peek));
@@ -435,24 +435,24 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
     let arflit = inAR.peek;
     let newflit = arflit;
     newflit.araddr = getFlitAddr(arflit.araddr, arflit.arsize, arflit.arburst,
-                                 readsSent);
+                                 readsSent[0]);
     newflit.arlen = 0;
     newflit.arburst = FIXED;
     // is this the last request ?
-    let isLast = (readsSent == arflit.arlen);
+    let isLast = (readsSent[0] == arflit.arlen);
     // produce a AR output
     outAR.put(newflit);
     lastReadRspFF.enq(isLast);
     // book keeping
     if (isLast) begin
       inAR.drop;
-      readsSent <= 0;
-    end else readsSent <= readsSent + 1;
+      readsSent[0] <= 0;
+    end else readsSent[0] <= readsSent[0] + 1;
     // DEBUG //
     if (debug) $display("%0t: forward_read_req", $time,
                         "\n", fshow(arflit), "\n", fshow(newflit),
                         "\nisLast: ", fshow(isLast),
-                        " readsSent: %0d", readsSent);
+                        " readsSent: %0d", readsSent[0]);
   endrule
   rule forward_read_rsp;
     // prepare new response flit
@@ -472,9 +472,9 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
     outShim.clear;
     lastReadRspFF.clear;
     countWriteRspFF.clear;
-    writesSent   <= 0;
-    readsSent    <= 0;
-    flitReceived <= 0;
+    writesSent[1]   <= 0;
+    readsSent[1]    <= 0;
+    flitReceived[1] <= 0;
   endaction;
   interface slave  = inShim.slave;
   interface master = outShim.master;
