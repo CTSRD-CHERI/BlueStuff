@@ -14,7 +14,7 @@ Bluestuff's [`Routable`](Routable.bsv) package provides:
   * a `module mkNoRouteFound (NoRouteFoundIfc#(a, b))` module capturing desired behaviour in case of absence of viable route
 - a `DetectLast#(type a)` class with a `Bool detectLast (a val)` method
 - an `ExpandReqRsp` class:
-  ```
+  ```bsv
   typeclass ExpandReqRsp#(type req_a, type req_b, type rsp_a, type rsp_b, type t)
     dependencies (
       (req_a, req_b, t) determines (rsp_a, rsp_b),
@@ -35,7 +35,7 @@ Bluestuff's [`Routable`](Routable.bsv) package provides:
 # Interconnect
 All buses provided in Bluestuff's [`Interconnect`](Interconnect.bsv) package support multi-flit transactions. The package provides:
 - a `mkOneWayBut` module:
-  ```
+  ```bsv
   module mkOneWayBus#(
     Vector#(nIns, Tuple2#(in_t, path_t)) ins,
     Vector#(nOuts, out_t#(flit_t)) outs
@@ -51,7 +51,7 @@ All buses provided in Bluestuff's [`Interconnect`](Interconnect.bsv) package sup
   ```
     This module connects a vector of sources with a vector of sinks. The sources produce some payload together with their desired destination used to select the appropriate sink. Only a single source can be connected to a single sink at any given time. This bus achieves this by using an instance of the arbiter provided in the [`OneHotArbiter`](OneHotArbiter.bsv) package.
 - a `mkTwoWayBus` module:
-  ```
+  ```bsv
   module mkTwoWayBus#(
   function Vector#(nRoutes, Bool) route (routing_t val),
   Vector#(nMasters, Master#(m2s_a, s2m_b)) ms,
