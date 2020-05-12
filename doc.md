@@ -34,7 +34,7 @@ Bluestuff's [`Routable`](Routable.bsv) package provides:
 
 # Interconnect
 All buses provided in Bluestuff's [`Interconnect`](Interconnect.bsv) package support multi-flit transactions. The package provides:
-- a `mkOneWayBut` module:
+- a `mkOneWayBus` module:
   ```bsv
   module mkOneWayBus#(
     Vector#(nIns, Tuple2#(in_t, path_t)) ins,
