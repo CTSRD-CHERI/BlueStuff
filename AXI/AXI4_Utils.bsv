@@ -532,6 +532,15 @@ module mkAXI4Shim (AXI4_Shim#(a, b, c, d, e, f, g, h));
   return shim;
 endmodule
 
+module toAXI4_Shim_Synth #(AXI4_Shim#(a, b, c, d, e, f, g, h) shim)
+                          (AXI4_Shim_Synth#(a, b, c, d, e, f, g, h));
+  let ug_master <- toUnguarded_AXI4_Master(shim.master);
+  let  ug_slave <- toUnguarded_AXI4_Slave(shim.slave);
+  interface master = toAXI4_Master_Synth(ug_master);
+  interface  slave = toAXI4_Slave_Synth(ug_slave);
+  interface  clear = shim.clear;
+endmodule
+
 //////////////////////////////
 // AXI4 Debug / Trace utils //
 ////////////////////////////////////////////////////////////////////////////////

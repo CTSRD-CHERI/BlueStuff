@@ -44,7 +44,7 @@ typedef Bit#(8) AXI4_Len;
 // AXI4 burst size (A3-49)
 typedef struct {
   Bit#(3) val;
-} AXI4_Size deriving (Bits, Bitwise, Arith, Eq, FShow);
+} AXI4_Size deriving (Bits, Bitwise, Arith, Ord, Eq, FShow);
 instance Literal#(AXI4_Size);
   function fromInteger(x) = case (x)
     1:       return AXI4_Size { val: 3'b000 };
