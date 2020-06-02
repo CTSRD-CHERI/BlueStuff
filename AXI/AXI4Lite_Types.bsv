@@ -154,7 +154,7 @@ instance Connectable#(AXI4Lite_W_Master_Synth#(a, b),
                       AXI4Lite_W_Slave_Synth#(a, b));
   module mkConnection#(AXI4Lite_W_Master_Synth#(a, b) m,
                        AXI4Lite_W_Slave_Synth#(a, b) s)(Empty);
-    rule connect_wflit; s.wflit(m.wdata, m.wstrb, m.wuser); endrule
+    rule connect_wflit (m.wvalid); s.wflit(m.wdata, m.wstrb, m.wuser); endrule
     rule connect_wready; m.wready(s.wready); endrule
   endmodule
 endinstance
@@ -277,7 +277,9 @@ instance Connectable#(AXI4Lite_AR_Master_Synth#(a, b),
                       AXI4Lite_AR_Slave_Synth#(a, b));
   module mkConnection#(AXI4Lite_AR_Master_Synth#(a, b) m,
                        AXI4Lite_AR_Slave_Synth#(a, b) s)(Empty);
-    rule connect_arflit; s.arflit(m.araddr, m.arprot, m.aruser); endrule
+    rule connect_arflit (m.arvalid);
+      s.arflit(m.araddr, m.arprot, m.aruser);
+    endrule
     rule connect_arready; m.arready(s.arready); endrule
   endmodule
 endinstance
@@ -332,7 +334,7 @@ instance Connectable#(AXI4Lite_R_Master_Synth#(a, b),
                       AXI4Lite_R_Slave_Synth#(a, b));
   module mkConnection#(AXI4Lite_R_Master_Synth#(a, b) m,
                        AXI4Lite_R_Slave_Synth#(a, b) s)(Empty);
-    rule connect_rflit; m.rflit(s.rdata, s.rresp, s.ruser); endrule
+    rule connect_rflit (s.rvalid); m.rflit(s.rdata, s.rresp, s.ruser); endrule
     rule connect_rready; s.rready(m.rready); endrule
   endmodule
 endinstance
