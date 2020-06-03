@@ -181,6 +181,46 @@ module mkAXI4LiteShim (AXI4Lite_Shim#(a, b, c, d, e, f, g));
   return shim;
 endmodule
 
+/////////////////////////
+// Debug / Trace utils //
+////////////////////////////////////////////////////////////////////////////////
+
+function AXI4Lite_Master#(a,b,c,d,e,f,g)
+         debugAXI4Lite_Master(AXI4Lite_Master#(a,b,c,d,e,f,g) m, Fmt msg) =
+  interface AXI4Lite_Master;
+    interface aw = debugSource(m.aw, $format(msg, " aw"));
+    interface w  = debugSource( m.w, $format(msg, "  w"));
+    interface b  = debugSink  ( m.b, $format(msg, "  b"));
+    interface ar = debugSource(m.ar, $format(msg, " ar"));
+    interface r  = debugSink  ( m.r, $format(msg, "  r"));
+  endinterface;
+
+function AXI4Lite_Slave#(a,b,c,d,e,f,g)
+         debugAXI4Lite_Slave(AXI4Lite_Slave#(a,b,c,d,e,f,g) s, Fmt msg) =
+  interface AXI4Lite_Slave;
+    interface aw = debugSink  (s.aw, $format(msg, " aw"));
+    interface w  = debugSink  ( s.w, $format(msg, "  w"));
+    interface b  = debugSource( s.b, $format(msg, "  b"));
+    interface ar = debugSink  (s.ar, $format(msg, " ar"));
+    interface r  = debugSource( s.r, $format(msg, "  r"));
+  endinterface;
+
+module mkAXI4LiteDebugShim #(String debugTag) (AXI4Lite_Shim#(a,b,c,d,e,f,g));
+  let shim <- mkAXI4LiteShim;
+  interface  slave = shim.slave;
+  interface master = debugAXI4Lite_Master(shim.master, $format(debugTag));
+  interface  clear = shim.clear;
+endmodule
+
+module mkAXI4LiteDebugShimSynth #(String debugTag) (AXI4Lite_Shim_Synth#(a,b,c,d,e,f,g));
+  let shim <- mkAXI4LiteDebugShim(debugTag);
+  let ug_master <- toUnguarded_AXI4Lite_Master(shim.master);
+  let  ug_slave <- toUnguarded_AXI4Lite_Slave(shim.slave);
+  interface master = toAXI4Lite_Master_Synth(ug_master);
+  interface  slave = toAXI4Lite_Slave_Synth(ug_slave);
+  interface  clear = shim.clear;
+endmodule
+
 
 /////////////////////////////////////
 // to/from "Synth" interface utils //

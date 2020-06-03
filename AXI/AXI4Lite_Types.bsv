@@ -485,6 +485,23 @@ interface AXI4Lite_Shim#(
   ) slave;
 endinterface
 
+interface AXI4Lite_Shim_Synth#(
+  numeric type addr_,
+  numeric type data_,
+  numeric type awuser_,
+  numeric type wuser_,
+  numeric type buser_,
+  numeric type aruser_,
+  numeric type ruser_);
+  method Action clear;
+  interface AXI4Lite_Master_Synth#(
+    addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_
+  ) master;
+  interface AXI4Lite_Slave_Synth#(
+    addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_
+  ) slave;
+endinterface
+
 ////////////////////////////////////
 // AXI4Lite Connectable instances //
 ////////////////////////////////////////////////////////////////////////////////
