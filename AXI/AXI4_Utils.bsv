@@ -57,11 +57,12 @@ module mergeWrite#(
 
   let flitLeft <- mkReg(0);
   let doDrop   <- mkPulseWire;
-
-  let outflit  = (flitLeft == 0) ?
-    FirstFlit(tuple2(aw.peek, w.peek)) :
-    OtherFlit(w.peek);
+  let outflit  <- mkDWire(OtherFlit(w.peek));
   let newCanPeek = (flitLeft == 0) ? aw.canPeek && w.canPeek : w.canPeek;
+
+  rule passFlit (flitLeft == 0);
+    outflit <= FirstFlit(tuple2(aw.peek, w.peek));
+  endrule
 
   rule genFirst (doDrop && flitLeft == 0);
     aw.drop;
