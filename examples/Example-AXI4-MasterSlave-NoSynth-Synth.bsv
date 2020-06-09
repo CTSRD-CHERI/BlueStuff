@@ -144,8 +144,15 @@ endmodule
 
 module top (Empty);
   let m <- axiMaster;
+  let mSynth <- toAXI4_Master_Synth(m);
+  let mNoSynth <- fromAXI4_Master_Synth(mSynth);
   let s <- axiSlave;
-  mkConnection(m, s);
+  let sSynth <- toAXI4_Slave_Synth(s);
+  let sNoSynth <- fromAXI4_Slave_Synth(sSynth);
+  //mkConnection(m, s);
+  //mkConnection(mNoSynth, s);
+  //mkConnection(m, sNoSynth);
+  mkConnection(mNoSynth, sNoSynth);
 endmodule
 
 `undef PARAMS

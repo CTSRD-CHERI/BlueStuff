@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2019 Alexandre Joannou
+ * Copyright (c) 2018-2020 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -58,46 +58,63 @@ endinstance
 // convert to/from Synth Master interface
 ////////////////////////////////////////////////////////////////////////////////
 
-function AXI4Lite_R_Master_Synth#(data_, user_)
-  toAXI4Lite_R_Master_Synth(snk_t s)
-  provisos (ToSink#(snk_t, t), FromAXI4Lite_RFlit#(t, data_, user_)) =
-  interface AXI4Lite_R_Master_Synth;
-    method rflit(rdata, rresp, ruser) = toSink(s).put(fromAXI4Lite_RFlit(
-      AXI4Lite_RFlit{ rdata: rdata, rresp: rresp, ruser: ruser }
-    ));
-    method rready = toSink(s).canPut;
-  endinterface;
+module toAXI4Lite_R_Master_Synth #(snk_t m)
+                                  (AXI4Lite_R_Master_Synth#(data_, user_))
+  provisos ( ToSink#(snk_t, t)
+           , FromAXI4Lite_RFlit#(t, data_, user_)
+           , Bits#(t, t_sz));
+  let snk <- toUnguardedSink(m);
+  method rflit(rvalid, rdata, rresp, ruser) = action
+    if (rvalid && snk.canPut) snk.put(fromAXI4Lite_RFlit(AXI4Lite_RFlit{
+      rdata: rdata, rresp: rresp, ruser: ruser
+    }));
+  endaction;
+  method rready = snk.canPut;
+endmodule
 
-function Sink#(AXI4Lite_RFlit#(data_, user_))
-  fromAXI4Lite_R_Master_Synth(AXI4Lite_R_Master_Synth#(data_, user_) m) =
-  interface Sink;
-    method canPut = m.rready;
-    method put(x) = m.rflit(x.rdata, x.rresp, x.ruser);
-  endinterface;
+module fromAXI4Lite_R_Master_Synth #(AXI4Lite_R_Master_Synth#(data_, user_) m)
+                                    (Sink#(AXI4Lite_RFlit#(data_, user_)));
+  // We use a guarded buffer to export as a guarded sink, and use an unguarded
+  // source as an internal interface to it for connection to the Synth interface
+  FIFOF#(AXI4Lite_RFlit#(data_, user_)) buffer <- mkSizedBypassFIFOF(1);
+  let src <- toUnguardedSource(buffer, ?);
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule forwardFlit;
+    m.rflit(src.canPeek, src.peek.rdata, src.peek.rresp, src.peek.ruser);
+  endrule
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule dropFlit (src.canPeek && m.rready); src.drop; endrule
+  return toSink(buffer);
+endmodule
 
 // convert to/from Synth Slave interface
 ////////////////////////////////////////////////////////////////////////////////
 
-function AXI4Lite_R_Slave_Synth#(data_, user_)
-  toAXI4Lite_R_Slave_Synth(src_t#(t) s)
-  provisos (ToSource#(src_t#(t), t), ToAXI4Lite_RFlit#(t, data_, user_));
-  let src = toSource(s);
+module toAXI4Lite_R_Slave_Synth #(src_t#(t) s)
+                                 (AXI4Lite_R_Slave_Synth#(data_, user_))
+  provisos ( ToSource#(src_t#(t), t)
+           , ToAXI4Lite_RFlit#(t, data_, user_)
+           , Bits#(t, t_sz));
+  let src <- toUnguardedSource(s, ?);
   AXI4Lite_RFlit#(data_, user_) flit = toAXI4Lite_RFlit(src.peek);
-  return interface AXI4Lite_R_Slave_Synth;
-    method rdata  = flit.rdata;
-    method rresp  = flit.rresp;
-    method ruser  = flit.ruser;
-    method rvalid = src.canPeek;
-    method rready(rdy) = action if (src.canPeek && rdy) src.drop; endaction;
-  endinterface;
-endfunction
+  method rdata  = flit.rdata;
+  method rresp  = flit.rresp;
+  method ruser  = flit.ruser;
+  method rvalid = src.canPeek;
+  method rready(rdy) = action if (src.canPeek && rdy) src.drop; endaction;
+endmodule
 
-function Source#(AXI4Lite_RFlit#(data_, user_))
-  fromAXI4Lite_R_Slave_Synth(AXI4Lite_R_Slave_Synth#(data_, user_) s) =
-  interface Source;
-    method canPeek = s.rvalid;
-    method peek = AXI4Lite_RFlit {
-      rdata: s.rdata, rresp: s.rresp, ruser: s.ruser
-    };
-    method drop = action if (s.rvalid) s.rready(True); endaction;
-  endinterface;
+module fromAXI4Lite_R_Slave_Synth #(AXI4Lite_R_Slave_Synth#(data_, user_) s)
+                                   (Source#(AXI4Lite_RFlit#(data_, user_)));
+  FIFOF#(AXI4Lite_RFlit#(data_, user_)) buffer <- mkSizedBypassFIFOF(1);
+  let snk <- toUnguardedSink(buffer);
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule forwardFlit (s.rvalid && snk.canPut);
+    snk.put (AXI4Lite_RFlit { rdata: s.rdata
+                            , rresp: s.rresp
+                            , ruser: s.ruser });
+  endrule
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule forwardReady; s.rready(snk.canPut); endrule
+  return toSource(buffer);
+endmodule

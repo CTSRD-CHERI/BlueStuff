@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2019 Alexandre Joannou
+ * Copyright (c) 2018-2020 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -58,62 +58,59 @@ endinstance
 // convert to/from Synth Master interface
 ////////////////////////////////////////////////////////////////////////////////
 
-function AXI4_B_Master_Synth#(id_, user_)
-  toAXI4_B_Master_Synth(snk_t m)
-  provisos (ToSink#(snk_t, t), FromAXI4_BFlit#(t, id_, user_)) =
-  interface AXI4_B_Master_Synth;
-    method bflit(bid, bresp, buser) = action
-      if (toSink(m).canPut) toSink(m).put(fromAXI4_BFlit(AXI4_BFlit{
-        bid: bid, bresp: bresp, buser: buser
-      }));
-    endaction;
-    method bready = toSink(m).canPut;
-  endinterface;
+module toAXI4_B_Master_Synth #(snk_t m) (AXI4_B_Master_Synth#(id_, user_))
+  provisos (ToSink#(snk_t, t), FromAXI4_BFlit#(t, id_, user_), Bits#(t, t_sz));
+  let snk <- toUnguardedSink(m);
+  method bflit(bvalid, bid, bresp, buser) = action
+    if (bvalid && snk.canPut) snk.put(fromAXI4_BFlit(AXI4_BFlit{
+      bid: bid, bresp: bresp, buser: buser
+    }));
+  endaction;
+  method bready = snk.canPut;
+endmodule
 
-module fromAXI4_B_Master_Synth#(AXI4_B_Master_Synth#(id_, user_) m) (Sink#(AXI4_BFlit#(id_, user_)));
-  //We rely on the buffer being guarded
+module fromAXI4_B_Master_Synth #(AXI4_B_Master_Synth#(id_, user_) m)
+                                (Sink#(AXI4_BFlit#(id_, user_)));
+  // We use a guarded buffer to export as a guarded sink, and use an unguarded
+  // source as an internal interface to it for connection to the Synth interface
   FIFOF#(AXI4_BFlit#(id_, user_)) buffer <- mkSizedBypassFIFOF(1);
+  let src <- toUnguardedSource(buffer, ?);
+  (* fire_when_enabled, no_implicit_conditions *)
   rule forwardFlit;
-    m.bflit(buffer.first.bid,
-            buffer.first.bresp,
-            buffer.first.buser);
+    m.bflit(src.canPeek, src.peek.bid, src.peek.bresp, src.peek.buser);
   endrule
-  //dropFlit only fires when both ready and canPeek, i.e. there is something to drop
-  rule dropFlit (m.bready);
-    buffer.deq;
-  endrule
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule dropFlit (src.canPeek && m.bready); src.drop; endrule
   return toSink(buffer);
 endmodule
 
 // convert to/from Synth Slave interface
 ////////////////////////////////////////////////////////////////////////////////
 
-function AXI4_B_Slave_Synth#(id_, user_)
-  toAXI4_B_Slave_Synth(src_t#(t) s)
-  provisos (ToSource#(src_t#(t), t), ToAXI4_BFlit#(t, id_, user_));
-  let src = toSource(s);
+module toAXI4_B_Slave_Synth #(src_t#(t) s) (AXI4_B_Slave_Synth#(id_, user_))
+  provisos ( ToSource#(src_t#(t), t)
+           , ToAXI4_BFlit#(t, id_, user_)
+           , Bits#(t, t_sz));
+  let src <- toUnguardedSource(s, ?);
   AXI4_BFlit#(id_, user_) flit = toAXI4_BFlit(src.peek);
-  return interface AXI4_B_Slave_Synth;
-    method bid    = flit.bid;
-    method bresp  = flit.bresp;
-    method buser  = flit.buser;
-    method bvalid = src.canPeek;
-    method bready(rdy) = action if (src.canPeek && rdy) src.drop; endaction;
-  endinterface;
-endfunction
+  method bid    = flit.bid;
+  method bresp  = flit.bresp;
+  method buser  = flit.buser;
+  method bvalid = src.canPeek;
+  method bready(rdy) = action if (src.canPeek && rdy) src.drop; endaction;
+endmodule
 
-module fromAXI4_B_Slave_Synth#(AXI4_B_Slave_Synth#(id_, user_) s) (Source#(AXI4_BFlit#(id_, user_)));
-  let dwReady <- mkDWire(False);
-  rule forwardReady;
-    s.bready(dwReady);
+module fromAXI4_B_Slave_Synth #(AXI4_B_Slave_Synth#(id_, user_) s)
+                               (Source#(AXI4_BFlit#(id_, user_)));
+  FIFOF#(AXI4_BFlit#(id_, user_)) buffer <- mkSizedBypassFIFOF(1);
+  let snk <- toUnguardedSink(buffer);
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule forwardFlit (s.bvalid && snk.canPut);
+    snk.put (AXI4_BFlit { bid:   s.bid
+                        , bresp: s.bresp
+                        , buser: s.buser });
   endrule
-  return interface Source;
-    method canPeek = s.bvalid;
-    method peek if (s.bvalid) = AXI4_BFlit {
-      bid:     s.bid,
-      bresp:   s.bresp,
-      buser:   s.buser
-    };
-    method drop if (s.bvalid) = dwReady._write(True);
-  endinterface;
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule forwardReady; s.bready(snk.canPut); endrule
+  return toSource(buffer);
 endmodule

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2019 Alexandre Joannou
+ * Copyright (c) 2018-2020 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -40,8 +40,10 @@ import SpecialFIFOs :: *;
 // to convert to/from the flit type
 ////////////////////////////////////////////////////////////////////////////////
 
-typeclass ToAXI4_AWFlit#(type t,
-numeric type id_, numeric type addr_, numeric type user_);
+typeclass ToAXI4_AWFlit#( type t
+                        , numeric type id_
+                        , numeric type addr_
+                        , numeric type user_);
   function AXI4_AWFlit#(id_, addr_, user_) toAXI4_AWFlit (t x);
 endtypeclass
 
@@ -49,8 +51,10 @@ instance ToAXI4_AWFlit#(AXI4_AWFlit#(a, b, c), a, b, c);
   function toAXI4_AWFlit = id;
 endinstance
 
-typeclass FromAXI4_AWFlit#(type t,
-numeric type id_, numeric type addr_, numeric type user_);
+typeclass FromAXI4_AWFlit#( type t
+                          , numeric type id_
+                          , numeric type addr_
+                          , numeric type user_);
   function t fromAXI4_AWFlit (AXI4_AWFlit#(id_, addr_, user_) x);
 endtypeclass
 
@@ -61,105 +65,109 @@ endinstance
 // convert to/from Synth Master interface
 ////////////////////////////////////////////////////////////////////////////////
 
-function AXI4_AW_Master_Synth#(id_, addr_, user_)
-  toAXI4_AW_Master_Synth(src_t#(t) s)
-  provisos (ToSource#(src_t#(t), t), ToAXI4_AWFlit#(t, id_, addr_, user_));
-  let src = toSource(s);
+module toAXI4_AW_Master_Synth #(src_t#(t) s)
+                               (AXI4_AW_Master_Synth#(id_, addr_, user_))
+  provisos ( ToSource#( src_t#(t), t)
+           , ToAXI4_AWFlit#(t, id_, addr_, user_)
+           , Bits#(t, t_sz));
+  let src <- toUnguardedSource(s, ?);
   AXI4_AWFlit#(id_, addr_, user_) flit = toAXI4_AWFlit(src.peek);
-  return interface AXI4_AW_Master_Synth;
-    method awid     = flit.awid;
-    method awaddr   = flit.awaddr;
-    method awlen    = flit.awlen;
-    method awsize   = flit.awsize;
-    method awburst  = flit.awburst;
-    method awlock   = flit.awlock;
-    method awcache  = flit.awcache;
-    method awprot   = flit.awprot;
-    method awqos    = flit.awqos;
-    method awregion = flit.awregion;
-    method awuser   = flit.awuser;
-    method awvalid  = src.canPeek;
-    method awready(rdy) = action if (src.canPeek && rdy) src.drop; endaction;
-  endinterface;
-endfunction
+  method awid     = flit.awid;
+  method awaddr   = flit.awaddr;
+  method awlen    = flit.awlen;
+  method awsize   = flit.awsize;
+  method awburst  = flit.awburst;
+  method awlock   = flit.awlock;
+  method awcache  = flit.awcache;
+  method awprot   = flit.awprot;
+  method awqos    = flit.awqos;
+  method awregion = flit.awregion;
+  method awuser   = flit.awuser;
+  method awvalid  = src.canPeek;
+  method awready(rdy) = action if (src.canPeek && rdy) src.drop; endaction;
+endmodule
 
-module fromAXI4_AW_Master_Synth#(AXI4_AW_Master_Synth#(id_, addr_, user_) m) (Source#(AXI4_AWFlit#(id_, addr_, user_)));
-  let dwReady <- mkDWire(False);
-  rule forwardReady;
-    m.awready(dwReady);
+module fromAXI4_AW_Master_Synth #(AXI4_AW_Master_Synth#(id_, addr_, user_) m)
+                                 (Source#(AXI4_AWFlit#(id_, addr_, user_)));
+  FIFOF#(AXI4_AWFlit#(id_, addr_, user_)) buffer <- mkSizedBypassFIFOF(1);
+  let snk <- toUnguardedSink(buffer);
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule forwardFlit (m.awvalid && snk.canPut);
+    snk.put (AXI4_AWFlit { awid:     m.awid
+                         , awaddr:   m.awaddr
+                         , awlen:    m.awlen
+                         , awsize:   m.awsize
+                         , awburst:  m.awburst
+                         , awlock:   m.awlock
+                         , awcache:  m.awcache
+                         , awprot:   m.awprot
+                         , awqos:    m.awqos
+                         , awregion: m.awregion
+                         , awuser:   m.awuser });
   endrule
-  return interface Source;
-    method canPeek = m.awvalid;
-    method peek if (m.awvalid) = AXI4_AWFlit {
-      awid:     m.awid,
-      awaddr:   m.awaddr,
-      awlen:    m.awlen,
-      awsize:   m.awsize,
-      awburst:  m.awburst,
-      awlock:   m.awlock,
-      awcache:  m.awcache,
-      awprot:   m.awprot,
-      awqos:    m.awqos,
-      awregion: m.awregion,
-      awuser:   m.awuser
-    };
-    method drop if (m.awvalid) = dwReady._write(True);
-  endinterface;
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule forwardReady; m.awready(snk.canPut); endrule
+  return toSource(buffer);
 endmodule
 
 // convert to/from Synth Slave interface
 ////////////////////////////////////////////////////////////////////////////////
 
-function AXI4_AW_Slave_Synth#(id_, addr_, user_)
-  toAXI4_AW_Slave_Synth(snk_t s)
-  provisos (ToSink#(snk_t, t), FromAXI4_AWFlit#(t, id_, addr_, user_)) =
-  interface AXI4_AW_Slave_Synth;
-    method awflit(awid,
-                  awaddr,
-                  awlen,
-                  awsize,
-                  awburst,
-                  awlock,
-                  awcache,
-                  awprot,
-                  awqos,
-                  awregion,
-                  awuser) = action if (toSink(s).canPut) toSink(s).put(fromAXI4_AWFlit(AXI4_AWFlit{
-        awid:     awid,
-        awaddr:   awaddr,
-        awlen:    awlen,
-        awsize:   awsize,
-        awburst:  awburst,
-        awlock:   awlock,
-        awcache:  awcache,
-        awprot:   awprot,
-        awqos:    awqos,
-        awregion: awregion,
-        awuser:   awuser
-      }));
-    endaction;
-    method awready = toSink(s).canPut;
-  endinterface;
+module toAXI4_AW_Slave_Synth #(snk_t s)
+                              (AXI4_AW_Slave_Synth#(id_, addr_, user_))
+  provisos ( ToSink#(snk_t, t)
+           , FromAXI4_AWFlit#(t, id_, addr_, user_)
+           , Bits#(t, t_sz));
+  let snk <- toUnguardedSink(s);
+  method awflit( awvalid
+               , awid
+               , awaddr
+               , awlen
+               , awsize
+               , awburst
+               , awlock
+               , awcache
+               , awprot
+               , awqos
+               , awregion
+               , awuser) = action if (awvalid && snk.canPut)
+    snk.put(fromAXI4_AWFlit(AXI4_AWFlit{ awid:     awid
+                                       , awaddr:   awaddr
+                                       , awlen:    awlen
+                                       , awsize:   awsize
+                                       , awburst:  awburst
+                                       , awlock:   awlock
+                                       , awcache:  awcache
+                                       , awprot:   awprot
+                                       , awqos:    awqos
+                                       , awregion: awregion
+                                       , awuser:   awuser }));
+  endaction;
+  method awready = snk.canPut;
+endmodule
 
-module fromAXI4_AW_Slave_Synth#(AXI4_AW_Slave_Synth#(id_, addr_, user_) s) (Sink#(AXI4_AWFlit#(id_, addr_, user_)));
-  //We rely on the buffer being guarded
+module fromAXI4_AW_Slave_Synth #(AXI4_AW_Slave_Synth#(id_, addr_, user_) s)
+                                (Sink#(AXI4_AWFlit#(id_, addr_, user_)));
+  // We use a guarded buffer to export as a guarded sink, and use an unguarded
+  // source as an internal interface to it for connection to the Synth interface
   FIFOF#(AXI4_AWFlit#(id_, addr_, user_)) buffer <- mkSizedBypassFIFOF(1);
+  let src <- toUnguardedSource(buffer, ?);
+  (* fire_when_enabled, no_implicit_conditions *)
   rule forwardFlit;
-    s.awflit(buffer.first.awid,
-             buffer.first.awaddr,
-             buffer.first.awlen,
-             buffer.first.awsize,
-             buffer.first.awburst,
-             buffer.first.awlock,
-             buffer.first.awcache,
-             buffer.first.awprot,
-             buffer.first.awqos,
-             buffer.first.awregion,
-             buffer.first.awuser);
+    s.awflit( src.canPeek
+            , src.peek.awid
+            , src.peek.awaddr
+            , src.peek.awlen
+            , src.peek.awsize
+            , src.peek.awburst
+            , src.peek.awlock
+            , src.peek.awcache
+            , src.peek.awprot
+            , src.peek.awqos
+            , src.peek.awregion
+            , src.peek.awuser);
   endrule
-  //dropFlit only fires when both ready and canPeek, i.e. there is something to drop
-  rule dropFlit (s.awready);
-    buffer.deq;
-  endrule
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule dropFlit (src.canPeek && s.awready); src.drop; endrule
   return toSink(buffer);
 endmodule

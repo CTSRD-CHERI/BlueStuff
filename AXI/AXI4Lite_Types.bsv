@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2019 Alexandre Joannou
+ * Copyright (c) 2018-2020 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -83,12 +83,12 @@ interface AXI4Lite_AW_Master_Synth#(numeric type addr_, numeric type user_);
 endinterface
 
 // Slave interfaces
+(* always_ready, always_enabled *)
 interface AXI4Lite_AW_Slave_Synth#(numeric type addr_, numeric type user_);
-  (* always_ready, enable="awvalid", prefix="" *)
-  method Action awflit (Bit#(addr_) awaddr,
-                        AXI4_Prot   awprot,
-                        Bit#(user_) awuser);
-  (* always_ready, always_enabled *)
+  (* prefix="" *) method Action awflit ( Bool        awvalid
+                                       , Bit#(addr_) awaddr
+                                       , AXI4_Prot   awprot
+                                       , Bit#(user_) awuser);
   method Bool awready;
 endinterface
 
@@ -97,10 +97,11 @@ instance Connectable#(AXI4Lite_AW_Master_Synth#(a, b),
                       AXI4Lite_AW_Slave_Synth#(a, b));
   module mkConnection#(AXI4Lite_AW_Master_Synth#(a,b ) m,
                        AXI4Lite_AW_Slave_Synth#(a, b) s)(Empty);
-    rule connect_awflit (m.awvalid);
-      s.awflit(m.awaddr, m.awprot, m.awuser);
+    (* fire_when_enabled, no_implicit_conditions *)
+    rule connect;
+      s.awflit(m.awvalid, m.awaddr, m.awprot, m.awuser);
+      m.awready(s.awready);
     endrule
-    rule connect_awready; m.awready(s.awready); endrule
   endmodule
 endinstance
 instance Connectable#(AXI4Lite_AW_Slave_Synth#(a, b),
@@ -140,12 +141,12 @@ interface AXI4Lite_W_Master_Synth#(numeric type data_, numeric type user_);
 endinterface
 
 // Slave interfaces
+(* always_ready, always_enabled *)
 interface AXI4Lite_W_Slave_Synth#(numeric type data_, numeric type user_);
-  (* always_ready, enable="wvalid", prefix="" *)
-  method Action wflit (Bit#(data_)           wdata,
-                       Bit#(TDiv#(data_, 8)) wstrb,
-                       Bit#(user_)           wuser);
-  (* always_ready, always_enabled *)
+  (* prefix="" *) method Action wflit ( Bool                  wvalid
+                                      , Bit#(data_)           wdata
+                                      , Bit#(TDiv#(data_, 8)) wstrb
+                                      , Bit#(user_)           wuser);
   method Bool wready;
 endinterface
 
@@ -154,8 +155,11 @@ instance Connectable#(AXI4Lite_W_Master_Synth#(a, b),
                       AXI4Lite_W_Slave_Synth#(a, b));
   module mkConnection#(AXI4Lite_W_Master_Synth#(a, b) m,
                        AXI4Lite_W_Slave_Synth#(a, b) s)(Empty);
-    rule connect_wflit (m.wvalid); s.wflit(m.wdata, m.wstrb, m.wuser); endrule
-    rule connect_wready; m.wready(s.wready); endrule
+    (* fire_when_enabled, no_implicit_conditions *)
+    rule connect;
+      s.wflit(m.wvalid, m.wdata, m.wstrb, m.wuser);
+      m.wready(s.wready);
+    endrule
   endmodule
 endinstance
 instance Connectable#(AXI4Lite_W_Slave_Synth#(a, b),
@@ -183,11 +187,11 @@ instance DetectLast#(AXI4Lite_BFlit#(user_));
 endinstance
 
 // Master interfaces
+(* always_ready, always_enabled *)
 interface AXI4Lite_B_Master_Synth#(numeric type user_);
-  (* always_ready, enable="bvalid", prefix="" *)
-  method Action bflit (AXI4_Resp   bresp,
-                       Bit#(user_) buser);
-  (* always_ready, always_enabled *)
+  (* prefix="" *) method Action bflit ( Bool        bvalid
+                                      , AXI4_Resp   bresp
+                                      , Bit#(user_) buser);
   method Bool bready;
 endinterface
 
@@ -204,8 +208,11 @@ endinterface
 instance Connectable#(AXI4Lite_B_Master_Synth#(a), AXI4Lite_B_Slave_Synth#(a));
   module mkConnection#(AXI4Lite_B_Master_Synth#(a) m,
                        AXI4Lite_B_Slave_Synth#(a) s)(Empty);
-    rule connect_bflit (s.bvalid); m.bflit(s.bresp, s.buser); endrule
-    rule connect_bready; s.bready(m.bready); endrule
+    (* fire_when_enabled, no_implicit_conditions *)
+    rule connect;
+      m.bflit(s.bvalid, s.bresp, s.buser);
+      s.bready(m.bready);
+    endrule
   endmodule
 endinstance
 instance Connectable#(AXI4Lite_B_Slave_Synth#(a), AXI4Lite_B_Master_Synth#(a));
@@ -263,12 +270,12 @@ interface AXI4Lite_AR_Master_Synth#(numeric type addr_, numeric type user_);
 endinterface
 
 // Slave interfaces
+(* always_ready, always_enabled *)
 interface AXI4Lite_AR_Slave_Synth#(numeric type addr_, numeric type user_);
-  (* always_ready, enable="arvalid", prefix="" *)
-  method Action arflit (Bit#(addr_) araddr,
-                        AXI4_Prot   arprot,
-                        Bit#(user_) aruser);
-  (* always_ready, always_enabled *)
+  (* prefix="" *) method Action arflit ( Bool        arvalid
+                                       , Bit#(addr_) araddr
+                                       , AXI4_Prot   arprot
+                                       , Bit#(user_) aruser);
   method Bool arready;
 endinterface
 
@@ -277,10 +284,11 @@ instance Connectable#(AXI4Lite_AR_Master_Synth#(a, b),
                       AXI4Lite_AR_Slave_Synth#(a, b));
   module mkConnection#(AXI4Lite_AR_Master_Synth#(a, b) m,
                        AXI4Lite_AR_Slave_Synth#(a, b) s)(Empty);
-    rule connect_arflit (m.arvalid);
-      s.arflit(m.araddr, m.arprot, m.aruser);
+    (* fire_when_enabled, no_implicit_conditions *)
+    rule connect;
+      s.arflit(m.arvalid, m.araddr, m.arprot, m.aruser);
+      m.arready(s.arready);
     endrule
-    rule connect_arready; m.arready(s.arready); endrule
   endmodule
 endinstance
 instance Connectable#(AXI4Lite_AR_Slave_Synth#(a, b),
@@ -310,12 +318,12 @@ instance DetectLast#(AXI4Lite_RFlit#(data_, user_));
 endinstance
 
 // Master interfaces
+(* always_ready, always_enabled *)
 interface AXI4Lite_R_Master_Synth#(numeric type data_, numeric type user_);
-  (* always_ready, enable="rvalid", prefix="" *)
-  method Action rflit (Bit#(data_) rdata,
-                       AXI4_Resp   rresp,
-                       Bit#(user_) ruser);
-  (* always_ready, always_enabled *)
+  (* prefix="" *) method Action rflit ( Bool        rvalid
+                                      , Bit#(data_) rdata
+                                      , AXI4_Resp   rresp
+                                      , Bit#(user_) ruser);
   method Bool rready;
 endinterface
 
@@ -334,8 +342,11 @@ instance Connectable#(AXI4Lite_R_Master_Synth#(a, b),
                       AXI4Lite_R_Slave_Synth#(a, b));
   module mkConnection#(AXI4Lite_R_Master_Synth#(a, b) m,
                        AXI4Lite_R_Slave_Synth#(a, b) s)(Empty);
-    rule connect_rflit (s.rvalid); m.rflit(s.rdata, s.rresp, s.ruser); endrule
-    rule connect_rready; s.rready(m.rready); endrule
+    (* fire_when_enabled, no_implicit_conditions *)
+    rule connect;
+      m.rflit(s.rvalid, s.rdata, s.rresp, s.ruser);
+      s.rready(m.rready);
+    endrule
   endmodule
 endinstance
 instance Connectable#(AXI4Lite_R_Slave_Synth#(a, b),

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2019 Alexandre Joannou
+ * Copyright (c) 2018-2020 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -47,8 +47,7 @@ instance ToAXI4_WFlit#(AXI4_WFlit#(a, b), a, b);
   function toAXI4_WFlit = id;
 endinstance
 
-typeclass FromAXI4_WFlit#(type t,
-numeric type data_, numeric type user_);
+typeclass FromAXI4_WFlit#(type t, numeric type data_, numeric type user_);
   function t fromAXI4_WFlit (AXI4_WFlit#(data_, user_) x);
 endtypeclass
 
@@ -59,59 +58,67 @@ endinstance
 // convert to/from Synth Master interface
 ////////////////////////////////////////////////////////////////////////////////
 
-function AXI4_W_Master_Synth#(data_, user_)
-  toAXI4_W_Master_Synth(src_t#(t) s)
-  provisos (ToSource#(src_t#(t), t), ToAXI4_WFlit#(t, data_, user_));
-  let src = toSource(s);
+module toAXI4_W_Master_Synth #(src_t#(t) s) (AXI4_W_Master_Synth#(data_, user_))
+  provisos ( ToSource#(src_t#(t), t)
+           , ToAXI4_WFlit#(t, data_, user_)
+           , Bits#(t, t_sz));
+  let src <- toUnguardedSource(s, ?);
   AXI4_WFlit#(data_, user_) flit = toAXI4_WFlit(src.peek);
-  return interface AXI4_W_Master_Synth;
-    method wdata  = flit.wdata;
-    method wstrb  = flit.wstrb;
-    method wlast  = flit.wlast;
-    method wuser  = flit.wuser;
-    method wvalid = src.canPeek;
-    method wready(rdy) = action if (src.canPeek && rdy) src.drop; endaction;
-  endinterface;
-endfunction
+  method wdata  = flit.wdata;
+  method wstrb  = flit.wstrb;
+  method wlast  = flit.wlast;
+  method wuser  = flit.wuser;
+  method wvalid = src.canPeek;
+  method wready(rdy) = action if (src.canPeek && rdy) src.drop; endaction;
+endmodule
 
-module fromAXI4_W_Master_Synth#(AXI4_W_Master_Synth#(data_, user_) m) (Source#(AXI4_WFlit#(data_, user_)));
-  let dwReady <- mkDWire(False);
-  rule forwardReady;
-    m.wready(dwReady);
-  endrule
-  return interface Source;
-    method canPeek = m.wvalid;
-    method peek if (m.wvalid) = AXI4_WFlit {
+module fromAXI4_W_Master_Synth #(AXI4_W_Master_Synth#(data_, user_) m)
+                                (Source#(AXI4_WFlit#(data_, user_)));
+  FIFOF#(AXI4_WFlit#(data_, user_)) buffer <- mkSizedBypassFIFOF(1);
+  let snk <- toUnguardedSink(buffer);
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule forwardFlit (m.wvalid && snk.canPut);
+    snk.put (AXI4_WFlit {
       wdata: m.wdata, wstrb: m.wstrb, wlast: m.wlast, wuser: m.wuser
-    };
-    method drop if (m.wvalid) = dwReady._write(True);
-  endinterface;
+    });
+  endrule
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule forwardReady; m.wready(snk.canPut); endrule
+  return toSource(buffer);
 endmodule
 
 // convert to/from Synth Slave interface
 ////////////////////////////////////////////////////////////////////////////////
 
-function AXI4_W_Slave_Synth#(data_, user_)
-  toAXI4_W_Slave_Synth(snk_t s)
-  provisos (ToSink#(snk_t, t), FromAXI4_WFlit#(t, data_, user_)) =
-  interface AXI4_W_Slave_Synth;
-    method wflit(wdata, wstrb, wlast, wuser) = action
-      if (toSink(s).canPut) toSink(s).put(fromAXI4_WFlit(AXI4_WFlit{
-        wdata: wdata, wstrb: wstrb, wlast: wlast, wuser: wuser
-      }));
-    endaction;
-    method wready = toSink(s).canPut;
-  endinterface;
+module toAXI4_W_Slave_Synth #(snk_t s)
+                             (AXI4_W_Slave_Synth#(data_, user_))
+  provisos ( ToSink#(snk_t, t)
+           , FromAXI4_WFlit#(t, data_, user_)
+           , Bits#(t, t_sz));
+  let snk <- toUnguardedSink(s);
+  method wflit(wvalid, wdata, wstrb, wlast, wuser) = action
+    if (wvalid && snk.canPut) snk.put(fromAXI4_WFlit(AXI4_WFlit{
+      wdata: wdata, wstrb: wstrb, wlast: wlast, wuser: wuser
+    }));
+  endaction;
+  method wready = snk.canPut;
+endmodule
 
-module fromAXI4_W_Slave_Synth#(AXI4_W_Slave_Synth#(data_, user_) s) (Sink#(AXI4_WFlit#(data_, user_)));
-  //We rely on the buffer being guarded
+module fromAXI4_W_Slave_Synth #(AXI4_W_Slave_Synth#(data_, user_) s)
+                               (Sink#(AXI4_WFlit#(data_, user_)));
+  // We use a guarded buffer to export as a guarded sink, and use an unguarded
+  // source as an internal interface to it for connection to the Synth interface
   FIFOF#(AXI4_WFlit#(data_, user_)) buffer <- mkSizedBypassFIFOF(1);
+  let src <- toUnguardedSource(buffer, ?);
+  (* fire_when_enabled, no_implicit_conditions *)
   rule forwardFlit;
-    s.wflit(buffer.first.wdata, buffer.first.wstrb, buffer.first.wlast, buffer.first.wuser);
+    s.wflit( src.canPeek
+           , src.peek.wdata
+           , src.peek.wstrb
+           , src.peek.wlast
+           , src.peek.wuser);
   endrule
-  //dropFlit only fires when both ready and canPeek, i.e. there is something to drop
-  rule dropFlit (s.wready);
-    buffer.deq;
-  endrule
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule dropFlit (src.canPeek && s.wready); src.drop; endrule
   return toSink(buffer);
 endmodule

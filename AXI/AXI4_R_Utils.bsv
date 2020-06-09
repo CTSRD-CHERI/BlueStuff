@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2019 Alexandre Joannou
+ * Copyright (c) 2018-2020 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -39,8 +39,10 @@ import SpecialFIFOs :: *;
 
 // typeclasses to convert to/from the flit type
 
-typeclass ToAXI4_RFlit#(type t,
-numeric type id_, numeric type data_, numeric type user_);
+typeclass ToAXI4_RFlit#( type t
+                       , numeric type id_
+                       , numeric type data_
+                       , numeric type user_);
   function AXI4_RFlit#(id_, data_, user_) toAXI4_RFlit (t x);
 endtypeclass
 
@@ -48,8 +50,10 @@ instance ToAXI4_RFlit#(AXI4_RFlit#(a, b, c), a, b, c);
   function toAXI4_RFlit = id;
 endinstance
 
-typeclass FromAXI4_RFlit#(type t,
-numeric type id_, numeric type data_, numeric type user_);
+typeclass FromAXI4_RFlit#( type t
+                         , numeric type id_
+                         , numeric type data_
+                         , numeric type user_);
   function t fromAXI4_RFlit (AXI4_RFlit#(id_, data_, user_) x);
 endtypeclass
 
@@ -60,68 +64,72 @@ endinstance
 // convert to/from Synth Master interface
 ////////////////////////////////////////////////////////////////////////////////
 
-function AXI4_R_Master_Synth#(id_, data_, user_)
-  toAXI4_R_Master_Synth(snk_t m)
-  provisos (ToSink#(snk_t, t), FromAXI4_RFlit#(t, id_, data_, user_)) =
-  interface AXI4_R_Master_Synth;
-    method rflit(rid, rdata, rresp, rlast, ruser) = action
-      if (toSink(m).canPut) toSink(m).put(fromAXI4_RFlit(AXI4_RFlit{
-        rid: rid, rdata: rdata, rresp: rresp, rlast: rlast, ruser: ruser
-      }));
-    endaction;
-    method rready = toSink(m).canPut;
-  endinterface;
+module toAXI4_R_Master_Synth #(snk_t m)
+                              (AXI4_R_Master_Synth#(id_, data_, user_))
+  provisos ( ToSink#(snk_t, t)
+           , FromAXI4_RFlit#(t, id_, data_, user_)
+           , Bits#(t, t_sz));
+  let snk <- toUnguardedSink(m);
+  method rflit(rvalid, rid, rdata, rresp, rlast, ruser) = action
+    if (rvalid && snk.canPut) snk.put(fromAXI4_RFlit(AXI4_RFlit{
+      rid: rid, rdata: rdata, rresp: rresp, rlast: rlast, ruser: ruser
+    }));
+  endaction;
+  method rready = snk.canPut;
+endmodule
 
-module fromAXI4_R_Master_Synth#(AXI4_R_Master_Synth#(id_, data_, user_) m) (Sink#(AXI4_RFlit#(id_, data_, user_)));
-  //We rely on the buffer being guarded
+module fromAXI4_R_Master_Synth #(AXI4_R_Master_Synth#(id_, data_, user_) m)
+                                (Sink#(AXI4_RFlit#(id_, data_, user_)));
+  // We use a guarded buffer to export as a guarded sink, and use an unguarded
+  // source as an internal interface to it for connection to the Synth interface
   FIFOF#(AXI4_RFlit#(id_, data_, user_)) buffer <- mkSizedBypassFIFOF(1);
+  let src <- toUnguardedSource(buffer, ?);
+  (* fire_when_enabled, no_implicit_conditions *)
   rule forwardFlit;
-    m.rflit(buffer.first.rid,
-            buffer.first.rdata,
-            buffer.first.rresp,
-            buffer.first.rlast,
-            buffer.first.ruser);
+    m.rflit( src.canPeek
+           , src.peek.rid
+           , src.peek.rdata
+           , src.peek.rresp
+           , src.peek.rlast
+           , src.peek.ruser);
   endrule
-  //dropFlit only fires when both ready and canPeek, i.e. there is something to drop
-  rule dropFlit (m.rready);
-    buffer.deq;
-  endrule
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule dropFlit (src.canPeek && m.rready); src.drop; endrule
   return toSink(buffer);
 endmodule
 
 // convert to/from Synth Slave interface
 ////////////////////////////////////////////////////////////////////////////////
 
-function AXI4_R_Slave_Synth#(id_, data_, user_)
-  toAXI4_R_Slave_Synth(src_t#(t) s)
-  provisos (ToSource#(src_t#(t), t), ToAXI4_RFlit#(t, id_, data_, user_));
-  let src = toSource(s);
+module toAXI4_R_Slave_Synth #(src_t#(t) s)
+                             (AXI4_R_Slave_Synth#(id_, data_, user_))
+  provisos ( ToSource#(src_t#(t), t)
+           , ToAXI4_RFlit#(t, id_, data_, user_)
+           , Bits#(t, t_sz));
+  let src <- toUnguardedSource(s, ?);
   AXI4_RFlit#(id_, data_, user_) flit = toAXI4_RFlit(src.peek);
-  return interface AXI4_R_Slave_Synth;
-    method rid    = flit.rid;
-    method rdata  = flit.rdata;
-    method rresp  = flit.rresp;
-    method rlast  = flit.rlast;
-    method ruser  = flit.ruser;
-    method rvalid = src.canPeek;
-    method rready(rdy) = action if (src.canPeek && rdy) src.drop; endaction;
-  endinterface;
-endfunction
+  method rid    = flit.rid;
+  method rdata  = flit.rdata;
+  method rresp  = flit.rresp;
+  method rlast  = flit.rlast;
+  method ruser  = flit.ruser;
+  method rvalid = src.canPeek;
+  method rready(rdy) = action if (src.canPeek && rdy) src.drop; endaction;
+endmodule
 
-module fromAXI4_R_Slave_Synth#(AXI4_R_Slave_Synth#(id_, data_, user_) s) (Source#(AXI4_RFlit#(id_, data_, user_)));
-  let dwReady <- mkDWire(False);
-  rule forwardReady;
-    s.rready(dwReady);
+module fromAXI4_R_Slave_Synth #(AXI4_R_Slave_Synth#(id_, data_, user_) s)
+                               (Source#(AXI4_RFlit#(id_, data_, user_)));
+  FIFOF#(AXI4_RFlit#(id_, data_, user_)) buffer <- mkSizedBypassFIFOF(1);
+  let snk <- toUnguardedSink(buffer);
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule forwardFlit (s.rvalid && snk.canPut);
+    snk.put (AXI4_RFlit { rid:   s.rid
+                        , rdata: s.rdata
+                        , rresp: s.rresp
+                        , rlast: s.rlast
+                        , ruser: s.ruser });
   endrule
-  return interface Source;
-    method canPeek = s.rvalid;
-    method peek if (s.rvalid) = AXI4_RFlit {
-      rid:     s.rid,
-      rdata:   s.rdata,
-      rresp:   s.rresp,
-      rlast:   s.rlast,
-      ruser:   s.ruser
-    };
-    method drop if (s.rvalid) = dwReady._write(True);
-  endinterface;
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule forwardReady; s.rready(snk.canPut); endrule
+  return toSource(buffer);
 endmodule

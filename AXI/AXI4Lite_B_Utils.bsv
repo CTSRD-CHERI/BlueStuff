@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2019 Alexandre Joannou
+ * Copyright (c) 2018-2020 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -58,44 +58,56 @@ endinstance
 // convert to/from Synth Master interface
 ////////////////////////////////////////////////////////////////////////////////
 
-function AXI4Lite_B_Master_Synth#(user_)
-  toAXI4Lite_B_Master_Synth(snk_t s)
-  provisos (ToSink#(snk_t, t), FromAXI4Lite_BFlit#(t, user_)) =
-  interface AXI4Lite_B_Master_Synth;
-    //method bflit(bid, bresp, buser) if (toSink(s).canPut) =
-    method bflit(bresp, buser) = toSink(s).put(fromAXI4Lite_BFlit(
-      AXI4Lite_BFlit{ bresp: bresp, buser: buser }
-    ));
-    method bready = toSink(s).canPut;
-  endinterface;
+module toAXI4Lite_B_Master_Synth #(snk_t m) (AXI4Lite_B_Master_Synth#(user_))
+  provisos (ToSink#(snk_t, t), FromAXI4Lite_BFlit#(t, user_), Bits#(t, t_sz));
+  let snk <- toUnguardedSink(m);
+  method bflit(bvalid, bresp, buser) = action
+    if (bvalid && snk.canPut) snk.put(fromAXI4Lite_BFlit(AXI4Lite_BFlit{
+      bresp: bresp, buser: buser
+    }));
+  endaction;
+  method bready = snk.canPut;
+endmodule
 
-function Sink#(AXI4Lite_BFlit#(user_))
-  fromAXI4Lite_B_Master_Synth(AXI4Lite_B_Master_Synth#(user_) m) =
-  interface Sink;
-    method canPut = m.bready;
-    method put(x) = m.bflit(x.bresp, x.buser);
-  endinterface;
+module fromAXI4Lite_B_Master_Synth #(AXI4Lite_B_Master_Synth#(user_) m)
+                                    (Sink#(AXI4Lite_BFlit#(user_)));
+  // We use a guarded buffer to export as a guarded sink, and use an unguarded
+  // source as an internal interface to it for connection to the Synth interface
+  FIFOF#(AXI4Lite_BFlit#(user_)) buffer <- mkSizedBypassFIFOF(1);
+  let src <- toUnguardedSource(buffer, ?);
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule forwardFlit;
+    m.bflit(src.canPeek, src.peek.bresp, src.peek.buser);
+  endrule
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule dropFlit (src.canPeek && m.bready); src.drop; endrule
+  return toSink(buffer);
+endmodule
 
 // convert to/from Synth Slave interface
 ////////////////////////////////////////////////////////////////////////////////
 
-function AXI4Lite_B_Slave_Synth#(user_)
-  toAXI4Lite_B_Slave_Synth(src_t#(t) s)
-  provisos (ToSource#(src_t#(t), t), ToAXI4Lite_BFlit#(t, user_));
-  let src = toSource(s);
+module toAXI4Lite_B_Slave_Synth #(src_t#(t) s) (AXI4Lite_B_Slave_Synth#(user_))
+  provisos ( ToSource#(src_t#(t), t)
+           , ToAXI4Lite_BFlit#(t, user_)
+           , Bits#(t, t_sz));
+  let src <- toUnguardedSource(s, ?);
   AXI4Lite_BFlit#(user_) flit = toAXI4Lite_BFlit(src.peek);
-  return interface AXI4Lite_B_Slave_Synth;
-    method bresp  = flit.bresp;
-    method buser  = flit.buser;
-    method bvalid = src.canPeek;
-    method bready(rdy) = action if (src.canPeek && rdy) src.drop; endaction;
-  endinterface;
-endfunction
+  method bresp  = flit.bresp;
+  method buser  = flit.buser;
+  method bvalid = src.canPeek;
+  method bready(rdy) = action if (src.canPeek && rdy) src.drop; endaction;
+endmodule
 
-function Source#(AXI4Lite_BFlit#(user_))
-  fromAXI4Lite_B_Slave_Synth(AXI4Lite_B_Slave_Synth#(user_) s) =
-  interface Source;
-    method canPeek = s.bvalid;
-    method peek = AXI4Lite_BFlit {bresp: s.bresp, buser: s.buser};
-    method drop = action if (s.bvalid) s.bready(True); endaction;
-  endinterface;
+module fromAXI4Lite_B_Slave_Synth #(AXI4Lite_B_Slave_Synth#(user_) s)
+                                   (Source#(AXI4Lite_BFlit#(user_)));
+  FIFOF#(AXI4Lite_BFlit#(user_)) buffer <- mkSizedBypassFIFOF(1);
+  let snk <- toUnguardedSink(buffer);
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule forwardFlit (s.bvalid && snk.canPut);
+    snk.put (AXI4Lite_BFlit { bresp: s.bresp, buser: s.buser });
+  endrule
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule forwardReady; s.bready(snk.canPut); endrule
+  return toSource(buffer);
+endmodule

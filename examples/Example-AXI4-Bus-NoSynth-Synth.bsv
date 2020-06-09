@@ -142,11 +142,34 @@ module axiSlave (`SLAVE_T);
 
 endmodule
 
+//`define DEBUG
+`ifdef DEBUG
 module top (Empty);
   let m <- axiMaster;
   let s <- axiSlave;
   mkConnection(m, s);
 endmodule
+`else
+module top (Empty);
+  Vector#(NMASTERS, `MASTER_T) ms;
+  Vector#(NSLAVES, `SLAVE_T)   ss;
+  for (Integer i = 0; i < valueOf(NMASTERS); i = i + 1) begin
+    let m <- axiMaster;
+    let mSynth <- toAXI4_Master_Synth(m);
+    let mNoSynth <- fromAXI4_Master_Synth(mSynth);
+    ms[i] = mNoSynth;
+  end
+  MappingTable#(NSLAVES, ADDR_sz) maptab = newVector;
+  for (Integer i = 0; i < valueOf(NSLAVES); i = i + 1) begin
+    maptab[i] = Range{base: fromInteger(i*valueOf(SlaveWidth)), size: fromInteger(valueOf(SlaveWidth))};
+    let s <- axiSlave;
+    let sSynth <- toAXI4_Slave_Synth(s);
+    let sNoSynth <- fromAXI4_Slave_Synth(sSynth);
+    ss[i] = sNoSynth;
+  end
+  mkAXI4Bus(routeFromMappingTable(maptab), ms, ss);
+endmodule
+`endif
 
 `undef PARAMS
 `undef MPARAMS

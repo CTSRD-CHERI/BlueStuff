@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2019 Alexandre Joannou
+ * Copyright (c) 2018-2020 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -39,8 +39,10 @@ import SpecialFIFOs :: *;
 
 // typeclasses to convert to/from the flit type
 
-typeclass ToAXI4_ARFlit#(type t,
-numeric type id_, numeric type addr_, numeric type user_);
+typeclass ToAXI4_ARFlit#( type t
+                        , numeric type id_
+                        , numeric type addr_
+                        , numeric type user_);
   function AXI4_ARFlit#(id_, addr_, user_) toAXI4_ARFlit (t x);
 endtypeclass
 
@@ -48,8 +50,10 @@ instance ToAXI4_ARFlit#(AXI4_ARFlit#(a, b, c), a, b, c);
   function toAXI4_ARFlit = id;
 endinstance
 
-typeclass FromAXI4_ARFlit#(type t,
-numeric type id_, numeric type addr_, numeric type user_);
+typeclass FromAXI4_ARFlit#( type t
+                          , numeric type id_
+                          , numeric type addr_
+                          , numeric type user_);
   function t fromAXI4_ARFlit (AXI4_ARFlit#(id_, addr_, user_) x);
 endtypeclass
 
@@ -60,105 +64,109 @@ endinstance
 // convert to/from Synth Master interface
 ////////////////////////////////////////////////////////////////////////////////
 
-function AXI4_AR_Master_Synth#(id_, addr_, user_)
-  toAXI4_AR_Master_Synth(src_t#(t) s)
-  provisos (ToSource#(src_t#(t), t), ToAXI4_ARFlit#(t, id_, addr_, user_));
-  let src = toSource(s);
+module toAXI4_AR_Master_Synth #(src_t#(t) s)
+                               (AXI4_AR_Master_Synth#(id_, addr_, user_))
+  provisos ( ToSource#(src_t#(t), t)
+           , ToAXI4_ARFlit#(t, id_, addr_, user_)
+           , Bits#(t, t_sz));
+  let src <- toUnguardedSource(s, ?);
   AXI4_ARFlit#(id_, addr_, user_) flit = toAXI4_ARFlit(src.peek);
-  return interface AXI4_AR_Master_Synth;
-    method arid     = flit.arid;
-    method araddr   = flit.araddr;
-    method arlen    = flit.arlen;
-    method arsize   = flit.arsize;
-    method arburst  = flit.arburst;
-    method arlock   = flit.arlock;
-    method arcache  = flit.arcache;
-    method arprot   = flit.arprot;
-    method arqos    = flit.arqos;
-    method arregion = flit.arregion;
-    method aruser   = flit.aruser;
-    method arvalid  = src.canPeek;
-    method arready(rdy) = action if (src.canPeek && rdy) src.drop; endaction;
-  endinterface;
-endfunction
+  method arid     = flit.arid;
+  method araddr   = flit.araddr;
+  method arlen    = flit.arlen;
+  method arsize   = flit.arsize;
+  method arburst  = flit.arburst;
+  method arlock   = flit.arlock;
+  method arcache  = flit.arcache;
+  method arprot   = flit.arprot;
+  method arqos    = flit.arqos;
+  method arregion = flit.arregion;
+  method aruser   = flit.aruser;
+  method arvalid  = src.canPeek;
+  method arready(rdy) = action if (src.canPeek && rdy) src.drop; endaction;
+endmodule
 
-module fromAXI4_AR_Master_Synth#(AXI4_AR_Master_Synth#(id_, addr_, user_) m) (Source#(AXI4_ARFlit#(id_, addr_, user_)));
-  let dwReady <- mkDWire(False);
-  rule forwardReady;
-    m.arready(dwReady);
+module fromAXI4_AR_Master_Synth #(AXI4_AR_Master_Synth#(id_, addr_, user_) m)
+                                 (Source#(AXI4_ARFlit#(id_, addr_, user_)));
+  FIFOF#(AXI4_ARFlit#(id_, addr_, user_)) buffer <- mkSizedBypassFIFOF(1);
+  let snk <- toUnguardedSink(buffer);
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule forwardFlit (m.arvalid && snk.canPut);
+    snk.put (AXI4_ARFlit { arid:     m.arid
+                         , araddr:   m.araddr
+                         , arlen:    m.arlen
+                         , arsize:   m.arsize
+                         , arburst:  m.arburst
+                         , arlock:   m.arlock
+                         , arcache:  m.arcache
+                         , arprot:   m.arprot
+                         , arqos:    m.arqos
+                         , arregion: m.arregion
+                         , aruser:   m.aruser });
   endrule
-  return interface Source;
-    method canPeek = m.arvalid;
-    method peek if (m.arvalid) = AXI4_ARFlit {
-      arid:     m.arid,
-      araddr:   m.araddr,
-      arlen:    m.arlen,
-      arsize:   m.arsize,
-      arburst:  m.arburst,
-      arlock:   m.arlock,
-      arcache:  m.arcache,
-      arprot:   m.arprot,
-      arqos:    m.arqos,
-      arregion: m.arregion,
-      aruser:   m.aruser
-    };
-    method drop if (m.arvalid) = dwReady._write(True);
-  endinterface;
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule forwardReady; m.arready(snk.canPut); endrule
+  return toSource(buffer);
 endmodule
 
 // convert to/from Synth Slave interface
 ////////////////////////////////////////////////////////////////////////////////
 
-function AXI4_AR_Slave_Synth#(id_, addr_, user_)
-  toAXI4_AR_Slave_Synth(snk_t s)
-  provisos (ToSink#(snk_t, t), FromAXI4_ARFlit#(t, id_, addr_, user_)) =
-  interface AXI4_AR_Slave_Synth;
-    method arflit(arid,
-                  araddr,
-                  arlen,
-                  arsize,
-                  arburst,
-                  arlock,
-                  arcache,
-                  arprot,
-                  arqos,
-                  arregion,
-                  aruser) = action if (toSink(s).canPut) toSink(s).put(fromAXI4_ARFlit(AXI4_ARFlit{
-        arid:     arid,
-        araddr:   araddr,
-        arlen:    arlen,
-        arsize:   arsize,
-        arburst:  arburst,
-        arlock:   arlock,
-        arcache:  arcache,
-        arprot:   arprot,
-        arqos:    arqos,
-        arregion: arregion,
-        aruser:   aruser
-      }));
-    endaction;
-    method arready = toSink(s).canPut;
-  endinterface;
+module toAXI4_AR_Slave_Synth #(snk_t s)
+                              (AXI4_AR_Slave_Synth#(id_, addr_, user_))
+  provisos ( ToSink#(snk_t, t)
+           , FromAXI4_ARFlit#(t, id_, addr_, user_)
+           , Bits#(t, t_sz));
+  let snk <- toUnguardedSink(s);
+  method arflit( arvalid
+               , arid
+               , araddr
+               , arlen
+               , arsize
+               , arburst
+               , arlock
+               , arcache
+               , arprot
+               , arqos
+               , arregion
+               , aruser) = action if (arvalid && snk.canPut)
+    snk.put(fromAXI4_ARFlit(AXI4_ARFlit{ arid:     arid
+                                       , araddr:   araddr
+                                       , arlen:    arlen
+                                       , arsize:   arsize
+                                       , arburst:  arburst
+                                       , arlock:   arlock
+                                       , arcache:  arcache
+                                       , arprot:   arprot
+                                       , arqos:    arqos
+                                       , arregion: arregion
+                                       , aruser:   aruser }));
+  endaction;
+  method arready = snk.canPut;
+endmodule
 
-module fromAXI4_AR_Slave_Synth#(AXI4_AR_Slave_Synth#(id_, addr_, user_) s) (Sink#(AXI4_ARFlit#(id_, addr_, user_)));
-  //We rely on the buffer being guarded
+module fromAXI4_AR_Slave_Synth #(AXI4_AR_Slave_Synth#(id_, addr_, user_) s)
+                                (Sink#(AXI4_ARFlit#(id_, addr_, user_)));
+  // We use a guarded buffer to export as a guarded sink, and use an unguarded
+  // source as an internal interface to it for connection to the Synth interface
   FIFOF#(AXI4_ARFlit#(id_, addr_, user_)) buffer <- mkSizedBypassFIFOF(1);
+  let src <- toUnguardedSource(buffer, ?);
+  (* fire_when_enabled, no_implicit_conditions *)
   rule forwardFlit;
-    s.arflit(buffer.first.arid,
-             buffer.first.araddr,
-             buffer.first.arlen,
-             buffer.first.arsize,
-             buffer.first.arburst,
-             buffer.first.arlock,
-             buffer.first.arcache,
-             buffer.first.arprot,
-             buffer.first.arqos,
-             buffer.first.arregion,
-             buffer.first.aruser);
+    s.arflit( src.canPeek
+            , src.peek.arid
+            , src.peek.araddr
+            , src.peek.arlen
+            , src.peek.arsize
+            , src.peek.arburst
+            , src.peek.arlock
+            , src.peek.arcache
+            , src.peek.arprot
+            , src.peek.arqos
+            , src.peek.arregion
+            , src.peek.aruser);
   endrule
-  //dropFlit only fires when both ready and canPeek, i.e. there is something to drop
-  rule dropFlit (s.arready);
-    buffer.deq;
-  endrule
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule dropFlit (src.canPeek && s.arready); src.drop; endrule
   return toSink(buffer);
 endmodule
