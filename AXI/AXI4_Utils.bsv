@@ -54,6 +54,7 @@ module mergeWrite#(
   Source#(AXI4_AWFlit#(id_, addr_, awuser_)) aw,
   Source#(AXI4_WFlit#(data_, wuser_)) w)
   (Source#(AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_)));
+  let debug = False;
 
   let awff <- mkFIFOF;
   let wff  <- mkFIFOF;
@@ -97,7 +98,7 @@ module mergeWrite#(
     end
   endrule
 
-  rule debug;
+  rule debug_print (debug);
     $display ("--- mergeWrite --- newCanPeek: ", fshow (newCanPeek));
     $display ("--- mergeWrite --- flitLeft: ", fshow (flitLeft));
     $display ("--- mergeWrite --- doDrop: ", fshow (doDrop));
@@ -113,6 +114,7 @@ module splitWrite#(
   Sink#(AXI4_AWFlit#(id_, addr_, awuser_)) aw,
   Sink#(AXI4_WFlit#(data_, wuser_)) w)
   (Sink#(AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_)));
+  let debug = False;
 
   let flitLeft <- mkReg(0);
   let doPut <- mkWire;
@@ -155,7 +157,7 @@ module splitWrite#(
     endcase
   endrule
 
-  rule debug;
+  rule debug_print (debug);
     $display ("--- splitWrite --- canDoPut: ", fshow (canDoPut));
     $display ("--- splitWrite --- flitLeft: ", fshow (flitLeft));
     $display ("--- splitWrite --- doPut: ", fshow (doPut));
