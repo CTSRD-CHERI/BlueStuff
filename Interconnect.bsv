@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2019 Alexandre Joannou
+ * Copyright (c) 2018-2020 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -202,8 +202,7 @@ module mkTwoWayBus#(
     FIFOF#(s2m_b)                  noRouteRsp <- mkFIFOF;
     NoRouteFoundIfc#(m2s_a, s2m_b) noRoute    <- mkNoRouteFound;
     Reg#(MasterWrapperState)       state      <- mkReg(UNALLOCATED);
-    PulseWire                      drainingNoRoute <- mkPulseWire;
-    Wire#(s2m_b)                   rspFwd     <- mkWire;
+    PulseWire                      fwdRsp     <- mkPulseWire;
     // inner signals
     Source#(m2s_a) src = m.source;
     Sink#(s2m_b) snk = m.sink;
@@ -241,17 +240,16 @@ module mkTwoWayBus#(
       if (detectLast(fatReq)) state <= UNALLOCATED;
     endrule
     // sink of responses
-    rule drainNoRouteResponse (snk.canPut && noRouteRsp.notEmpty);
+    rule drainNoRouteResponse (!fwdRsp && snk.canPut && noRouteRsp.notEmpty);
       noRouteRsp.deq;
       snk.put(noRouteRsp.first);
-      drainingNoRoute.send;
-    endrule
-    rule forwardRsp (snk.canPut && !noRouteRsp.notEmpty);
-      snk.put(rspFwd);
     endrule
     Sink#(s2m_b) rsps = interface Sink;
-      method canPut   = !drainingNoRoute;
-      method put(x) if (!drainingNoRoute) = action rspFwd <= x; endaction;
+      method canPut   = snk.canPut;
+      method put(x) if (snk.canPut) = action
+        fwdRsp.send;
+        snk.put(x);
+      endaction;
     endinterface;
     return tuple3(toSource(innerReq), toSource(innerRoute), rsps);
   endmodule
