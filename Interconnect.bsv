@@ -60,7 +60,7 @@ module mkOneWayBus#(
   // convert arguments to Source and Sink
   let sources = map(toSource, map(tpl_1, ins));
   let   paths = map(toSource, map(tpl_2, ins));
-  let   sinks = map(toSink, outs);
+  let   sinks <- mapM(toUnguardedSink, outs);
 
   /////////////////////////////////
   // general helpers and signals //
@@ -151,7 +151,7 @@ module mkOneWayBus#(
   Rules sinkRules = emptyRules;
   for (Integer i = 0; i < valueOf(nOuts); i = i + 1) begin
     sinkRules = rJoinMutuallyExclusive(sinkRules, rules
-      rule sink_selected;
+      rule sink_selected (sinks[i].canPut);
         sinks[i].put(flitToSink[i]);
       endrule
     endrules);
@@ -205,7 +205,7 @@ module mkTwoWayBus#(
     PulseWire                      fwdRsp     <- mkPulseWire;
     // inner signals
     Source#(m2s_a) src = m.source;
-    Sink#(s2m_b) snk = m.sink;
+    Sink#(s2m_b) snk <- toUnguardedSink(m.sink);
     m2s_a req = src.peek;
     m2s_b fatReq = expand(req, mid);
     Vector#(nSlaves, Bool) dest = route(routingField(req));
@@ -353,7 +353,7 @@ module mkInOrderTwoWayBus#(
     Reg#(MasterWrapperState)         state      <- mkReg(UNALLOCATED);
     // inner signals
     Source#(m2s_t) src = m.source;
-    Sink#(s2m_t) snk = m.sink;
+    Sink#(s2m_t) snk <- toUnguardedSink(m.sink);
     Vector#(nSlaves, Bool) dest = route(routingField(src.peek));
     Bool isRoutable = countIf(id, dest) == 1;
     // consume different kinds of flits

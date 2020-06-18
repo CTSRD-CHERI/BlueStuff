@@ -384,11 +384,11 @@ interface AXI4Lite_Master_Synth#(
   numeric type buser_,
   numeric type aruser_,
   numeric type ruser_);
-  interface AXI4Lite_AW_Master_Synth#(addr_, awuser_) aw;
-  interface AXI4Lite_W_Master_Synth#(data_, wuser_)   w;
-  interface AXI4Lite_B_Master_Synth#(buser_)          b;
-  interface AXI4Lite_AR_Master_Synth#(addr_, aruser_) ar;
-  interface AXI4Lite_R_Master_Synth#(data_, ruser_)   r;
+  (* prefix = "" *) interface AXI4Lite_AW_Master_Synth#(addr_, awuser_) aw;
+  (* prefix = "" *) interface AXI4Lite_W_Master_Synth#(data_, wuser_)   w;
+  (* prefix = "" *) interface AXI4Lite_B_Master_Synth#(buser_)          b;
+  (* prefix = "" *) interface AXI4Lite_AR_Master_Synth#(addr_, aruser_) ar;
+  (* prefix = "" *) interface AXI4Lite_R_Master_Synth#(data_, ruser_)   r;
 endinterface
 
 interface AXI4Lite_Master_Xactor#(
@@ -443,11 +443,11 @@ interface AXI4Lite_Slave_Synth#(
   numeric type buser_,
   numeric type aruser_,
   numeric type ruser_);
-  interface AXI4Lite_AW_Slave_Synth#(addr_, awuser_) aw;
-  interface AXI4Lite_W_Slave_Synth#(data_, wuser_)   w;
-  interface AXI4Lite_B_Slave_Synth#(buser_)          b;
-  interface AXI4Lite_AR_Slave_Synth#(addr_, aruser_) ar;
-  interface AXI4Lite_R_Slave_Synth#(data_, ruser_)   r;
+  (* prefix = "" *) interface AXI4Lite_AW_Slave_Synth#(addr_, awuser_) aw;
+  (* prefix = "" *) interface AXI4Lite_W_Slave_Synth#(data_, wuser_)   w;
+  (* prefix = "" *) interface AXI4Lite_B_Slave_Synth#(buser_)          b;
+  (* prefix = "" *) interface AXI4Lite_AR_Slave_Synth#(addr_, aruser_) ar;
+  (* prefix = "" *) interface AXI4Lite_R_Slave_Synth#(data_, ruser_)   r;
 endinterface
 
 interface AXI4Lite_Slave_Xactor#(

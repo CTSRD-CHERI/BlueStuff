@@ -595,11 +595,11 @@ interface AXI4_Master#(
   numeric type buser_,
   numeric type aruser_,
   numeric type ruser_);
-  (* prefix = "" *) interface Source#(AXI4_AWFlit#(id_, addr_, awuser_)) aw;
-  (* prefix = "" *) interface Source#(AXI4_WFlit#(data_, wuser_))        w;
-  (* prefix = "" *) interface Sink#(AXI4_BFlit#(id_, buser_))            b;
-  (* prefix = "" *) interface Source#(AXI4_ARFlit#(id_, addr_, aruser_)) ar;
-  (* prefix = "" *) interface Sink#(AXI4_RFlit#(id_, data_, ruser_))     r;
+  interface Source#(AXI4_AWFlit#(id_, addr_, awuser_)) aw;
+  interface Source#(AXI4_WFlit#(data_, wuser_))        w;
+  interface Sink#(AXI4_BFlit#(id_, buser_))            b;
+  interface Source#(AXI4_ARFlit#(id_, addr_, aruser_)) ar;
+  interface Sink#(AXI4_RFlit#(id_, data_, ruser_))     r;
 endinterface
 
 instance CulDeSac#(AXI4_Master#(id_,
