@@ -175,6 +175,7 @@ endmodule
 `defAXI4LiteShimFIFOF(BypassFIFOF, mkBypassFIFOF)
 `defAXI4LiteShimFIFOF(BypassFF1, mkSizedBypassFIFOF(1))
 `defAXI4LiteShimFIFOF(FF1, mkFIFOF1)
+`defAXI4LiteShimFIFOF(FF, mkFIFOF)
 `defAXI4LiteShimFIFOF(SizedFIFOF4, mkSizedFIFOF(4))
 
 module mkAXI4LiteShim (AXI4Lite_Shim#(a, b, c, d, e, f, g));
