@@ -34,8 +34,11 @@ import AXI4Lite_B_Utils :: *;
 import AXI4Lite_AR_Utils :: *;
 import AXI4Lite_R_Utils :: *;
 
+// BlueStuff import
+import Routable :: *;
 // BlueBasics import
 import SourceSink :: *;
+import MasterSlave :: *;
 
 // Standard
 import FIFOF :: *;
@@ -384,4 +387,18 @@ module mkAXI4Lite_Slave_Xactor (AXI4Lite_Slave_Xactor#(a, b, c, d, e, f, g));
   method clear if (!clearing) = action clearing <= True; endaction;
   interface master = guard_AXI4Lite_Master(shim.master, clearing);
   interface slaveSynth = slvSynth;
+endmodule
+
+///////////////////////////////
+// AXI4Lite "no route" slave //
+////////////////////////////////////////////////////////////////////////////////
+
+module mkNoRouteAXI4Lite_Slave (AXI4Lite_Slave #(a,b,c,d,e,f,g));
+  let noRouteWrite <- mkNoRouteSlave;
+  let noRouteRead  <- mkNoRouteSlave;
+  interface aw = noRouteWrite.sink;
+  interface  w = nullSink;
+  interface  b = noRouteWrite.source;
+  interface ar = noRouteRead.sink;
+  interface  r = noRouteRead.source;
 endmodule

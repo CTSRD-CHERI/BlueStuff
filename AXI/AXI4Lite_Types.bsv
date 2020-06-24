@@ -33,6 +33,7 @@ import DefaultValue :: *;
 import Routable :: *;
 // BlueBasics import
 import SourceSink :: *;
+import MasterSlave :: *;
 
 import AXI4_AXI4Lite_Types :: *;
 
@@ -54,18 +55,25 @@ instance Routable#(AXI4Lite_AWFlit#(addr_, awuser_),
                    AXI4Lite_BFlit#(wuser_),
                    Bit#(addr_));
   function routingField(x) = x.awaddr;
-  module mkNoRouteFound(NoRouteFoundIfc#(AXI4Lite_AWFlit#(addr_, awuser_),
-                                         AXI4Lite_BFlit#(buser_)));
+  module mkNoRouteSlave(Slave#( AXI4Lite_AWFlit#(addr_, awuser_)
+                              , AXI4Lite_BFlit#(buser_)));
     Reg#(AXI4Lite_AWFlit#(addr_, awuser_)) currentReq[2] <- mkCReg(2, ?);
     Reg#(Bool)                             pendingReq[2] <- mkCReg(2, False);
-    method pushReq (req) if (!pendingReq[0]) = action
-      currentReq[0] <= req;
-      pendingReq[0] <= True;
-    endaction;
-    method getRsp if (pendingReq[1]) = actionvalue
-      pendingReq[1] <= False;
-      return tuple2(True, AXI4Lite_BFlit {bresp: DECERR, buser: ?});
-    endactionvalue;
+    interface sink = interface Sink;
+      method canPut = !pendingReq[0];
+      method put (req) if (!pendingReq[0]) = action
+        currentReq[0] <= req;
+        pendingReq[0] <= True;
+      endaction;
+    endinterface;
+    interface source = interface Source;
+      method canPeek = pendingReq[1];
+      method peek if (pendingReq[1]) = AXI4Lite_BFlit { bresp: DECERR
+                                                      , buser: ? };
+      method drop if (pendingReq[1]) = action
+        pendingReq[1] <= False;
+      endaction;
+    endinterface;
   endmodule
 endinstance
 instance DetectLast#(AXI4Lite_AWFlit#(addr_, user_));
@@ -241,18 +249,26 @@ instance Routable#(
   AXI4Lite_RFlit#(data_, ruser_),
   Bit#(addr_));
   function routingField(x) = x.araddr;
-  module mkNoRouteFound(NoRouteFoundIfc#(AXI4Lite_ARFlit#(addr_, aruser_),
-                                         AXI4Lite_RFlit#(data_, ruser_)));
+  module mkNoRouteSlave(Slave#( AXI4Lite_ARFlit#(addr_, aruser_)
+                              , AXI4Lite_RFlit#(data_, ruser_)));
     Reg#(AXI4Lite_ARFlit#(addr_, aruser_)) currentReq[2] <- mkCReg(2, ?);
     Reg#(Bool)                             pendingReq[2] <- mkCReg(2, False);
-    method pushReq (req) if (!pendingReq[0]) = action
-      currentReq[0] <= req;
-      pendingReq[0] <= True;
-    endaction;
-    method getRsp if (pendingReq[1]) = actionvalue
-      pendingReq[1] <= False;
-      return tuple2(True, AXI4Lite_RFlit {rdata: ?, rresp: DECERR, ruser: ?});
-    endactionvalue;
+    interface sink = interface Sink;
+      method canPut = !pendingReq[0];
+      method put (req) if (!pendingReq[0]) = action
+        currentReq[0] <= req;
+        pendingReq[0] <= True;
+      endaction;
+    endinterface;
+    interface source = interface Source;
+      method canPeek = pendingReq[1];
+      method peek if (pendingReq[1]) = AXI4Lite_RFlit{ rdata: ?
+                                                     , rresp: DECERR
+                                                     , ruser: ? };
+      method drop if (pendingReq[1]) = action
+        pendingReq[1] <= False;
+      endaction;
+    endinterface;
   endmodule
 endinstance
 instance DetectLast#(AXI4Lite_ARFlit#(addr_, user_));
@@ -588,13 +604,16 @@ instance Routable#(
               Bit#(addr_))
   );
   function routingField(x) = x.aw.awaddr; // XXX routingField(aw); XXX THIS SHOULD JUST WORK BUT DOESN'T ?!
-  module mkNoRouteFound(NoRouteFoundIfc#(
-                          AXI4Lite_WriteFlit#(addr_, data_, awuser_, wuser_),
-                          AXI4Lite_BFlit#(buser_)));
-    NoRouteFoundIfc#(AXI4Lite_AWFlit#(addr_, awuser_), AXI4Lite_BFlit#(buser_))
-      inner <- mkNoRouteFound;
-    method pushReq (req) = inner.pushReq(req.aw);
-    method getRsp = inner.getRsp;
+  module mkNoRouteSlave (Slave#(
+                           AXI4Lite_WriteFlit#(addr_, data_, awuser_, wuser_),
+                           AXI4Lite_BFlit#(buser_)));
+    Slave#(AXI4Lite_AWFlit#(addr_, awuser_), AXI4Lite_BFlit#(buser_))
+      inner <- mkNoRouteSlave;
+    interface sink = interface Sink;
+      method canPut = inner.sink.canPut;
+      method put (x) = inner.sink.put (x.aw);
+    endinterface;
+    interface source = inner.source;
   endmodule
 endinstance
 instance DetectLast#(AXI4Lite_WriteFlit#(addr_, data_, awuser_, wuser_));

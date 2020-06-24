@@ -36,15 +36,17 @@ import AXI4_B_Utils :: *;
 import AXI4_AR_Utils :: *;
 import AXI4_R_Utils :: *;
 
+// BlueStuff import
+import Routable :: *;
 // BlueBasics import
 import SourceSink :: *;
+import MasterSlave :: *;
 
 // Standard
 import FIFOF :: *;
 import SpecialFIFOs :: *;
 import ConfigReg :: *;
 import Connectable :: *;
-
 
 ////////////////////////////////
 // AXI4 Write channel helpers //
@@ -979,10 +981,10 @@ module toWider_AXI4_Master #(AXI4_Master#(id_, addr_, narrow_, awuser_, wuser_, 
 
   //TODO will not tolerate bursts
   //TODO will handle only one outstanding ID at a time
-  
+
   AXI4_Shim#(id_, addr_, narrow_, awuser_, wuser_, buser_, aruser_, ruser_) bufferShim <- mkAXI4ShimUGSizedFIFOF4;
   mkConnection(bufferShim.slave, narrow);
-  
+
   let inMaster = bufferShim.master;
 
   let takeUpperW <- mkFIFOF;
@@ -1433,4 +1435,18 @@ module mkAXI4_Slave_Zeroing_Xactor (AXI4_Slave_Width_Xactor#(a, b, c, d, e, f, g
   method clear if (!clearing) = action clearing <= True; endaction;
   interface master = guard_AXI4_Master(shim.master, clearing);
   interface slaveSynth = slvSynth;
+endmodule
+
+///////////////////////////
+// AXI4 "no route" slave //
+////////////////////////////////////////////////////////////////////////////////
+
+module mkNoRouteAXI4_Slave (AXI4_Slave #(a,b,c,d,e,f,g,h));
+  let noRouteWrite <- mkNoRouteSlave;
+  let noRouteRead  <- mkNoRouteSlave;
+  interface aw = noRouteWrite.sink;
+  interface  w = nullSink;
+  interface  b = noRouteWrite.source;
+  interface ar = noRouteRead.sink;
+  interface  r = noRouteRead.source;
 endmodule

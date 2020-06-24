@@ -34,6 +34,7 @@ import DefaultValue :: *;
 import Routable :: *;
 // BlueBasics import
 import SourceSink :: *;
+import MasterSlave :: *;
 
 import AXI4_AXI4Lite_Types :: *;
 
@@ -77,20 +78,26 @@ instance Routable#(
   AXI4_BFlit#(id_, buser_),
   Bit#(addr_));
   function routingField(x) = x.awaddr;
-  module mkNoRouteFound(NoRouteFoundIfc#(AXI4_AWFlit#(id_, addr_, awuser_),
-                                         AXI4_BFlit#(id_, buser_)));
+  module mkNoRouteSlave(Slave#( AXI4_AWFlit#(id_, addr_, awuser_)
+                              , AXI4_BFlit#(id_, buser_)));
     Reg#(AXI4_AWFlit#(id_, addr_, awuser_)) currentReq[2] <- mkCReg(2, ?);
     Reg#(Bool)                              pendingReq[2] <- mkCReg(2, False);
-    method pushReq (req) if (!pendingReq[0]) = action
-      currentReq[0] <= req;
-      pendingReq[0] <= True;
-    endaction;
-    method getRsp if (pendingReq[1]) = actionvalue
-      pendingReq[1] <= False;
-      return tuple2(True, AXI4_BFlit {
-                            bid: currentReq[1].awid, bresp: DECERR, buser: ?
-                          });
-    endactionvalue;
+    interface sink = interface Sink;
+      method canPut = !pendingReq[0];
+      method put (req) if (!pendingReq[0]) = action
+        currentReq[0] <= req;
+        pendingReq[0] <= True;
+      endaction;
+    endinterface;
+    interface source = interface Source;
+      method canPeek = pendingReq[1];
+      method peek if (pendingReq[1]) = AXI4_BFlit { bid: currentReq[1].awid
+                                                  , bresp: DECERR
+                                                  , buser: ? };
+      method drop if (pendingReq[1]) = action
+        pendingReq[1] <= False;
+      endaction;
+    endinterface;
   endmodule
 endinstance
 instance DetectLast#(AXI4_AWFlit#(id_, addr_, user_));
@@ -374,23 +381,28 @@ instance Routable#(
   AXI4_RFlit#(id_, data_, ruser_),
   Bit#(addr_));
   function routingField(x) = x.araddr;
-  module mkNoRouteFound(NoRouteFoundIfc#(AXI4_ARFlit#(id_, addr_, aruser_),
-                                         AXI4_RFlit#(id_, data_, ruser_)));
+  module mkNoRouteSlave(Slave#( AXI4_ARFlit#(id_, addr_, aruser_)
+                              , AXI4_RFlit#(id_, data_, ruser_)));
     Reg#(AXI4_ARFlit#(id_, addr_, aruser_)) currentReq[2] <- mkCReg(2, ?);
     Reg#(Bit#(TAdd#(SizeOf#(AXI4_Len), 1))) flitCount[2]  <- mkCReg(2, 0);
-    method pushReq (req) if (flitCount[0] == 0) = action
-      currentReq[0] <= req;
-      flitCount[0]  <= zeroExtend(req.arlen) + 1;
-    endaction;
-    method getRsp if (flitCount[1] != 0) = actionvalue
-      flitCount[1] <= flitCount[1] - 1;
-      let isLast = flitCount[1] == 1;
-      return tuple2(isLast,
-                    AXI4_RFlit{
-                      rid: currentReq[1].arid, rdata: ?, rresp: DECERR,
-                      rlast: isLast, ruser: ?
-                    });
-    endactionvalue;
+    interface sink = interface Sink;
+      method canPut = flitCount[0] == 0;
+      method put (req) if (flitCount[0] == 0) = action
+        currentReq[0] <= req;
+        flitCount[0]  <= zeroExtend(req.arlen) + 1;
+      endaction;
+    endinterface;
+    interface source = interface Source;
+      method canPeek = flitCount[1] != 0;
+      method peek if (flitCount[1] != 0) = AXI4_RFlit{ rid: currentReq[1].arid
+                                                     , rdata: ?
+                                                     , rresp: DECERR
+                                                     , rlast: flitCount[1] == 1
+                                                     , ruser: ? };
+      method drop if (flitCount[1] != 0) = action
+        flitCount[1] <= flitCount[1] - 1;
+      endaction;
+    endinterface;
   endmodule
 endinstance
 instance DetectLast#(AXI4_ARFlit#(id_, addr_, user_));
@@ -947,16 +959,19 @@ instance Routable#(
     tagged FirstFlit {.aw, .w}: aw.awaddr; // XXX routingField(aw); XXX THIS SHOULD JUST WORK BUT DOESN'T ?!
     default: ?;
   endcase;
-  module mkNoRouteFound(NoRouteFoundIfc#(
-                          AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_),
-                          AXI4_BFlit#(id_, buser_)));
-    NoRouteFoundIfc#(AXI4_AWFlit#(id_, addr_, awuser_),
-                     AXI4_BFlit#(id_, buser_)) inner <- mkNoRouteFound;
-    method pushReq (req) = case (req) matches
-      tagged FirstFlit {.aw, .w}: inner.pushReq(aw);
-      default: noAction;
-    endcase;
-    method getRsp = inner.getRsp;
+  module mkNoRouteSlave (Slave#(
+                           AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_),
+                           AXI4_BFlit#(id_, buser_)));
+    Slave#(AXI4_AWFlit#(id_, addr_, awuser_), AXI4_BFlit#(id_, buser_))
+      inner <- mkNoRouteSlave;
+    interface sink = interface Sink;
+      method canPut = inner.sink.canPut;
+      method put (req) = case (req) matches
+        tagged FirstFlit {.aw, ._}: inner.sink.put(aw);
+        default: noAction;
+      endcase;
+    endinterface;
+    interface source = inner.source;
   endmodule
 endinstance
 instance DetectLast#(AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_));

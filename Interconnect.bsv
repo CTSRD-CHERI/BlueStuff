@@ -200,7 +200,7 @@ module mkTwoWayBus#(
     FIFOF#(m2s_b)                  innerReq   <- mkFIFOF;
     FIFOF#(Vector#(nSlaves, Bool)) innerRoute <- mkFIFOF;
     FIFOF#(s2m_b)                  noRouteRsp <- mkFIFOF;
-    NoRouteFoundIfc#(m2s_a, s2m_b) noRoute    <- mkNoRouteFound;
+    Slave#(m2s_a, s2m_b)           noRoute    <- mkNoRouteSlave;
     Reg#(MasterWrapperState)       state      <- mkReg(UNALLOCATED);
     PulseWire                      fwdRsp     <- mkPulseWire;
     // inner signals
@@ -224,13 +224,14 @@ module mkTwoWayBus#(
       innerReq.enq(fatReq);
       if (detectLast(fatReq)) state <= UNALLOCATED;
     endrule
+    (* descending_urgency = "nonRoutableGenRsp, nonRoutableFlit" *)
     rule nonRoutableFlit (state == UNALLOCATED && src.canPeek && !isRoutable);
-      noRoute.pushReq(req);
+      noRoute.sink.put(req);
     endrule
     rule nonRoutableGenRsp;
-      match {.isLast, .rsp} <- noRoute.getRsp;
+      let rsp <- get(noRoute.source);
       noRouteRsp.enq(rsp);
-      if (isLast) begin
+      if (detectLast(rsp)) begin
         src.drop;
         if (!detectLast(fatReq)) state <= DRAIN;
       end
@@ -349,7 +350,7 @@ module mkInOrderTwoWayBus#(
     FIFOF#(UpFlit#(m2s_t, nMasters)) innerReq   <- mkFIFOF;
     FIFOF#(Vector#(nSlaves, Bool))   innerRoute <- mkFIFOF;
     FIFOF#(Maybe#(s2m_t))            innerRsp   <- mkFIFOF;
-    NoRouteFoundIfc#(m2s_t, s2m_t)   noRoute    <- mkNoRouteFound;
+    Slave#(m2s_t, s2m_t)             noRoute    <- mkNoRouteSlave;
     Reg#(MasterWrapperState)         state      <- mkReg(UNALLOCATED);
     // inner signals
     Source#(m2s_t) src = m.source;
@@ -371,13 +372,14 @@ module mkInOrderTwoWayBus#(
       innerReq.enq(UpFlit {path: orig, flit: req});
       if (detectLast(req)) state <= UNALLOCATED;
     endrule
+    (* descending_urgency = "nonRoutableGenRsp, nonRoutableFlit" *)
     rule nonRoutableFlit (state == UNALLOCATED && src.canPeek && !isRoutable);
-      noRoute.pushReq(src.peek);
+      noRoute.sink.put(src.peek);
     endrule
     rule nonRoutableGenRsp;
-      match {.isLast, .rsp} <- noRoute.getRsp;
+      let rsp <- get(noRoute.source);
       innerRsp.enq(Valid(rsp));
-      if (isLast) begin
+      if (detectLast(rsp)) begin
         src.drop;
         if (!detectLast(src.peek)) state <= DRAIN;
       end

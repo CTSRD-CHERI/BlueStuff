@@ -52,11 +52,6 @@ BSCFLAGS += -show-range-conflict
 #BSCFLAGS += -show-rule-rel \* \*
 #BSCFLAGS += -steps-warn-interval n
 
-# Bluespec is not compatible with gcc > 4.9
-# This is actually problematic when using $test$plusargs
-CC = gcc-4.8
-CXX = g++-4.8
-
 EXAMPLESDIR = examples
 SIMEXAMPLESSRC = $(wildcard $(EXAMPLESDIR)/Example-*.bsv)
 SIMEXAMPLES = $(addprefix sim, $notdir($(basename $(SIMEXAMPLESSRC))))

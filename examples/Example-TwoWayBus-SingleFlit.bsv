@@ -64,13 +64,17 @@ typedef struct {
 
 instance Routable#(Req, Rsp, Vector#(NSlaves, Bool));
   function routingField (x) = x.to;
-  module mkNoRouteFound (NoRouteFoundIfc#(Req, Rsp));
+  module mkNoRouteSlave (Slave#(Req, Rsp));
     FIFOF#(Bit#(0)) ff <- mkFIFOF1;
-    method pushReq (x) = ff.enq(?);
-    method getRsp = actionvalue
-      ff.deq;
-      return tuple2(True, Rsp { status: KO });
-    endactionvalue;
+    interface sink = interface Sink;
+      method canPut = ff.notFull;
+      method put (x) = ff.enq(?);
+    endinterface;
+    interface source = interface Source;
+      method canPeek = ff.notEmpty;
+      method peek if (ff.notEmpty) = Rsp { status: KO };
+      method drop if (ff.notEmpty) = ff.deq;
+    endinterface;
   endmodule
 endinstance
 

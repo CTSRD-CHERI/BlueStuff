@@ -29,19 +29,15 @@
 package Routable;
 
 import Vector :: *;
+import MasterSlave :: *;
 
 ////////////////////////
 // Routable typeclass //
 ////////////////////////////////////////////////////////////////////////////////
 
-interface NoRouteFoundIfc#(type req_t, type rsp_t);
-  method Action pushReq (req_t req);
-  method ActionValue#(Tuple2#(Bool, rsp_t)) getRsp;
-endinterface
-
 typeclass Routable#(type a, type b, type c) dependencies (a determines (b, c));
   function c routingField (a val);
-  module mkNoRouteFound (NoRouteFoundIfc#(a, b));
+  module mkNoRouteSlave (Slave#(a, b));
 endtypeclass
 
 //////////////////////////

@@ -69,18 +69,31 @@ typedef struct {
 
 instance Routable#(Req, Rsp, Vector#(NSlaves, Bool));
   function routingField (x) = x.to;
-  module mkNoRouteFound (NoRouteFoundIfc#(Req, Rsp));
+  module mkNoRouteSlave (Slave#(Req, Rsp));
     FIFOF#(Bit#(0)) ff <- mkFIFOF1;
-    method pushReq (x) = ff.enq(?);
-    method getRsp = actionvalue
-      ff.deq;
-      return tuple2(True, Rsp { status: KO });
-    endactionvalue;
+    interface sink = interface Sink;
+      method canPut = ff.notFull;
+      method put (x) = ff.enq(?);
+    endinterface;
+    interface source = interface Source;
+      method canPeek = ff.notEmpty;
+      method peek if (ff.notEmpty) = Rsp { status: KO };
+      method drop if (ff.notEmpty) = ff.deq;
+    endinterface;
   endmodule
 endinstance
 
 instance DetectLast#(Req); function detectLast (x) = x.last; endinstance
+instance DetectLast#(Tuple2#(Req, Bit#(TLog#(NMasters))));
+  function detectLast (x) = tpl_1(x).last;
+endinstance
 instance DetectLast#(Rsp); function detectLast = constFn(True); endinstance
+instance ExpandReqRsp#(Req, Tuple2#(Req, Bit#(TLog#(NMasters))),
+                       Tuple2#(Rsp, Bit#(TLog#(NMasters))), Rsp,
+                       Bit#(TLog#(NMasters)));
+  function expand(r, x) = tuple2(r, x);
+  function shrink(r) = r;
+endinstance
 
 module mkMaster (Master#(Req, Rsp));
   Reg#(Vector#(NSlaves, Bool)) dest <- mkConfigReg(cons(True, replicate(False)));
@@ -112,14 +125,15 @@ module mkMaster (Master#(Req, Rsp));
   endinterface;
 endmodule
 
-module mkSlave (Slave#(Req, Rsp));
+module mkSlave (Slave#( Tuple2#(Req, Bit#(TLog#(NMasters)))
+                      , Tuple2#(Rsp, Bit#(TLog#(NMasters)))));
   let ff <- mkFIFOF;
   interface sink = interface Sink;
     method put(x) = action
       $display("%0t -- -- -- Slave received ", $time, fshow(x));
-      if (x.last) begin
+      if (tpl_1(x).last) begin
         $display("%0t -- -- -- Slave sending rsp", $time);
-        ff.enq(Rsp { status: OK });
+        ff.enq(tuple2(Rsp { status: OK }, tpl_2(x)));
       end
     endaction;
     method canPut = ff.notFull;
@@ -130,9 +144,11 @@ endmodule
 module top (Empty);
 
   Vector#(NMasters, Master#(Req, Rsp)) masters <- replicateM(mkMaster);
-  Vector#(NSlaves,  Slave#(Req, Rsp))  slaves  <- replicateM(mkSlave);
+  Vector#(NSlaves,  Slave#( Tuple2#(Req, Bit#(TLog#(NMasters)))
+                          , Tuple2#(Rsp, Bit#(TLog#(NMasters)))))
+    slaves  <- replicateM(mkSlave);
 
-  mkInOrderTwoWayBus(id, masters, slaves);
-  //mkTwoWayBus(id, masters, slaves);
+  //mkInOrderTwoWayBus(id, masters, slaves);
+  mkTwoWayBus(id, masters, slaves);
 
 endmodule
