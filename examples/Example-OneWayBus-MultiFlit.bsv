@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2019 Alexandre Joannou
+ * Copyright (c) 2018-2020 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -38,13 +38,14 @@ import ConfigReg :: *;
 typedef struct {
   Bit#(i) id;
   Vector#(o, Bool) dest;
+  Bool last;
 } Flit#(numeric type i, numeric type o) deriving (Bits);
 instance FShow#(Flit#(a,b));
   function fshow(x) =
     $format("[id = %0d, dest = %b]", x.id, x.dest);
 endinstance
 instance DetectLast#(Flit#(a,b));
-  function detectLast = constFn(True);
+  function detectLast(x) = x.last; 
 endinstance
 
 function Vector#(n, Bool) route (Bit#(a) x);
@@ -72,12 +73,19 @@ module top (Empty);
 
   for (Integer i = 0; i < nIns; i = i + 1) begin
     Reg#(Vector#(NOuts, Bool)) next <- mkConfigReg(cons(True, replicate(False)));
+    let localCnt <- mkReg (0);
     rule doEnq;
       ins[i].enq(tuple2(Flit {
         id: fromInteger(i),
-        dest: next
+        dest: next,
+        last: localCnt == 4
       }, next));
-      next <= rotate(next);
+    endrule
+    rule iterate_flits;
+      if (localCnt >= 4) begin
+        localCnt <= 0;
+        next <= rotate(next);
+      end else localCnt <= localCnt + 1;
     endrule
   end
   for (Integer i = 0; i < nOuts; i = i + 1)
