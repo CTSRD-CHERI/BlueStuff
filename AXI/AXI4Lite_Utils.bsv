@@ -329,6 +329,20 @@ module toUnguarded_AXI4Lite_Master #(AXI4Lite_Master#(a, b, c, d, e, f, g) m)
   interface r  = u_r;
 endmodule
 
+module toUnguarded_AXI4Lite_Slave #(AXI4Lite_Slave#(a, b, c, d, e, f, g) s)
+                                   (AXI4Lite_Slave#(a, b, c, d, e, f, g));
+  let u_aw <- toUnguardedSink(s.aw);
+  let u_w  <- toUnguardedSink(s.w);
+  let u_b  <- toUnguardedSource(s.b, ?);
+  let u_ar <- toUnguardedSink(s.ar);
+  let u_r  <- toUnguardedSource(s.r, ?);
+  interface aw = u_aw;
+  interface w  = u_w;
+  interface b  = u_b;
+  interface ar = u_ar;
+  interface r  = u_r;
+endmodule
+
 function AXI4Lite_Master#(a,b,c,d,e,f,g) guard_AXI4Lite_Master
         (AXI4Lite_Master#(a,b,c,d,e,f,g) raw, Bool block) =
   interface AXI4Lite_Master;
@@ -349,6 +363,7 @@ function AXI4Lite_Slave#(a,b,c,d,e,f,g) guard_AXI4Lite_Slave
     interface r  = guardSource(raw.r, block);
   endinterface;
 
+/*
 module mkAXI4Lite_Master_Xactor (AXI4Lite_Master_Xactor#(a, b, c, d, e, f, g));
   let shim <- mkAXI4LiteShimBypassFIFOF;
   let master <- toAXI4Lite_Master_Synth(shim.master);
@@ -360,20 +375,6 @@ module mkAXI4Lite_Master_Xactor (AXI4Lite_Master_Xactor#(a, b, c, d, e, f, g));
   method clear if (!clearing) = action clearing <= True; endaction;
   interface slave = guard_AXI4Lite_Slave(shim.slave, clearing);
   interface masterSynth = master;
-endmodule
-
-module toUnguarded_AXI4Lite_Slave #(AXI4Lite_Slave#(a, b, c, d, e, f, g) s)
-                                   (AXI4Lite_Slave#(a, b, c, d, e, f, g));
-  let u_aw <- toUnguardedSink(s.aw);
-  let u_w  <- toUnguardedSink(s.w);
-  let u_b  <- toUnguardedSource(s.b, ?);
-  let u_ar <- toUnguardedSink(s.ar);
-  let u_r  <- toUnguardedSource(s.r, ?);
-  interface aw = u_aw;
-  interface w  = u_w;
-  interface b  = u_b;
-  interface ar = u_ar;
-  interface r  = u_r;
 endmodule
 
 module mkAXI4Lite_Slave_Xactor (AXI4Lite_Slave_Xactor#(a, b, c, d, e, f, g));
@@ -388,11 +389,13 @@ module mkAXI4Lite_Slave_Xactor (AXI4Lite_Slave_Xactor#(a, b, c, d, e, f, g));
   interface master = guard_AXI4Lite_Master(shim.master, clearing);
   interface slaveSynth = slvSynth;
 endmodule
+*/
 
 ///////////////////////////////
 // AXI4Lite "no route" slave //
 ////////////////////////////////////////////////////////////////////////////////
 
+/*
 module mkNoRouteAXI4Lite_Slave (AXI4Lite_Slave #(a,b,c,d,e,f,g));
   let noRouteWrite <- mkNoRouteSlave;
   let noRouteRead  <- mkNoRouteSlave;
@@ -402,3 +405,4 @@ module mkNoRouteAXI4Lite_Slave (AXI4Lite_Slave #(a,b,c,d,e,f,g));
   interface ar = noRouteRead.sink;
   interface  r = noRouteRead.source;
 endmodule
+*/
