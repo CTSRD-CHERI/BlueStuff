@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2019 Alexandre Joannou
+ * Copyright (c) 2018-2020 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -29,61 +29,136 @@
 package Routable;
 
 import Vector :: *;
+
 import MasterSlave :: *;
 
-////////////////////////
-// Routable typeclass //
+//////////////////////
+// Routable classes //
 ////////////////////////////////////////////////////////////////////////////////
 
-typeclass Routable#(type a, type b, type c) dependencies (a determines (b, c));
-  function c routingField (a val);
-  module mkNoRouteSlave (Slave#(a, b));
+// The Routable class provides methods to help routing a flit type through some
+// interconnect logic. The routingField method extracts a field of the flit to
+// be used as an argument to a separate routing function. Additionally, the
+// isLast method identifies a flit as the last of a (possibly multi-flit)
+// packet. It is useful to help keep track of state needed for packet switching
+// logic.
+
+typeclass Has_routingField #(type t, type r_t) dependencies (t determines r_t);
+  function r_t routingField (t x);
 endtypeclass
 
-//////////////////////////
-// DetectLast typeclass //
+typeclass Has_isLast #(type t);
+  function Bool isLast (t x);
+endtypeclass
+
+typeclass Routable #(type f_t, type r_t)
+  provisos ( Has_routingField #(f_t, r_t)
+           , Has_isLast #(f_t))
+  dependencies (f_t determines r_t);
+endtypeclass
+
+instance Routable #(a, b) provisos (Has_routingField #(a, b), Has_isLast #(a));
+endinstance
+
+/////////////////////////
+// FallibleRoute class //
 ////////////////////////////////////////////////////////////////////////////////
 
-typeclass DetectLast#(type a);
-  function Bool detectLast (a val);
+// The FallibleRoute class provides a mkNoRouteSlave module for a pair of
+// request and response type. It will usually get any relevant metadata from
+// the request that needs to be forwarded and send a response containing this
+// information and a routing error code.
+
+typeclass FallibleRoute #(type req_t, type rsp_t);
+  module mkNoRouteSlave (Slave #(req_t, rsp_t));
 endtypeclass
 
 ////////////////////////////
-// ExpandReqRsp typeclass //
+// ExpandableReqRsp class //
 ////////////////////////////////////////////////////////////////////////////////
 
-typeclass ExpandReqRsp#(type req_a, type req_b, type rsp_a, type rsp_b, type t)
-  dependencies (
-    (req_a, req_b, t) determines (rsp_a, rsp_b),
-    rsp_a determines (req_a, req_b, rsp_b, t)
-  );
-  function req_b expand(req_a r, t x);
-  function Tuple2#(rsp_b, t) shrink(rsp_a r);
+// The ExpandableReqRsp class provides methods to enrich flits with information
+// that interconnect logic uses when performing two-way request-response
+// transfers. The request flits will typically be augmented with information
+// identifying the original source of the packet (using the expand method).
+// This information is mirrored in the enriched response flit which can then
+// get trimmed (using the shrink method) to retrieve the information in order
+// to target the original source of the request when routing the response back.
+
+typeclass ExpandableReqRsp #( type req_t,     type req_fat_t
+                            , type rsp_fat_t, type rsp_t
+                            , numeric type n_masters)
+  dependencies ( (req_t, req_fat_t) determines (rsp_t, rsp_fat_t, n_masters)
+               , rsp_fat_t determines (rsp_t, n_masters, req_t, req_fat_t)
+               , (rsp_t, rsp_fat_t) determines (req_t, req_fat_t, n_masters));
+  function req_fat_t expand (Bit #(TLog #(n_masters)) x, req_t r);
+  function Tuple2 #(Bit #(TLog #(n_masters)), rsp_t) shrink (rsp_fat_t r);
 endtypeclass
 
-///////////////////////
-// Memory Range type //
+///////////////////
+// route helpers //
 ////////////////////////////////////////////////////////////////////////////////
 
+// The WithRouteInfo type wraps any type with information that will be used to
+// be routed with. If the wrapped type has an implementation of "isLast", this
+// implementation is used for WithRouteInfo 's isLast.
+// XXX Note that if the wrapped type has an implementation of "routingField",
+// it is ignored and WithRouteInfo's routeInfo field is used instead.
 typedef struct {
-  Bit#(n) base;
-  Bit#(n) size;
-} Range#(numeric type n) deriving (Bits);
-function Bit#(n) rangeBase(Range#(n) range) = range.base;
-function Bit#(n) rangeSize(Range#(n) range) = range.size;
-function Bit#(n) rangeTop (Range#(n) range) = range.base + range.size;
-function Bool inRange(Range#(n) range, Bit#(n) addr) =
-  (addr >= rangeBase(range) && (addr - rangeBase(range)) < rangeSize(range));
+  t   payload;
+  r_t routeInfo;
+} WithRouteInfo #(type t, type r_t) deriving (FShow, Bits);
+instance Has_routingField #(WithRouteInfo #(t, r_t), r_t);
+  function routingField (x) = x.routeInfo;
+endinstance
+instance Has_isLast #(WithRouteInfo #(t, r_t)) provisos (Has_isLast #(t));
+  function isLast (x) = isLast (x.payload);
+endinstance
 
-////////////////////////
-// Mapping table type //
-////////////////////////////////////////////////////////////////////////////////
-typedef Vector#(n, Range#(a)) MappingTable#(numeric type n, numeric type a);
-function Vector#(n, Bool) routeFromMappingTable (MappingTable#(n, a) mt, Bit#(a) addr);
-  function pred = flip(inRange);
-  let route = replicate(False);
-  let mIdx = findIndex(pred(addr), mt);
-  if (isValid(mIdx)) route[mIdx.Valid] = True;
+// The WithMetaInfo type wraps a type with meta information and uses the
+// wrapped type's implementation of "routingField" and "isLast"
+typedef struct {
+  t   payload;
+  m_t metaInfo;
+} WithMetaInfo #(type t, type m_t) deriving (FShow, Bits);
+instance Has_routingField #(WithMetaInfo #(t, m_t), r_t)
+  provisos (Has_routingField #(t, r_t));
+  function routingField (x) = routingField (x.payload);
+endinstance
+instance Has_isLast #(WithMetaInfo #(t, m_t)) provisos (Has_isLast #(t));
+  function isLast (x) = isLast (x.payload);
+endinstance
+
+// Routing function from index to one hot vector
+// XXX Note: special case for idx type of Bit #(0) as it does not seam to yield
+// the naively expected behaviour of a singleton vector with True in it
+function Vector #(n, Bool) indexToOneHot (Bit #(TLog #(n)) idx) =
+  (valueOf (n) == 1) ? replicate (True) : unpack (1 << idx);
+
+// Range type to help represent memory ranges and describe a memory map that
+// can be used to help derive a routing function. The Range type consists of
+// a base and a size and function to queries those as well as the range top,
+// and whether an address is in the range or not
+typedef struct {
+  Bit #(n) base;
+  Bit #(n) size;
+} Range #(numeric type n) deriving (Bits);
+function Bit #(n) rangeBase (Range #(n) rg) = rg.base;
+function Bit #(n) rangeSize (Range #(n) rg) = rg.size;
+function Bit #(n) rangeTop  (Range #(n) rg) = rg.base + rg.size;
+function Bool inRange (Range #(n) rg, Bit #(n) addr) =
+  (addr >= rangeBase (rg) && (addr - rangeBase (rg)) < rangeSize (rg));
+
+// A mapping table is a collection of ranges. The routeFromMappingTable
+// function takes a mapping table and return a function from address to one hot
+// vector that can be used as a routing function for an interconnect.
+typedef Vector #(n, Range #(a)) MappingTable #(numeric type n, numeric type a);
+function Vector #(n, Bool) routeFromMappingTable ( MappingTable #(n, a) mt
+                                                 , Bit #(a) addr);
+  function pred = flip (inRange);
+  let route = replicate (False);
+  let mIdx = findIndex (pred (addr), mt);
+  if (isValid (mIdx)) route[mIdx.Valid] = True;
   return route;
 endfunction
 

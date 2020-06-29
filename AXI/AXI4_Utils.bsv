@@ -1383,7 +1383,7 @@ function AXI4_Slave#(a,b,c,d,e,f,g,h) guard_AXI4_Slave
     interface ar = guardSink(raw.ar, block);
     interface r  = guardSource(raw.r, block);
   endinterface;
-
+/*
 module mkAXI4_Master_Xactor (AXI4_Master_Xactor#(a, b, c, d, e, f, g, h));
   let shim <- mkAXI4ShimBypassFIFOF;
   let master <- toAXI4_Master_Synth(shim.master);
@@ -1436,11 +1436,13 @@ module mkAXI4_Slave_Zeroing_Xactor (AXI4_Slave_Width_Xactor#(a, b, c, d, e, f, g
   interface master = guard_AXI4_Master(shim.master, clearing);
   interface slaveSynth = slvSynth;
 endmodule
+*/
 
 ///////////////////////////
 // AXI4 "no route" slave //
 ////////////////////////////////////////////////////////////////////////////////
 
+/*
 module mkNoRouteAXI4_Slave (AXI4_Slave #(a,b,c,d,e,f,g,h));
   let noRouteWrite <- mkNoRouteSlave;
   let noRouteRead  <- mkNoRouteSlave;
@@ -1450,3 +1452,4 @@ module mkNoRouteAXI4_Slave (AXI4_Slave #(a,b,c,d,e,f,g,h));
   interface ar = noRouteRead.sink;
   interface  r = noRouteRead.source;
 endmodule
+*/

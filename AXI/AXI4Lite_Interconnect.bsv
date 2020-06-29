@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2019 Alexandre Joannou
+ * Copyright (c) 2018-2020 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -44,6 +44,7 @@ import Routable :: *;
 
 `define PARAMS addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_
 
+/*
 module mkAXI4LiteBus#(
     function Vector#(nRoutes, Bool) route (Bit#(addr_) val),
     Vector#(nMasters, AXI4Lite_Master#(`PARAMS)) masters,
@@ -94,7 +95,7 @@ module mkAXI4LiteBus#(
     Slave#(AXI4Lite_ARFlit#(addr_, aruser_),
     AXI4Lite_RFlit#(data_, ruser_)))
     read_slaves   = newVector;
-  for (Integer i = 0; i < valueOf(nSlaves); i = i + 1) begin  
+    for (Integer i = 0; i < valueOf(nSlaves); i = i + 1) begin
     // split to write slaves
     write_slaves[i] = interface Slave;
       interface sink   = splitLiteWrite(slaves[i].aw, slaves[i].w);
@@ -111,5 +112,6 @@ module mkAXI4LiteBus#(
   mkInOrderTwoWayBus(route, read_masters, read_slaves);
 
 endmodule
+*/
 
 `undef PARAMS

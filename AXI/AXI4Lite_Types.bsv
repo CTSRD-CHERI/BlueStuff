@@ -51,33 +51,11 @@ typedef struct {
 instance DefaultValue#(AXI4Lite_AWFlit#(addr_, user_));
   function defaultValue = AXI4Lite_AWFlit { awaddr: ?, awprot: 0, awuser: ? };
 endinstance
-instance Routable#(AXI4Lite_AWFlit#(addr_, awuser_),
-                   AXI4Lite_BFlit#(wuser_),
-                   Bit#(addr_));
-  function routingField(x) = x.awaddr;
-  module mkNoRouteSlave(Slave#( AXI4Lite_AWFlit#(addr_, awuser_)
-                              , AXI4Lite_BFlit#(buser_)));
-    Reg#(AXI4Lite_AWFlit#(addr_, awuser_)) currentReq[2] <- mkCReg(2, ?);
-    Reg#(Bool)                             pendingReq[2] <- mkCReg(2, False);
-    interface sink = interface Sink;
-      method canPut = !pendingReq[0];
-      method put (req) if (!pendingReq[0]) = action
-        currentReq[0] <= req;
-        pendingReq[0] <= True;
-      endaction;
-    endinterface;
-    interface source = interface Source;
-      method canPeek = pendingReq[1];
-      method peek if (pendingReq[1]) = AXI4Lite_BFlit { bresp: DECERR
-                                                      , buser: ? };
-      method drop if (pendingReq[1]) = action
-        pendingReq[1] <= False;
-      endaction;
-    endinterface;
-  endmodule
+instance Has_routingField #(AXI4Lite_AWFlit #(addr_, user_), Bit #(addr_));
+  function routingField (x) = x.awaddr;
 endinstance
-instance DetectLast#(AXI4Lite_AWFlit#(addr_, user_));
-  function detectLast(x) = True;
+instance Has_isLast #(AXI4Lite_AWFlit #(addr_, user_));
+  function isLast = constFn (True);
 endinstance
 
 // Master interfaces
@@ -134,8 +112,8 @@ typedef struct {
 instance DefaultValue#(AXI4Lite_WFlit#(data_, user_));
   function defaultValue = AXI4Lite_WFlit { wdata: ?, wstrb: ~0, wuser: ? };
 endinstance
-instance DetectLast#(AXI4Lite_WFlit#(data_, user_));
-  function detectLast(x) = True;
+instance Has_isLast #(AXI4Lite_WFlit #(data_, user_));
+  function isLast = constFn (True);
 endinstance
 
 // Master interfaces
@@ -190,8 +168,8 @@ typedef struct {
 instance DefaultValue#(AXI4Lite_BFlit#(user_));
   function defaultValue = AXI4Lite_BFlit { bresp: OKAY, buser: ? };
 endinstance
-instance DetectLast#(AXI4Lite_BFlit#(user_));
-  function detectLast(x) = True;
+instance Has_isLast #(AXI4Lite_BFlit #(user_));
+  function isLast = constFn (True);
 endinstance
 
 // Master interfaces
@@ -244,35 +222,11 @@ typedef struct {
 instance DefaultValue#(AXI4Lite_ARFlit#(addr_, user_));
   function defaultValue = AXI4Lite_ARFlit { araddr: ?, arprot: 0, aruser: ? };
 endinstance
-instance Routable#(
-  AXI4Lite_ARFlit#(addr_, aruser_),
-  AXI4Lite_RFlit#(data_, ruser_),
-  Bit#(addr_));
-  function routingField(x) = x.araddr;
-  module mkNoRouteSlave(Slave#( AXI4Lite_ARFlit#(addr_, aruser_)
-                              , AXI4Lite_RFlit#(data_, ruser_)));
-    Reg#(AXI4Lite_ARFlit#(addr_, aruser_)) currentReq[2] <- mkCReg(2, ?);
-    Reg#(Bool)                             pendingReq[2] <- mkCReg(2, False);
-    interface sink = interface Sink;
-      method canPut = !pendingReq[0];
-      method put (req) if (!pendingReq[0]) = action
-        currentReq[0] <= req;
-        pendingReq[0] <= True;
-      endaction;
-    endinterface;
-    interface source = interface Source;
-      method canPeek = pendingReq[1];
-      method peek if (pendingReq[1]) = AXI4Lite_RFlit{ rdata: ?
-                                                     , rresp: DECERR
-                                                     , ruser: ? };
-      method drop if (pendingReq[1]) = action
-        pendingReq[1] <= False;
-      endaction;
-    endinterface;
-  endmodule
+instance Has_routingField #(AXI4Lite_ARFlit #(addr_, user_), Bit #(addr_));
+  function routingField (x) = x.araddr;
 endinstance
-instance DetectLast#(AXI4Lite_ARFlit#(addr_, user_));
-  function detectLast(x) = True;
+instance Has_isLast #(AXI4Lite_ARFlit #(addr_, user_));
+  function isLast = constFn (True);
 endinstance
 
 // Master interfaces
@@ -329,8 +283,8 @@ typedef struct {
 instance DefaultValue#(AXI4Lite_RFlit#(data_, user_));
   function defaultValue = AXI4Lite_RFlit { rdata: ?, rresp: OKAY, ruser: ? };
 endinstance
-instance DetectLast#(AXI4Lite_RFlit#(data_, user_));
-  function detectLast(x) = True;
+instance Has_isLast #(AXI4Lite_RFlit #(data_, user_));
+  function isLast = constFn (True);
 endinstance
 
 // Master interfaces
@@ -595,27 +549,10 @@ typedef struct {
   numeric type data_,
   numeric type awuser_,
   numeric type wuser_) deriving (Bits, FShow);
-instance Routable#(
-  AXI4Lite_WriteFlit#(addr_, data_, awuser_, wuser_),
-  AXI4Lite_BFlit#(buser_),
-  Bit#(addr_)) provisos (
-    Routable#(AXI4Lite_AWFlit#(addr_, awuser_),
-              AXI4Lite_BFlit#(buser_),
-              Bit#(addr_))
-  );
-  function routingField(x) = x.aw.awaddr; // XXX routingField(aw); XXX THIS SHOULD JUST WORK BUT DOESN'T ?!
-  module mkNoRouteSlave (Slave#(
-                           AXI4Lite_WriteFlit#(addr_, data_, awuser_, wuser_),
-                           AXI4Lite_BFlit#(buser_)));
-    Slave#(AXI4Lite_AWFlit#(addr_, awuser_), AXI4Lite_BFlit#(buser_))
-      inner <- mkNoRouteSlave;
-    interface sink = interface Sink;
-      method canPut = inner.sink.canPut;
-      method put (x) = inner.sink.put (x.aw);
-    endinterface;
-    interface source = inner.source;
-  endmodule
+instance Has_routingField #(AXI4Lite_WriteFlit #(addr_, data_, awuser_, wuser_)
+                           , Bit #(addr_));
+  function routingField (x) = routingField (x.aw);
 endinstance
-instance DetectLast#(AXI4Lite_WriteFlit#(addr_, data_, awuser_, wuser_));
-  function detectLast(x) = detectLast(x.w);
+instance Has_isLast #(AXI4Lite_WriteFlit #(addr_, data_, awuser_, wuser_));
+  function isLast = constFn (True);
 endinstance

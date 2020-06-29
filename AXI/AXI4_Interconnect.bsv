@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2019 Alexandre Joannou
+ * Copyright (c) 2018-2020 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -46,86 +46,42 @@ import Routable :: *;
 `define MPARAMS id_, `PARAMS
 `define SPARAMS sid_, `PARAMS
 
-module mkAXI4Bus_Synth#(
-    function Vector#(nRoutes, Bool) route (Bit#(addr_) val),
-    Vector#(nMasters, AXI4_Master_Synth#(`MPARAMS)) masters,
-    Vector#(nSlaves, AXI4_Slave_Synth#(`SPARAMS)) slaves
-  ) (Empty) provisos (
-    Add#(id_, TLog#(nMasters), sid_),
-    Routable#(
-      AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_),
-      AXI4_BFlit#(id_, buser_),
-      Bit#(addr_)),
-    Routable#(
-      AXI4_ARFlit#(id_, addr_, aruser_),
-      AXI4_RFlit#(id_, data_, ruser_),
-      Bit#(addr_)),
-    ExpandReqRsp#(
-      AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_),
-      AXI4_WriteFlit#(sid_, addr_, data_, awuser_, wuser_),
-      AXI4_BFlit#(sid_, buser_),
-      AXI4_BFlit#(id_, buser_),
-      Bit#(TLog#(nMasters))),
-    ExpandReqRsp#(
-      AXI4_ARFlit#(id_, addr_, aruser_),
-      AXI4_ARFlit#(sid_, addr_, aruser_),
-      AXI4_RFlit#(sid_, data_, ruser_),
-      AXI4_RFlit#(id_, data_, ruser_),
-      Bit#(TLog#(nMasters))),
-    // assertion on argument sizes
-    Add#(1, a__, nMasters), // at least one master is needed
-    Add#(1, b__, nSlaves), // at least one slave is needed
-    Add#(nRoutes, 0, nSlaves) // nRoutes == nSlaves
-  );
-  let msNoSynth <- mapM(fromAXI4_Master_Synth, masters);
-  let ssNoSynth <- mapM(fromAXI4_Slave_Synth, slaves);
-  mkAXI4Bus(route, msNoSynth, ssNoSynth);
+module mkAXI4Bus_Synth #(
+  function Vector #(nSlaves, Bool) route (Bit #(addr_) val)
+, Vector #(nMasters, AXI4_Master_Synth #(`MPARAMS)) masters
+, Vector #(nSlaves,  AXI4_Slave_Synth  #(`SPARAMS)) slaves
+) (Empty) provisos (
+  Add #(1, a__, nSlaves)
+, Add #(1, b__, nMasters)
+, Add #(id_, TLog #(nMasters), sid_)
+);
+  let msNoSynth <- mapM (fromAXI4_Master_Synth, masters);
+  let ssNoSynth <- mapM (fromAXI4_Slave_Synth,  slaves);
+  mkAXI4Bus (route, msNoSynth, ssNoSynth);
 endmodule
 
-module mkAXI4Bus#(
-    function Vector#(nRoutes, Bool) route (Bit#(addr_) val),
-    Vector#(nMasters, AXI4_Master#(`MPARAMS)) masters,
-    Vector#(nSlaves, AXI4_Slave#(`SPARAMS)) slaves
-  ) (Empty) provisos (
-    Add#(id_, TLog#(nMasters), sid_),
-    Routable#(
-      AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_),
-      AXI4_BFlit#(id_, buser_),
-      Bit#(addr_)),
-    Routable#(
-      AXI4_ARFlit#(id_, addr_, aruser_),
-      AXI4_RFlit#(id_, data_, ruser_),
-      Bit#(addr_)),
-    ExpandReqRsp#(
-      AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_),
-      AXI4_WriteFlit#(sid_, addr_, data_, awuser_, wuser_),
-      AXI4_BFlit#(sid_, buser_),
-      AXI4_BFlit#(id_, buser_),
-      Bit#(TLog#(nMasters))),
-    ExpandReqRsp#(
-      AXI4_ARFlit#(id_, addr_, aruser_),
-      AXI4_ARFlit#(sid_, addr_, aruser_),
-      AXI4_RFlit#(sid_, data_, ruser_),
-      AXI4_RFlit#(id_, data_, ruser_),
-      Bit#(TLog#(nMasters))),
-    // assertion on argument sizes
-    Add#(1, a__, nMasters), // at least one master is needed
-    Add#(1, b__, nSlaves), // at least one slave is needed
-    Add#(nRoutes, 0, nSlaves) // nRoutes == nSlaves
-  );
+module mkAXI4Bus #(
+  function Vector #(nSlaves, Bool) route (Bit #(addr_) val)
+, Vector #(nMasters, AXI4_Master #(`MPARAMS)) masters
+, Vector #(nSlaves,  AXI4_Slave  #(`SPARAMS)) slaves
+) (Empty) provisos (
+  Add #(1, a__, nSlaves)
+, Add #(1, b__, nMasters)
+, Add #(id_, TLog #(nMasters), sid_)
+);
 
   // prepare masters
-  Vector#(nMasters,
-    Master#(AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_),
-            AXI4_BFlit#(id_, buser_))
-  ) write_masters = newVector;
-  Vector#(nMasters,
-    Master#(AXI4_ARFlit#(id_, addr_, aruser_), AXI4_RFlit#(id_, data_, ruser_))
-  ) read_masters = newVector;
-  for (Integer i = 0; i < valueOf(nMasters); i = i + 1) begin
-    Bit#(TLog#(nMasters)) mid = fromInteger(i);
+  Vector #( nMasters
+          , Master #( AXI4_WriteFlit #(id_, addr_, data_, awuser_, wuser_)
+                    , AXI4_BFlit #(id_, buser_)))
+    write_masters = newVector;
+  Vector #(nMasters, Master #( AXI4_ARFlit #(id_, addr_, aruser_)
+                             , AXI4_RFlit #(id_, data_, ruser_)))
+    read_masters = newVector;
+  for (Integer i = 0; i < valueOf (nMasters); i = i + 1) begin
+    Bit #(TLog #(nMasters)) mid = fromInteger (i);
     // merge from write masters
-    let merged <- mergeWrite(masters[i].aw, masters[i].w);
+    let merged <- mergeWrite (masters[i].aw, masters[i].w);
     write_masters[i] = interface Master;
       interface source = merged;
       interface sink   = masters[i].b;
@@ -137,16 +93,16 @@ module mkAXI4Bus#(
   end
 
   // prepare slaves
-  Vector#(nSlaves,
-    Slave#(AXI4_WriteFlit#(sid_, addr_, data_, awuser_, wuser_),
-           AXI4_BFlit#(sid_, buser_))
-  ) write_slaves = newVector;
-  Vector#(nSlaves,
-    Slave#(AXI4_ARFlit#(sid_, addr_, aruser_), AXI4_RFlit#(sid_, data_, ruser_))
-  ) read_slaves = newVector;
-  for (Integer i = 0; i < valueOf(nSlaves); i = i + 1) begin  
+  Vector #( nSlaves
+          , Slave #( AXI4_WriteFlit #(sid_, addr_, data_, awuser_, wuser_)
+                   , AXI4_BFlit #(sid_, buser_)))
+    write_slaves = newVector;
+  Vector #(nSlaves, Slave #( AXI4_ARFlit #(sid_, addr_, aruser_)
+                           , AXI4_RFlit #(sid_, data_, ruser_)))
+    read_slaves = newVector;
+  for (Integer i = 0; i < valueOf (nSlaves); i = i + 1) begin
     // split to write slaves
-    let split <- splitWrite(slaves[i].aw, slaves[i].w);
+    let split <- splitWrite (slaves[i].aw, slaves[i].w);
     write_slaves[i] = interface Slave;
       interface sink   = split;
       interface source = slaves[i].b;
@@ -158,7 +114,11 @@ module mkAXI4Bus#(
   end
 
   // connect with standard busses
-  mkTwoWayBus(route, write_masters, write_slaves);
-  mkTwoWayBus(route, read_masters, read_slaves);
+  mkRelaxedTwoWayBus (route, write_masters, write_slaves);
+  mkRelaxedTwoWayBus (route, read_masters,  read_slaves);
 
 endmodule
+
+`undef PARAMS
+`undef MPARAMS
+`undef SPARAMS

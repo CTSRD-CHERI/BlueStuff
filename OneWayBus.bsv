@@ -29,23 +29,66 @@
 package OneWayBus;
 
 export mkOneWayBus;
+export mkOneWayBusNoRoute;
 
-import SourceSink :: *;
-import Routable :: *;
+import Routable      :: *;
+import SourceSink    :: *;
 import OneHotArbiter :: *;
 
 import Vector :: *;
 
-/////////////////
-// One-way bus //
+///////////////////////////////
+// One-way bus core wrappers //
 ////////////////////////////////////////////////////////////////////////////////
-// Simple bus receiving both a flit and a one-hot vector of Bool identifying a
-// unique destination
-module mkOneWayBus #(Vector #(nI, in_t) ins, Vector #(nO, out_t) outs) (Empty)
-  provisos (
-  ToSource #(in_t, Tuple2 #(flit_t, Vector #(nO, Bool)))
+module mkOneWayBus #(
+  function Vector #(nO, Bool) route (r_t x) // the routing function to use
+, Vector #(nI, in_t)  ins                   // the inputs
+, Vector #(nO, out_t) outs                  // the outputs
+) (Empty) provisos (
+  ToSource #(in_t,  flit_t)
+, ToSink   #(out_t, flit_t)
+, Routable #(flit_t, r_t)
+, Bits #(flit_t, flit_sz)
+  // assertion on argument sizes
+, Add #(1, a__, nI) // at least one input is needed
+, Add #(1, b__, nO) // at least one output is needed
+);
+  mkOneWayBus_core (route, Invalid, ins, outs);
+endmodule
+module mkOneWayBusNoRoute #(
+  function Vector #(nO, Bool) route (r_t x) // the routing function to use
+, out_t dflt_out                            // the default output on route fail
+, Vector #(nI, in_t)  ins                   // the inputs
+, Vector #(nO, out_t) outs                  // the outputs
+) (Empty) provisos (
+  ToSource #(in_t,  flit_t)
+, ToSink   #(out_t, flit_t)
+, Routable #(flit_t, r_t)
+, Bits #(flit_t, flit_sz)
+  // assertion on argument sizes
+, Add #(1, a__, nI) // at least one input is needed
+, Add #(1, b__, nO) // at least one output is needed
+);
+  mkOneWayBus_core (route, Valid (toSink (dflt_out)), ins, outs);
+endmodule
+
+/////////////////////////////
+// One-way bus core module //
+////////////////////////////////////////////////////////////////////////////////
+module mkOneWayBus_core #(
+  // 1st arg - routing function
+  function Vector #(nO, Bool) route (r_t x)
+  // 2nd arg - Default output to use on route failure
+, Maybe #(Sink #(flit_t)) m_dfltOutputSnk
+  // 3rd arg - all inputs
+, Vector #(nI, in_t) ins
+  // 4th arg - all outputs
+, Vector #(nO, out_t) outs
+) (Empty) provisos (
+  ToSource #(in_t, flit_t)
 , ToSink #(out_t, flit_t)
-, Bits #(flit_t, flit_sz), DetectLast #(flit_t)
+, Routable #(flit_t, r_t)
+, Bits #(flit_t, flit_sz)
   // assertion on argument sizes
 , Add #(1, a__, nI) // at least one input is needed
 , Add #(1, b__, nO) // at least one output is needed
@@ -58,25 +101,70 @@ module mkOneWayBus #(Vector #(nI, in_t) ins, Vector #(nO, out_t) outs) (Empty)
   let verbose_inputs         = False;
   let verbose_ouptuts        = False;
 
-  // convert inputs and outputs vector arguments to Source and Sink
-  function f (x) = toUnguardedSource (x, ?);
-  let  inputSrc <- mapM (f, ins);
-  let outputSnk <- mapM (toUnguardedSink, outs);
-  function srcCanPeek (src) = src.canPeek;
-  function  snkCanPut (snk) = snk.canPut;
-  let inputSrcCanPeek = map (srcCanPeek, inputSrc);
-  let outputSnkCanPut = map (snkCanPut, outputSnk);
+  /////////////////////////////
+  // boilerplate definitions //
+  //////////////////////////////////////////////////////////////////////////////
+
+  // helper function to detect valid one hot routes
+  function isOneHot (x) = countIf (id, x) == 1;
+
+  // statically detect if we are using a default no route sink or not
+  let has_dflt_output = isValid (m_dfltOutputSnk);
+
+  // Prepare wires to carry values from and to the inputs and outputs
+
+  // declare input wires
+  let inputSrc = map (toSource, ins);
+  Vector #(nI, Wire #(Bool))
+    inputCanPeek <- replicateM (mkDWire (False));
+  Vector #(nI, Wire #(flit_t))
+    inputPeek <- replicateM (mkDWire (?));
+  Vector #(nI, Wire #(Vector #(nO, Bool)))
+    inputDest <- replicateM (mkDWire (?));
+  // assign input wires
+  for (Integer i = 0; i < valueOf (nI); i = i + 1) begin
+    (* no_implicit_conditions, fire_when_enabled *)
+    rule set_input_canPeek_wire;
+      inputCanPeek[i] <= inputSrc[i].canPeek;
+    endrule
+    (* fire_when_enabled *)
+    rule set_input_peek_wires;
+      inputPeek[i] <= inputSrc[i].peek;
+      inputDest[i] <= compose (route, routingField) (inputSrc[i].peek);
+    endrule
+  end
+  // declare output wires
+  let outputSnk = map (toSink, outs);
+  Vector #(nO, Wire #(Bool)) outputCanPut <- replicateM (mkDWire (False));
+  let dfltOutputSnk = m_dfltOutputSnk.Valid;
+  Wire #(Bool) dfltOutputCanPut <- mkDWire (False);
+  // assign output wires
+  for (Integer i = 0; i < valueOf (nO); i = i + 1) begin
+    (* no_implicit_conditions, fire_when_enabled *)
+    rule set_output_canPut_wire;
+      outputCanPut[i] <= outputSnk[i].canPut;
+    endrule
+  end
+  if (has_dflt_output) begin
+    (* no_implicit_conditions, fire_when_enabled *)
+    rule set_dflt_output_canPut_wire;
+      dfltOutputCanPut <= dfltOutputSnk.canPut;
+    endrule
+  end
+
+  // Helper function to read a vector of Wires
+  function readVWire = readVReg;
 
   // This register keeps track of multi-flit packets, with their provenance and
   // their destination. Change in destination between flits of a same packet is
-  // not supported and the information in this register will be used to check
-  // consistency in destination of follow flits in an assertion rule if
-  // "inputs_assertion_rules" is True
+  // not supported
   Reg #(Maybe #(Tuple2 #(Vector #(nI, Bool), Vector #(nO, Bool))))
     moreFlits <- mkReg(Invalid);
   // These wires are used to carry a flit from a selected input to each of the
   // potential outputs. Only one is expected to be valid in a given cycle.
   Vector #(nO, RWire #(flit_t)) toOutput <- replicateM (mkRWire);
+  // In case of un-routable flit, carry the flit to a default no-route output.
+  RWire #(flit_t) toDfltOutput <- mkRWire;
 
   /////////////////
   // arbitration //
@@ -86,11 +174,15 @@ module mkOneWayBus #(Vector #(nI, in_t) ins, Vector #(nO, out_t) outs) (Empty)
   // a request available, the requested destination is compared with the
   // available outputs. If the destination output is available, the request is
   // considered active as far as arbitration is concerned.
+  // In the case where a default slave is available, consider invalid
+  // destinations for active requests as well.
+  function canUseRoute (x) =
+       (has_dflt_output && !isOneHot (x) && dfltOutputCanPut)
+    || \or (zipWith (\&& , x, readVWire (outputCanPut)));
   Vector #(nI, Bool) activeRequest = replicate (False);
-  for (Integer i = 0; i < valueOf(nI); i = i + 1) if (inputSrcCanPeek[i]) begin
-    match {._, .dest} = inputSrc[i].peek;
-    activeRequest[i] = \or (zipWith (\&& , dest, outputSnkCanPut));
-  end
+  for (Integer i = 0; i < valueOf(nI); i = i + 1) if (inputCanPeek[i])
+    activeRequest[i] = canUseRoute (inputDest[i]);
+
   // Determine the selected input with a one hot arbiter when the bus is not
   // already transferring a multi-flit packet. The arbiter receives the
   // activeRequest vector and produces on the selectInput wire a one hot vector
@@ -129,76 +221,80 @@ module mkOneWayBus #(Vector #(nI, in_t) ins, Vector #(nO, out_t) outs) (Empty)
 
   Rules inputRules = emptyRules;
   for (Integer i = 0; i < valueOf (nI); i = i + 1) begin
-    // handles on flit and desired destination from the input
-    match {.flit, .dest} = inputSrc[i].peek;
     // handles on active input and output. Only useful when in a multi-flit.
     match {.from, .to} = moreFlits.Valid;
     if (verbose_inputs) begin
       rule input_debug;
         $display ( "%0t -- %m debug: input#%0d -- ", $time, i
-                 , "inputSrcCanPeek: ", fshow (inputSrcCanPeek[i])
-                 , ", dest: ", fshow (dest)
+                 , "inputCanPeek: ", fshow (inputCanPeek[i])
+                 , ", inputDest: ", fshow (inputDest[i])
                  , ", selectInput: ", fshow (selectInput[i]));
       endrule
     end
     /////////////////////
     // assertion rules //
     /////////////////////
-    if (inputs_assertion_rules) begin
-      rule arbitration_fail (selectInput[i] && !inputSrcCanPeek[i]);
-        $display ( "%0t -- %m error: input#%0d ", $time, i
-                 , "was selected but did not emit a request");
-        $finish (0);
-      endrule
-      rule legal_destination_fail ( selectInput[i]
-                                 && inputSrcCanPeek[i]
-                                 && (countIf (id, dest) != 1));
-        $display ( "%0t -- %m error: input#%0d ", $time, i
-                 , "requested an invalid destination: "
-                 , fshow (dest), " (not a valid one-hot destination)");
-        $finish (0);
-      endrule
-      rule follow_destination_fail (isValid (moreFlits) && inputSrcCanPeek[i]
-                                                        && dest != to);
-        $display ( "%0t -- %m error: input#%0d ", $time, i
-                 , "emitted a follow flit to destination ", fshow (dest)
-                 , " but the initial flit targeted ", fshow (to));
-        $finish (0);
-      endrule
-    end
+    rule arbitration_fail (inputs_assertion_rules && selectInput[i] && !inputCanPeek[i]);
+      $display ( "%0t -- %m error: input#%0d ", $time, i
+               , "was selected but did not emit a request");
+      $finish (0);
+    endrule
+    rule legal_destination_fail ( inputs_assertion_rules
+                               && !has_dflt_output
+                               && selectInput[i]
+                               && inputCanPeek[i]
+                               && !isOneHot (inputDest[i]));
+      $display ( "%0t -- %m error: input#%0d ", $time, i
+               , "requested an invalid destination: "
+               , fshow (inputDest[i]), " (not a valid one-hot destination)");
+      $finish (0);
+    endrule
     ////////////////////////////////
     // actual functionality rules //
     ////////////////////////////////
     inputRules = rJoinMutuallyExclusive (inputRules, rules
       (* mutually_exclusive = "input_first_flit, input_follow_flit" *)
       rule input_first_flit (!isValid (moreFlits) && selectInput[i]
-                                                  && inputSrcCanPeek[i]);
+                                                  && inputCanPeek[i]);
         if (verbose_inputs) $display (
           "%0t -- %m debug: input_first_flit#%0d - ", $time, i
-        , "dest: ", fshow (dest));
+        , "inputDest: ", fshow (inputDest[i]));
         // consume from the input
         inputSrc[i].drop;
-        // forward the flit to the desired destination output
-        zipWithM_ (forwardFlit (flit), dest, toOutput);
+        // forward the flit to the desired destination (default output in case
+        // of non routable flit)
+        if (!isOneHot (inputDest[i])) toDfltOutput.wset (inputPeek[i]);
+        else zipWithM_ (forwardFlit (inputPeek[i]), inputDest[i], toOutput);
         // update next state of the bus in case of multi-flit transaction
-        if (!detectLast (flit)) begin
+        if (!isLast (inputPeek[i])) begin
           let newFrom = replicate (False);
           newFrom[i] = True;
-          moreFlits <= Valid (tuple2 (newFrom, dest));
+          moreFlits <= Valid (tuple2 (newFrom, inputDest[i]));
+          if (verbose_inputs) $display (
+            "%0t -- %m debug: input_first_flit#%0d - ", $time, i
+          , "starting multi-flit packet");
         end
       endrule
-      rule input_follow_flit (isValid (moreFlits)
-                              && from[i] && inputSrcCanPeek[i]
-                              && \or (zipWith (\&& , dest, outputSnkCanPut)));
+      rule input_follow_flit (
+           isValid (moreFlits)
+        && from[i] && inputCanPeek[i]
+        && canUseRoute (to));
         if (verbose_inputs) $display (
           "%0t -- %m debug: input_follow_flit#%0d - ", $time, i
-        , "dest: ", fshow (dest));
+        , "to: ", fshow (to));
         // consume from the input
         inputSrc[i].drop;
-        // forward the flit to the desired destination output
-        zipWithM_ (forwardFlit (flit), dest, toOutput);
+        // forward the flit to the desired destination (default output in case
+        // of non routable flit)
+        if (!isOneHot (to)) toDfltOutput.wset (inputPeek[i]);
+        else zipWithM_ (forwardFlit (inputPeek[i]), to, toOutput);
         // update next state of the bus on end of multi-flit transaction
-        if (detectLast (flit)) moreFlits <= Invalid;
+        if (isLast (inputPeek[i])) begin
+          moreFlits <= Invalid;
+          if (verbose_inputs) $display (
+            "%0t -- %m debug: input_follow_flit#%0d - ", $time, i
+            , "ending multi-flit packet");
+        end
       endrule
     endrules);
   end
@@ -218,15 +314,35 @@ module mkOneWayBus #(Vector #(nI, in_t) ins, Vector #(nO, out_t) outs) (Empty)
     if (verbose_ouptuts) begin
       rule output_debug;
         $display ( "%0t -- %m debug: output#%0d -- ", $time, i
-                 , "outputSnkCanPut: ", fshow (outputSnkCanPut[i])
+                 , "outputCanPut: ", fshow (outputCanPut[i])
                  , ", toOutput: ", fshow (isValid (toOutput[i].wget)));
       endrule
     end
     outputRules = rJoinMutuallyExclusive (outputRules, rules
-      rule output_selected (isValid (toOutput[i].wget) && outputSnkCanPut[i]);
+      rule output_selected (isValid (toOutput[i].wget) && outputCanPut[i]);
         if (verbose_ouptuts) $display (
           "%0t -- %m debug: output_selected#%0d", $time, i);
         outputSnk[i].put (toOutput[i].wget.Valid);
+      endrule
+    endrules);
+  end
+
+  // Additionally, we handle the default output targeted in case no route was
+  // found.
+  if (has_dflt_output) begin
+    if (verbose_ouptuts) begin
+      rule dflt_output_debug;
+        $display ( "%0t -- %m debug: dflt_output -- ", $time
+                 , "dfltOutputCanPut: ", fshow (dfltOutputCanPut)
+                 , ", toDfltOutput: ", fshow (isValid (toDfltOutput.wget)));
+      endrule
+    end
+    outputRules = rJoinMutuallyExclusive (outputRules, rules
+      rule dflt_output_selected (  isValid (toDfltOutput.wget)
+                                && dfltOutputCanPut);
+        if (verbose_ouptuts) $display (
+          "%0t -- %m debug: dflt_output_selected", $time);
+        dfltOutputSnk.put (toDfltOutput.wget.Valid);
       endrule
     endrules);
   end
