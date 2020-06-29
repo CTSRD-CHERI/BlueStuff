@@ -29,6 +29,7 @@
 package TwoWayBus;
 
 export mkTwoWayBus;
+export mkRelaxedTwoWayBus;
 export mkInOrderTwoWayBus;
 
 import Routable    :: *;
@@ -42,267 +43,190 @@ import Vector :: *;
 /////////////////
 // Two-Way Bus //
 ////////////////////////////////////////////////////////////////////////////////
-// master wrapper state enum
-typedef enum {
-  UNALLOCATED, ALLOCATED, DRAIN
-} MasterWrapperState deriving (Bits, Eq);
-// slave wrapper state enum
-typedef enum {
-  UNALLOCATED, ALLOCATED
-} SlaveWrapperState deriving (Bits, Eq);
-module mkTwoWayBus#(
-    function Vector#(nRoutes, Bool) route (routing_t val),
-    Vector#(nMasters, Master#(m2s_a, s2m_b)) ms,
-    Vector#(nSlaves, Slave#(m2s_b, s2m_a)) ss
-  ) (Empty) provisos (
-    Bits#(m2s_a, m2s_a_sz), Bits#(s2m_b, s2m_b_sz),
-    Bits#(m2s_b, m2s_b_sz), Bits#(s2m_a, s2m_a_sz),
-    ExpandReqRsp#(m2s_a, m2s_b, s2m_a, s2m_b, Bit#(TLog#(nMasters))),
-    Routable#(m2s_a, s2m_b, routing_t),
-    DetectLast#(m2s_b), DetectLast#(s2m_b),
-    // assertion on argument sizes
-    Add#(1, a__, nMasters), // at least one Master is needed
-    Add#(1, b__, nSlaves), // at least one slave is needed
-    Add#(nRoutes, 0, nSlaves) // nRoutes == nSlaves
-  );
+module mkTwoWayBus #(
+  function Vector #(nSlvs, Bool)  routeUp    (r_up_t x)
+, function Vector #(nMsts, Bool)  routeDown  (r_down_t x)
+, slave_t                         noRouteSlv
+, function module #(inner_master) wrapMaster ( master_t m
+                                             , Integer idx)
+, function module #(inner_slave)  wrapSlave  (slave_t s)
+, Vector #(nMsts, master_t)       ms
+, Vector #(nSlvs,  slave_t)       ss
+) (Empty) provisos (
+  Bits #(req_t,     req_sz),       Bits #(rsp_t,     rsp_sz)
+, Bits #(inner_req, inner_req_sz), Bits #(inner_rsp, inner_rsp_sz)
+, Bits #(req_fat_t, req_fat_sz),   Bits #(rsp_fat_t, rsp_fat_sz)
+, Routable #(inner_req, r_up_t)
+, Routable #(inner_rsp, r_down_t)
+  // type aliases
+, Alias #(master_t,     Master #(req_t,     rsp_t))
+, Alias #(inner_master, Master #(inner_req, inner_rsp))
+, Alias #(inner_slave,  Slave  #(inner_req, inner_rsp))
+, Alias #(slave_t,      Slave  #(req_fat_t, rsp_fat_t))
+  // assertion on argument sizes
+, Add #(1, a__, nMsts) // at least one Master is needed
+, Add #(1, b__, nSlvs) // at least one slave is needed
+);
 
-  // for each master...
-  //////////////////////////////////////////////////////////////////////////////
-  module wrapMaster#(Master#(m2s_a, s2m_b) m, Bit#(TLog#(nMasters)) mid)
-    (Master#(Tuple2#(m2s_b, Vector#(nSlaves, Bool)), s2m_b));
-    FIFOF#(Tuple2#(m2s_b, Vector#(nSlaves, Bool))) innerReq   <- mkFIFOF;
-    FIFOF#(s2m_b)                                  noRouteRsp <- mkFIFOF;
-    Slave#(m2s_a, s2m_b)                           noRoute    <- mkNoRouteSlave;
-    Reg#(MasterWrapperState)                       state      <- mkReg(UNALLOCATED);
-    PulseWire                                      fwdRsp     <- mkPulseWire;
-    // inner signals
-    Source#(m2s_a) src = m.source;
-    Sink#(s2m_b) snk <- toUnguardedSink(m.sink);
-    m2s_a req = src.peek;
-    m2s_b fatReq = expand(req, mid);
-    Vector#(nSlaves, Bool) dest = route(routingField(req));
-    Bool isRoutable = countIf(id, dest) == 1;
-    // consume different kinds of flits
-    (* mutually_exclusive = "firstFlit, followFlits, nonRoutableFlit, drainFlits" *)
-    (* mutually_exclusive = "firstFlit, followFlits, nonRoutableGenRsp, drainFlits" *)
-    rule firstFlit (state == UNALLOCATED && src.canPeek && isRoutable);
-      src.drop;
-      innerReq.enq(tuple2(fatReq, dest));
-      if (!detectLast(fatReq)) state <= ALLOCATED;
-    endrule
-    rule followFlits (state == ALLOCATED && src.canPeek);
-      src.drop;
-      innerReq.enq(tuple2(fatReq, dest));
-      if (detectLast(fatReq)) state <= UNALLOCATED;
-    endrule
-    (* descending_urgency = "nonRoutableGenRsp, nonRoutableFlit" *)
-    rule nonRoutableFlit (state == UNALLOCATED && src.canPeek && !isRoutable);
-      noRoute.sink.put(req);
-    endrule
-    rule nonRoutableGenRsp;
-      let rsp <- get(noRoute.source);
-      noRouteRsp.enq(rsp);
-      if (detectLast(rsp)) begin
-        src.drop;
-        if (!detectLast(fatReq)) state <= DRAIN;
-      end
-    endrule
-    rule drainFlits (state == DRAIN);
-      src.drop;
-      if (detectLast(fatReq)) state <= UNALLOCATED;
-    endrule
-    // sink of responses
-    rule drainNoRouteResponse (!fwdRsp && snk.canPut && noRouteRsp.notEmpty);
-      noRouteRsp.deq;
-      snk.put(noRouteRsp.first);
-    endrule
-    // interface
-    interface source = toSource(innerReq);
-    interface sink = interface Sink;
-      method canPut   = snk.canPut;
-      method put(x) if (snk.canPut) = action
-        fwdRsp.send;
-        snk.put(x);
-      endaction;
-    endinterface;
-  endmodule
-  Vector#(nMasters, Master#(Tuple2#(m2s_b, Vector#(nSlaves, Bool)), s2m_b))
-    innerMasters = newVector;
-  for (Integer i = 0; i < valueOf(nMasters); i = i + 1)
-    innerMasters[i] <- wrapMaster(ms[i], fromInteger(i));
-
-  // for each slave...
-  //////////////////////////////////////////////////////////////////////////////
-  module wrapSlave#(Slave#(m2s_b, s2m_a) s)
-    (Slave#(m2s_b, Tuple2#(s2m_b, Vector#(nMasters, Bool))));
-    // inner signals
-    FIFOF#(Tuple2#(s2m_b, Vector#(nMasters, Bool))) rspBack <- mkFIFOF;
-    Source#(s2m_a) src = s.source;
-    Reg#(SlaveWrapperState) state <- mkReg(UNALLOCATED);
-    // consume different kinds of flits
-    (* mutually_exclusive = "firstFlit, followFlits" *)
-    rule firstFlit (state == UNALLOCATED && src.canPeek);
-      s2m_a rspFat <- get(src);
-      match {.rsp, .dest} = shrink(rspFat);
-      rspBack.enq(tuple2(rsp, unpack(1 << dest)));
-      if (!detectLast(rsp)) state <= ALLOCATED;
-    endrule
-    rule followFlits (state == ALLOCATED && src.canPeek);
-      s2m_a rspFat <- get(src);
-      match {.rsp, .dest} = shrink(rspFat);
-      rspBack.enq(tuple2(rsp, unpack(1 << dest)));
-      if (detectLast(rsp)) state <= UNALLOCATED;
-    endrule
-    // interface
-    interface sink = s.sink;
-    interface source = toSource(rspBack);
-  endmodule
-  Vector#(nSlaves, Slave#(m2s_b, Tuple2#(s2m_b, Vector#(nMasters, Bool))))
-    innerSlaves = newVector;
-  for (Integer i = 0; i < valueOf(nSlaves); i = i + 1)
-    innerSlaves[i] <- wrapSlave(ss[i]);
+  let innerMasters    <- zipWithM  (wrapMaster, ms, genVector);
+  let innerSlaves     <- mapM      (wrapSlave, ss);
+  let innerNoRouteSlv <- wrapSlave (noRouteSlv);
 
   // Master to Slave bus
   //////////////////////////////////////////////////////////////////////////////
-  mkOneWayBus ( map (getMasterSource, innerMasters)
-              , map (getSlaveSink, innerSlaves));
+  mkOneWayBusNoRoute ( routeUp
+                     , getSlaveSink (innerNoRouteSlv)
+                     , map (getMasterSource, innerMasters)
+                     , map (getSlaveSink, innerSlaves));
+
   // Slave to Master bus
   //////////////////////////////////////////////////////////////////////////////
-  mkOneWayBus ( map (getSlaveSource, innerSlaves)
+  mkOneWayBus ( routeDown
+              , map (getSlaveSource, cons (innerNoRouteSlv, innerSlaves))
               , map (getMasterSink, innerMasters));
 
 endmodule
 
-//////////////////////////
-// In Order Two-Way Bus //
+/////////////////////////
+// Relaxed Two-Way Bus //
 ////////////////////////////////////////////////////////////////////////////////
-// type to wrap the route back to the initiating master
-typedef struct {
-  Vector#(n, Bool) path;
-  t flit;
-} UpFlit#(type t, numeric type n) deriving (Bits);
-instance DetectLast#(UpFlit#(t, n)) provisos (DetectLast#(t));
-  function detectLast(x) = detectLast(x.flit);
-endinstance
-module mkInOrderTwoWayBus#(
-    function Vector#(nRoutes, Bool) route (routing_t val),
-    Vector#(nMasters, Master#(m2s_t, s2m_t)) ms,
-    Vector#(nSlaves, Slave#(m2s_t, s2m_t)) ss
+module mkRelaxedTwoWayBus #( function Vector #(n_slaves, Bool) route (r_up_t x)
+                           , Vector #(n_masters, master_t) ms
+                           , Vector #(n_slaves,  slave_t) ss
   ) (Empty) provisos (
-    Bits#(m2s_t, m2s_sz), Bits#(s2m_t, s2m_sz),
-    Routable#(m2s_t, s2m_t, routing_t),
-    DetectLast#(m2s_t), DetectLast#(s2m_t),
+    Bits #(req_t,     req_sz),       Bits #(rsp_t,     rsp_sz)
+  , Bits #(inner_req, inner_req_sz), Bits #(inner_rsp, inner_rsp_sz)
+  , Bits #(req_fat_t, req_fat_sz),   Bits #(rsp_fat_t, rsp_fat_sz)
+  , Routable #(inner_req, r_up_t)
+  , Routable #(inner_rsp, r_down_t)
+  , FallibleRoute #(req_fat_t, rsp_fat_t)
+  , ExpandableReqRsp #(req_t, req_fat_t, rsp_fat_t, rsp_t, n_masters)
+    // type aliases
+  , Alias #(r_down_t,     Bit #(TLog #(n_masters)))
+  , Alias #(inner_req,    WithMetaInfo  #(req_t, r_down_t))
+  , Alias #(inner_rsp,    WithRouteInfo #(rsp_t, r_down_t))
+  , Alias #(master_t,     Master #(req_t,     rsp_t))
+  , Alias #(inner_master, Master #(inner_req, inner_rsp))
+  , Alias #(inner_slave,  Slave  #(inner_req, inner_rsp))
+  , Alias #(slave_t,      Slave  #(req_fat_t, rsp_fat_t))
     // assertion on argument sizes
-    Add#(1, a__, nMasters), // at least one Master is needed
-    Add#(1, b__, nSlaves), // at least one slave is needed
-    Add#(nRoutes, 0, nSlaves) // nRoutes == nSlaves
+  , Add #(1, a__, n_masters) // at least one Master is needed
+  , Add #(1, b__, n_slaves)  // at least one slave is needed
   );
 
-  // for each master...
-  //////////////////////////////////////////////////////////////////////////////
-  module wrapMaster#(Master#(m2s_t, s2m_t) m, Vector#(nMasters, Bool) orig)
-    (Master#(Tuple2#(UpFlit#(m2s_t, nMasters), Vector#(nSlaves, Bool)), s2m_t));
-    FIFOF#(Tuple2#(UpFlit#(m2s_t, nMasters), Vector#(nSlaves, Bool)))
-      innerReq <- mkFIFOF;
-    FIFOF#(Maybe#(s2m_t))            innerRsp   <- mkFIFOF;
-    Slave#(m2s_t, s2m_t)             noRoute    <- mkNoRouteSlave;
-    Reg#(MasterWrapperState)         state      <- mkReg(UNALLOCATED);
-    // inner signals
-    Source#(m2s_t) src = m.source;
-    Sink#(s2m_t) snk <- toUnguardedSink(m.sink);
-    Vector#(nSlaves, Bool) dest = route(routingField(src.peek));
-    Bool isRoutable = countIf(id, dest) == 1;
-    // consume different kinds of flits
-    (* mutually_exclusive = "firstFlit, followFlits, nonRoutableFlit, drainFlits" *)
-    (* mutually_exclusive = "firstFlit, followFlits, nonRoutableGenRsp, drainFlits" *)
-    rule firstFlit (state == UNALLOCATED && src.canPeek && isRoutable);
-      let req <- get(src);
-      innerReq.enq(tuple2(UpFlit {path: orig, flit: req}, dest));
-      innerRsp.enq(Invalid);
-      if (!detectLast(req)) state <= ALLOCATED;
-    endrule
-    rule followFlits (state == ALLOCATED && src.canPeek);
-      let req <- get(src);
-      innerReq.enq(tuple2(UpFlit {path: orig, flit: req}, dest));
-      if (detectLast(req)) state <= UNALLOCATED;
-    endrule
-    (* descending_urgency = "nonRoutableGenRsp, nonRoutableFlit" *)
-    rule nonRoutableFlit (state == UNALLOCATED && src.canPeek && !isRoutable);
-      noRoute.sink.put(src.peek);
-    endrule
-    rule nonRoutableGenRsp;
-      let rsp <- get(noRoute.source);
-      innerRsp.enq(Valid(rsp));
-      if (detectLast(rsp)) begin
-        src.drop;
-        if (!detectLast(src.peek)) state <= DRAIN;
-      end
-    endrule
-    rule drainFlits (state == DRAIN);
-      let req <- get(src);
-      if (detectLast(req)) state <= UNALLOCATED;
-    endrule
-    // sink of responses
-    rule drainInnerResponse (innerRsp.notEmpty && isValid(innerRsp.first) && snk.canPut);
-      innerRsp.deq;
-      snk.put(innerRsp.first.Valid);
-    endrule
-    // interface
-    interface source = toSource(innerReq);
-    interface sink = interface Sink;
-      method canPut   = innerRsp.notEmpty && !isValid(innerRsp.first) && snk.canPut;
-      method put(x) if (innerRsp.notEmpty && !isValid(innerRsp.first) && snk.canPut) = action
-        snk.put(x);
-        if (detectLast(x)) innerRsp.deq;
-      endaction;
-    endinterface;
+  // the wrapper for a master:
+  // - augments requests with the master's index on the bus for later route
+  //   back using the WithMetaInfo type
+  // - extracts the response from the payload field in the WithRouteInfo type
+  //   used for inner responses
+  module wrapMaster #(master_t m, Integer idx)
+                     (Master #(inner_req, inner_rsp));
+    function inner_req toInnerReq (req_t r) =
+      WithMetaInfo { payload: r, metaInfo: fromInteger (idx) };
+    function rsp_t fromInnerRsp (inner_rsp r) = r.payload;
+    interface source = mapSource (toInnerReq, m.source);
+    interface sink   = mapSink   (fromInnerRsp, m.sink);
   endmodule
-  Vector#(nMasters, Master#( Tuple2#( UpFlit#(m2s_t, nMasters)
-                                    , Vector#(nSlaves, Bool))
-                           , s2m_t)) innerMasters = newVector;
-  for (Integer i = 0; i < valueOf(nMasters); i = i + 1) begin
-    Vector#(nMasters, Bool) orig = replicate(False);
-    orig[i] = True;
-    innerMasters[i] <- wrapMaster(ms[i], orig);
-  end
 
-  // for each slave...
-  //////////////////////////////////////////////////////////////////////////////
-  module wrapSlave#(Slave#(m2s_t, s2m_t) s)
-    (Slave#(UpFlit#(m2s_t, nMasters), Tuple2#(s2m_t,Vector#(nMasters, Bool))));
-    FIFOF#(Vector#(nMasters, Bool)) routeBack <- mkFIFOF;
-    let routeSrc = toSource(routeBack);
-    let outCanPeek = routeSrc.canPeek && s.source.canPeek;
-    // split the incomming flit
+  // the wrapper for a slave:
+  // - creates the fat request out of the information in the WithMetaInfo
+  //   request received from the Master using the expand method
+  // - prepares the inner response from the Slave's response into a
+  //   WithRouteInfo using the shrink method
+  module wrapSlave #(slave_t s) (Slave #(inner_req, inner_rsp));
+    function req_fat_t fromInnerReq (inner_req r) =
+      expand (r.metaInfo, r.payload);
+    function inner_rsp toInnerRsp (rsp_fat_t r);
+      Tuple2 #(r_down_t, rsp_t) x = shrink (r); // XXX extra type info needed
+      match {.r_info, .rsp} = x;                // XXX to help bsc...
+      return WithRouteInfo { routeInfo: r_info, payload: rsp };
+    endfunction
+    interface sink   = mapSink   (fromInnerReq, s.sink);
+    interface source = mapSource (toInnerRsp, s.source);
+  endmodule
+
+  let noRouteSlv <- mkNoRouteSlave;
+
+  mkTwoWayBus ( route, indexToOneHot, noRouteSlv
+              , wrapMaster, wrapSlave, ms, ss);
+
+endmodule
+
+//////////////////////////
+// In-Order Two-Way Bus //
+////////////////////////////////////////////////////////////////////////////////
+module mkInOrderTwoWayBus #( function Vector #(n_slaves, Bool) route (r_up_t x)
+                           , Vector #(n_masters, master_t) ms
+                           , Vector #(n_slaves,  slave_t) ss
+  ) (Empty) provisos (
+    Bits #(req_t,     req_sz),       Bits #(rsp_t,     rsp_sz)
+  , Bits #(inner_req, inner_req_sz), Bits #(inner_rsp, inner_rsp_sz)
+  , Routable #(req_t, r_up_t)
+  , Has_isLast #(rsp_t)
+  //, FallibleRoute #(inner_req, inner_rsp)
+  , FallibleRoute #(req_t, rsp_t)
+    // type aliases
+  , Alias #(r_down_t,     Bit #(TLog #(n_masters)))
+  , Alias #(inner_req,    WithMetaInfo  #(req_t, r_down_t))
+  , Alias #(inner_rsp,    WithRouteInfo #(rsp_t, r_down_t))
+  , Alias #(master_t,     Master #(req_t,     rsp_t))
+  , Alias #(slave_t,      Slave  #(req_t, rsp_t))
+    // assertion on argument sizes
+  , Add #(1, a__, n_masters) // at least one Master is needed
+  , Add #(1, b__, n_slaves)  // at least one slave is needed
+  );
+
+  // the wrapper for a master:
+  // - augments requests with the master's index on the bus for later route
+  //   back using the WithMetaInfo type
+  // - extracts the response from the payload field in the WithRouteInfo type
+  //   used for inner responses
+  module wrapMaster #(master_t m, Integer idx)
+                     (Master #(inner_req, inner_rsp));
+    function inner_req toInnerReq (req_t r) =
+      WithMetaInfo { payload: r, metaInfo: fromInteger (idx) };
+    function rsp_t fromInnerRsp (inner_rsp r) = r.payload;
+    interface source = mapSource (toInnerReq, m.source);
+    interface sink   = mapSink   (fromInnerRsp, m.sink);
+  endmodule
+
+  // the wrapper for a slave. Note: The slave MUST respond in order
+  // - extract the routing information from the inner request and stash it in a
+  //   fifo while the vanilla request is being processed by the slave
+  // - dequeue the fifo and augment the vanilla slave response with the routing
+  //   information for the inner response
+  module wrapSlave #(slave_t s) (Slave #(inner_req, inner_rsp));
+    let ff <- mkUGFIFOF;
+    let reqInfoSaved <- mkReg (False);
+    let guardSnk =
+      s.sink.canPut && (reqInfoSaved || (!reqInfoSaved && ff.notFull));
+    let guardSrc = s.source.canPeek && ff.notEmpty;
     interface sink = interface Sink;
-      method canPut = s.sink.canPut && routeBack.notFull;
-      //method put(x) if (s.sink.canPut && routeBack.notFull) = action
-      method put(x) = action
-        routeBack.enq(x.path);
-        s.sink.put(x.flit);
+      method canPut = guardSnk;
+      method put (x) if (guardSnk) = action
+        if (!reqInfoSaved) begin
+          ff.enq (x.metaInfo);
+          if (!isLast (x)) reqInfoSaved <= True;
+        end
+        if (isLast (x)) reqInfoSaved <= False;
+        s.sink.put (x.payload);
       endaction;
     endinterface;
     interface source = interface Source;
-      method canPeek = outCanPeek;
-      method peek if (outCanPeek) = tuple2 (s.source.peek, routeSrc.peek);
-      method drop if (outCanPeek) =
-        action s.source.drop; routeSrc.drop; endaction;
+      method canPeek = guardSrc;
+      method peek if (guardSrc) = WithRouteInfo { routeInfo: ff.first
+                                                , payload: s.source.peek };
+      method drop if (guardSrc) = action
+        s.source.drop;
+        if (isLast (s.source.peek)) ff.deq;
+      endaction;
     endinterface;
   endmodule
-  Vector#(nSlaves, Slave#( UpFlit#(m2s_t, nMasters)
-                         , Tuple2#(s2m_t,Vector#(nMasters, Bool))))
-    innerSlaves = newVector;
-  for (Integer i = 0; i < valueOf(nSlaves); i = i + 1)
-    innerSlaves[i] <- wrapSlave(ss[i]);
 
-  // Master to Slave bus
-  //////////////////////////////////////////////////////////////////////////////
-  mkOneWayBus ( map (getMasterSource, innerMasters)
-              , map (getSlaveSink, innerSlaves));
-  // Slave to Master bus
-  //////////////////////////////////////////////////////////////////////////////
-  mkOneWayBus ( map (getSlaveSource, innerSlaves)
-              , map (getMasterSink, innerMasters));
+  let noRouteSlv <- mkNoRouteSlave;
+
+  mkTwoWayBus ( route, indexToOneHot, noRouteSlv
+              , wrapMaster, wrapSlave, ms, ss);
 
 endmodule
 

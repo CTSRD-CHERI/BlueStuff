@@ -60,8 +60,6 @@ typedef   0 RUSER_sz;
 `define SLAVE_T  AXI4_Slave#(`SPARAMS)
 `define MASTER_SYNTH_T AXI4_Master_Synth#(`MPARAMS)
 `define SLAVE_SYNTH_T  AXI4_Slave_Synth#(`SPARAMS)
-`define MASTER_XACTOR_T AXI4_Master_Xactor#(`MPARAMS)
-`define SLAVE_XACTOR_T  AXI4_Slave_Xactor#(`SPARAMS)
 
 Integer nb_flit = 8;
 Integer nb_rsp = 2;
@@ -150,12 +148,14 @@ endmodule
 `ifdef DEBUG
 module top (Empty);
     `MASTER_T m <- axiMaster;
-    `MASTER_XACTOR_T mxactor <- mkAXI4_Master_Xactor;
-    mkConnection (m, mxactor.slave);
+    let mShim <- mkAXI4ShimFF;
+    let mShim_mSynth <- toAXI4_Master_Synth (mShim.master);
+    mkConnection (m, mShim.slave);
     `SLAVE_T s <- axiSlave;
-    `SLAVE_XACTOR_T sxactor <- mkAXI4_Slave_Xactor;
-    mkConnection (s, sxactor.master);
-    mkConnection(mxactor.masterSynth, sxactor.slaveSynth);
+    let sShim <- mkAXI4ShimFF;
+    let sShim_sSynth <- toAXI4_Slave_Synth (sShim.slave);
+    mkConnection (s, sShim.master);
+    mkConnection(mShim_mSynth, sShim_sSynth);
 endmodule
 `else
 module top (Empty);
@@ -163,17 +163,17 @@ module top (Empty);
   Vector#(NSLAVES, `SLAVE_SYNTH_T)   ss;
   for (Integer i = 0; i < valueOf(NMASTERS); i = i + 1) begin
     `MASTER_T m <- axiMaster;
-    `MASTER_XACTOR_T mxactor <- mkAXI4_Master_Xactor;
-    mkConnection (m, mxactor.slave);
-    ms[i] = mxactor.masterSynth;
+    let mShim <- mkAXI4ShimFF;
+    mkConnection (m, mShim.slave);
+    ms[i] <- toAXI4_Master_Synth (mShim.master);
   end
   MappingTable#(NSLAVES, ADDR_sz) maptab = newVector;
   for (Integer i = 0; i < valueOf(NSLAVES); i = i + 1) begin
     maptab[i] = Range{base: fromInteger(i*valueOf(SlaveWidth)), size: fromInteger(valueOf(SlaveWidth))};
     `SLAVE_T s <- axiSlave;
-    `SLAVE_XACTOR_T sxactor <- mkAXI4_Slave_Xactor;
-    mkConnection (s, sxactor.master);
-    ss[i] = sxactor.slaveSynth;
+    let sShim <- mkAXI4ShimFF;
+    mkConnection (s, sShim.master);
+    ss[i] <- toAXI4_Slave_Synth (sShim.slave);
   end
   mkAXI4Bus_Synth(routeFromMappingTable(maptab), ms, ss);
 endmodule
@@ -186,5 +186,3 @@ endmodule
 `undef SLAVE_T
 `undef MASTER_SYNTH_T
 `undef SLAVE_SYNTH_T
-`undef MASTER_XACTOR_T
-`undef SLAVE_XACTOR_T

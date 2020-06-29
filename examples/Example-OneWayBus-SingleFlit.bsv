@@ -26,10 +26,10 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
-import Routable :: *;
+import Routable   :: *;
+import OneWayBus  :: *;
+import ListExtra  :: *;
 import SourceSink :: *;
-import Interconnect :: *;
-import ListExtra :: *;
 
 import FIFOF :: *;
 import Vector :: *;
@@ -43,8 +43,11 @@ instance FShow#(Flit#(a,b));
   function fshow(x) =
     $format("[id = %0d, dest = %b]", x.id, x.dest);
 endinstance
-instance DetectLast#(Flit#(a,b));
-  function detectLast = constFn(True);
+instance Has_routingField #(Flit#(i,o), Vector#(o, Bool));
+  function routingField (x) = x.dest;
+endinstance
+instance Has_isLast #(Flit#(i,o));
+  function isLast = constFn(True);
 endinstance
 
 function Vector#(n, Bool) route (Bit#(a) x);
@@ -63,9 +66,8 @@ module top (Empty);
   Integer nOuts = valueOf(NOuts);
 
 
-  Vector#(NIns, FIFOF#(Tuple2#(Flit#(NIns, NOuts), Vector#(NOuts, Bool))))
-    ins <- replicateM(mkFIFOF);
-  Vector#(NOuts, FIFOF#(Flit#(NIns, NOuts))) outs  <- replicateM(mkFIFOF);
+  Vector#(NIns,  FIFOF#(Flit#(NIns, NOuts)))  ins <- replicateM(mkFIFOF);
+  Vector#(NOuts, FIFOF#(Flit#(NIns, NOuts))) outs <- replicateM(mkFIFOF);
 
   let cnt <- mkReg(0);
   rule count; cnt <= cnt + 1; endrule
@@ -73,10 +75,10 @@ module top (Empty);
   for (Integer i = 0; i < nIns; i = i + 1) begin
     Reg#(Vector#(NOuts, Bool)) next <- mkConfigReg(cons(True, replicate(False)));
     rule doEnq;
-      ins[i].enq(tuple2(Flit {
+      ins[i].enq(Flit {
         id: fromInteger(i),
         dest: next
-      }, next));
+      });
       next <= rotate(next);
     endrule
   end
@@ -86,7 +88,7 @@ module top (Empty);
       $display("%0t -- dest %0d received from id %0d -- ", $time, i, outs[i].first.id, fshow(outs[i].first));
     endrule
 
-  mkOneWayBus(ins, outs);
+  mkOneWayBus(id, ins, outs);
 
   rule terminate(cnt > 200); $finish(0); endrule
 

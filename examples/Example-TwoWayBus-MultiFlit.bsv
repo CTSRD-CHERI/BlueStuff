@@ -26,15 +26,14 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
-
-import Routable :: *;
+import Routable     :: *;
+import ListExtra    :: *;
+import SourceSink   :: *;
+import MasterSlave  :: *;
 import Interconnect :: *;
-import ListExtra :: *;
-import SourceSink :: *;
-import MasterSlave :: *;
 
-import FIFOF :: *;
-import Vector :: *;
+import FIFOF     :: *;
+import Vector    :: *;
 import ConfigReg :: *;
 
 typedef 1 NMasters;
@@ -53,7 +52,7 @@ function Bit#(n) firstHot(Bit#(n) x);
 endfunction
 
 typedef struct {
-  Vector#(NSlaves, Bool) to;
+  Bit #(TLog #(NSlaves)) to;
   Bit#(32) payload;
   Bool last;
 } Req deriving (Bits);
@@ -61,48 +60,47 @@ instance FShow#(Req);
   function fshow(x) = $format( "Req { to:%b, payload: %0d, last: "
                              , x.to, x.payload, fshow (x.last), " }");
 endinstance
+instance Has_routingField #(Req, Bit #(TLog #(NSlaves)));
+  function routingField (x) = x.to;
+endinstance
+instance Has_isLast #(Req); function isLast (x) = x.last; endinstance
 
 typedef enum {OK, KO} RStatus deriving (Bits, Eq, FShow);
 typedef struct {
   RStatus status;
 } Rsp deriving (Bits, FShow);
+instance Has_isLast #(Rsp); function isLast = constFn (True); endinstance
 
-instance Routable#(Req, Rsp, Vector#(NSlaves, Bool));
-  function routingField (x) = x.to;
-  module mkNoRouteSlave (Slave#(Req, Rsp));
-    FIFOF#(Bit#(0)) ff <- mkFIFOF1;
+typedef WithRouteInfo #(Req, Bit #(TLog #(NMasters))) ReqFat;
+typedef WithRouteInfo #(Rsp, Bit #(TLog #(NMasters))) RspFat;
+instance ExpandableReqRsp #(Req, ReqFat, RspFat, Rsp, NMasters);
+  function expand (x, r) = ReqFat { routeInfo: x, payload: r};
+  function shrink (r) = tuple2 (r.routeInfo, r.payload);
+endinstance
+instance FallibleRoute #(ReqFat, RspFat);
+  module mkNoRouteSlave (Slave #( ReqFat, RspFat));
+    let ff <- mkFIFOF1;
     interface sink = interface Sink;
-      method canPut = ff.notFull;
-      method put (x) = ff.enq(?);
+      method  canPut = ff.notFull;
+      method put (x) = ff.enq (x.routeInfo);
     endinterface;
     interface source = interface Source;
       method canPeek = ff.notEmpty;
-      method peek if (ff.notEmpty) = Rsp { status: KO };
+      method peek if (ff.notEmpty) = RspFat { routeInfo: ff.first
+                                            , payload:  Rsp { status: KO } };
       method drop if (ff.notEmpty) = ff.deq;
     endinterface;
   endmodule
 endinstance
 
-instance DetectLast#(Req); function detectLast (x) = x.last; endinstance
-instance DetectLast#(Tuple2#(Req, Bit#(TLog#(NMasters))));
-  function detectLast (x) = tpl_1(x).last;
-endinstance
-instance DetectLast#(Rsp); function detectLast = constFn(True); endinstance
-instance ExpandReqRsp#(Req, Tuple2#(Req, Bit#(TLog#(NMasters))),
-                       Tuple2#(Rsp, Bit#(TLog#(NMasters))), Rsp,
-                       Bit#(TLog#(NMasters)));
-  function expand(r, x) = tuple2(r, x);
-  function shrink(r) = r;
-endinstance
-
 module mkMaster (Master#(Req, Rsp));
-  Reg#(Vector#(NSlaves, Bool)) dest <- mkConfigReg(cons(True, replicate(False)));
+  Reg#(Bit #(TLog #(NSlaves))) dest <- mkConfigReg(0);
   let ff <- mkFIFOF;
   Reg#(Bool) reqSent <- mkReg (False);
   Reg#(Bit#(32)) rspCnt <- mkReg (0);
   Reg#(Bit#(32)) cnt <- mkReg (0);
   rule enq (!reqSent);
-    dest <= rotate(dest);
+    dest <= dest + 1;
     let req = Req { to: dest
                   , payload: cnt
                   , last: cnt == fromInteger (nb_flit - 1) };
@@ -125,15 +123,15 @@ module mkMaster (Master#(Req, Rsp));
   endinterface;
 endmodule
 
-module mkSlave (Slave#( Tuple2#(Req, Bit#(TLog#(NMasters)))
-                      , Tuple2#(Rsp, Bit#(TLog#(NMasters)))));
+module mkSlave (Slave#(ReqFat, RspFat));
   let ff <- mkFIFOF;
   interface sink = interface Sink;
     method put(x) = action
       $display("%0t -- -- -- Slave received ", $time, fshow(x));
-      if (tpl_1(x).last) begin
+      if (isLast (x)) begin
         $display("%0t -- -- -- Slave sending rsp", $time);
-        ff.enq(tuple2(Rsp { status: OK }, tpl_2(x)));
+        ff.enq(RspFat { routeInfo: x.routeInfo
+                      , payload: Rsp { status: OK } });
       end
     endaction;
     method canPut = ff.notFull;
@@ -143,12 +141,14 @@ endmodule
 
 module top (Empty);
 
-  Vector#(NMasters, Master#(Req, Rsp)) masters <- replicateM(mkMaster);
-  Vector#(NSlaves,  Slave#( Tuple2#(Req, Bit#(TLog#(NMasters)))
-                          , Tuple2#(Rsp, Bit#(TLog#(NMasters)))))
-    slaves  <- replicateM(mkSlave);
+  Vector#(NMasters, Master #(Req,    Rsp))    masters <- replicateM(mkMaster);
+  Vector#(NSlaves,  Slave  #(ReqFat, RspFat)) slaves  <- replicateM(mkSlave);
 
-  //mkInOrderTwoWayBus(id, masters, slaves);
-  mkTwoWayBus(id, masters, slaves);
+  let cnt <- mkReg(0);
+  rule count; cnt <= cnt + 1; endrule
+
+  mkRelaxedTwoWayBus(indexToOneHot, masters, slaves);
+
+  rule terminate(cnt > 3000); $finish(0); endrule
 
 endmodule

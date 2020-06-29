@@ -77,35 +77,11 @@ instance DefaultValue#(AXI4_AWFlit#(id_, addr_, user_));
     awprot: 0, awqos: 0, awregion: 0, awuser: ?
   };
 endinstance
-instance Routable#(
-  AXI4_AWFlit#(id_, addr_, awuser_),
-  AXI4_BFlit#(id_, buser_),
-  Bit#(addr_));
-  function routingField(x) = x.awaddr;
-  module mkNoRouteSlave(Slave#( AXI4_AWFlit#(id_, addr_, awuser_)
-                              , AXI4_BFlit#(id_, buser_)));
-    Reg#(AXI4_AWFlit#(id_, addr_, awuser_)) currentReq[2] <- mkCReg(2, ?);
-    Reg#(Bool)                              pendingReq[2] <- mkCReg(2, False);
-    interface sink = interface Sink;
-      method canPut = !pendingReq[0];
-      method put (req) if (!pendingReq[0]) = action
-        currentReq[0] <= req;
-        pendingReq[0] <= True;
-      endaction;
-    endinterface;
-    interface source = interface Source;
-      method canPeek = pendingReq[1];
-      method peek if (pendingReq[1]) = AXI4_BFlit { bid: currentReq[1].awid
-                                                  , bresp: DECERR
-                                                  , buser: ? };
-      method drop if (pendingReq[1]) = action
-        pendingReq[1] <= False;
-      endaction;
-    endinterface;
-  endmodule
+instance Has_routingField #(AXI4_AWFlit #(id_, addr_, user_), Bit #(addr_));
+  function routingField (x) = x.awaddr;
 endinstance
-instance DetectLast#(AXI4_AWFlit#(id_, addr_, user_));
-  function detectLast(x) = True;
+instance Has_isLast #(AXI4_AWFlit #(id_, addr_, user_));
+  function isLast = constFn (True);
 endinstance
 
 // Master interfaces
@@ -220,8 +196,8 @@ instance DefaultValue#(AXI4_WFlit#(data_, user_));
     wdata: ?, wstrb: ~0, wlast: True, wuser: ?
   };
 endinstance
-instance DetectLast#(AXI4_WFlit#(data_, user_));
-  function detectLast(x) = x.wlast;
+instance Has_isLast #(AXI4_WFlit #(data_, user_));
+  function isLast (x) = x.wlast;
 endinstance
 
 // Master interfaces
@@ -295,8 +271,8 @@ typedef struct {
 instance DefaultValue#(AXI4_BFlit#(id_, user_));
   function defaultValue = AXI4_BFlit { bid: 0, bresp: OKAY, buser: ? };
 endinstance
-instance DetectLast#(AXI4_BFlit#(id_, user_));
-  function detectLast(x) = True;
+instance Has_isLast #(AXI4_BFlit #(id_, user_));
+  function isLast = constFn (True);
 endinstance
 
 // Master interfaces
@@ -380,37 +356,11 @@ instance DefaultValue#(AXI4_ARFlit#(id_, addr_, user_));
     arprot: 0, arqos: 0, arregion: 0, aruser: ?
   };
 endinstance
-instance Routable#(
-  AXI4_ARFlit#(id_, addr_, aruser_),
-  AXI4_RFlit#(id_, data_, ruser_),
-  Bit#(addr_));
-  function routingField(x) = x.araddr;
-  module mkNoRouteSlave(Slave#( AXI4_ARFlit#(id_, addr_, aruser_)
-                              , AXI4_RFlit#(id_, data_, ruser_)));
-    Reg#(AXI4_ARFlit#(id_, addr_, aruser_)) currentReq[2] <- mkCReg(2, ?);
-    Reg#(Bit#(TAdd#(SizeOf#(AXI4_Len), 1))) flitCount[2]  <- mkCReg(2, 0);
-    interface sink = interface Sink;
-      method canPut = flitCount[0] == 0;
-      method put (req) if (flitCount[0] == 0) = action
-        currentReq[0] <= req;
-        flitCount[0]  <= zeroExtend(req.arlen) + 1;
-      endaction;
-    endinterface;
-    interface source = interface Source;
-      method canPeek = flitCount[1] != 0;
-      method peek if (flitCount[1] != 0) = AXI4_RFlit{ rid: currentReq[1].arid
-                                                     , rdata: ?
-                                                     , rresp: DECERR
-                                                     , rlast: flitCount[1] == 1
-                                                     , ruser: ? };
-      method drop if (flitCount[1] != 0) = action
-        flitCount[1] <= flitCount[1] - 1;
-      endaction;
-    endinterface;
-  endmodule
+instance Has_routingField #(AXI4_ARFlit #(id_, addr_, user_), Bit #(addr_));
+  function routingField (x) = x.araddr;
 endinstance
-instance DetectLast#(AXI4_ARFlit#(id_, addr_, user_));
-  function detectLast(x) = True;
+instance Has_isLast #(AXI4_ARFlit #(id_, addr_, user_));
+  function isLast = constFn (True);
 endinstance
 
 // Master interfaces
@@ -527,8 +477,8 @@ instance DefaultValue#(AXI4_RFlit#(id_, data_, user_));
     rid: 0, rdata: ?, rresp: OKAY, rlast: True, ruser: ?
   };
 endinstance
-instance DetectLast#(AXI4_RFlit#(id_, data_, user_));
-  function detectLast(x) = x.rlast;
+instance Has_isLast #(AXI4_RFlit #(id_, data_, user_));
+  function isLast (x) = x.rlast;
 endinstance
 
 // Master interfaces
@@ -966,51 +916,31 @@ typedef union tagged {
   numeric type data_,
   numeric type awuser_,
   numeric type wuser_) deriving (FShow, Bits);
-instance Routable#(
-  AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_),
-  AXI4_BFlit#(id_, buser_),
-  Bit#(addr_)) provisos (
-    Routable#(AXI4_AWFlit#(id_, addr_, awuser_),
-              AXI4_BFlit#(id_, buser_),
-              Bit#(addr_))
-  );
-  function routingField(x) = case (x) matches
-    tagged FirstFlit {.aw, .w}: aw.awaddr; // XXX routingField(aw); XXX THIS SHOULD JUST WORK BUT DOESN'T ?!
-    default: ?;
+instance Has_routingField #(AXI4_WriteFlit #(id_, addr_, data_, awuser_, wuser_)
+                           , Bit #(addr_));
+  function routingField (x) = case (x) matches
+    tagged FirstFlit {.aw, .w}: routingField (aw);
+    default: 0;
   endcase;
-  module mkNoRouteSlave (Slave#(
-                           AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_),
-                           AXI4_BFlit#(id_, buser_)));
-    Slave#(AXI4_AWFlit#(id_, addr_, awuser_), AXI4_BFlit#(id_, buser_))
-      inner <- mkNoRouteSlave;
-    interface sink = interface Sink;
-      method canPut = inner.sink.canPut;
-      method put (req) = case (req) matches
-        tagged FirstFlit {.aw, ._}: inner.sink.put(aw);
-        default: noAction;
-      endcase;
-    endinterface;
-    interface source = inner.source;
-  endmodule
 endinstance
-instance DetectLast#(AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_));
-  function detectLast(x) = case (x) matches
-    tagged FirstFlit {.aw, .w}: detectLast(w);
-    tagged OtherFlit .w: detectLast(w);
+instance Has_isLast #(AXI4_WriteFlit #(id_, addr_, data_, awuser_, wuser_));
+  function isLast (x) = case (x) matches
+    tagged FirstFlit {.aw, .w}: isLast (w);
+    tagged OtherFlit .w: isLast (w);
   endcase;
 endinstance
 
-////////////////////////////
-// ExpandReqRsp instances //
+////////////////////////////////
+// ExpandableReqRsp instances //
 ////////////////////////////////////////////////////////////////////////////////
 
-instance ExpandReqRsp#(
+instance ExpandableReqRsp#(
   AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_),
   AXI4_WriteFlit#(sid_, addr_, data_, awuser_, wuser_),
   AXI4_BFlit#(sid_, buser_),
   AXI4_BFlit#(id_, buser_),
-  Bit#(n)) provisos (Add#(id_, n, sid_));
-  function expand(r, x) = case (r) matches
+  n) provisos (Add#(id_, TLog#(n), sid_));
+  function expand(x, r) = case (r) matches
     tagged FirstFlit {.aw, .w}: FirstFlit(tuple2(AXI4_AWFlit {
       awid: {x, aw.awid}, awaddr: aw.awaddr, awlen: aw.awlen, awsize: aw.awsize,
       awburst: aw.awburst, awlock: aw.awlock, awcache: aw.awcache,
@@ -1019,25 +949,76 @@ instance ExpandReqRsp#(
     }, w));
     tagged OtherFlit .f: OtherFlit(f);
   endcase;
-  function shrink(r) = tuple2(AXI4_BFlit {
+  function shrink(r) = tuple2(truncateLSB(r.bid), AXI4_BFlit {
     bid: truncate(r.bid), bresp: r.bresp, buser: r.buser
-  }, truncateLSB(r.bid));
+  });
 endinstance
 
-instance ExpandReqRsp#(
+instance FallibleRoute#( AXI4_WriteFlit#(sid_, addr_, data_, awuser_, wuser_)
+                       , AXI4_BFlit#(sid_, buser_));
+  module mkNoRouteSlave (Slave #( AXI4_WriteFlit#(sid_, addr_, data_, awuser_, wuser_)
+                                , AXI4_BFlit#(sid_, buser_)));
+    Reg #(Maybe #(Bit #(sid_))) m_send_rsp[2] <- mkCReg (2, Invalid);
+    Reg #(Bool)              drain_until_last <- mkReg (False);
+    interface sink = interface Sink;
+      method canPut = drain_until_last || !isValid (m_send_rsp[0]);
+      method put (req) if (drain_until_last || !isValid (m_send_rsp[0])) = action
+        case (req) matches
+          tagged FirstFlit {.aw, ._}: m_send_rsp[0] <= Valid (aw.awid);
+        endcase
+        drain_until_last <= !isLast (req);
+      endaction;
+    endinterface;
+    interface source = interface Source;
+      method canPeek = isValid (m_send_rsp[1]);
+      method peek if (isValid (m_send_rsp[1])) =
+        AXI4_BFlit{ bid: m_send_rsp[1].Valid, bresp: DECERR, buser: ? };
+      method drop if (isValid (m_send_rsp[1])) =
+        writeReg (m_send_rsp[1], Invalid);
+    endinterface;
+  endmodule
+endinstance
+instance ExpandableReqRsp#(
   AXI4_ARFlit#(id_, addr_, aruser_),
   AXI4_ARFlit#(sid_, addr_, aruser_),
   AXI4_RFlit#(sid_, data_, ruser_),
   AXI4_RFlit#(id_, data_, ruser_),
-  Bit#(n)) provisos (Add#(id_, n, sid_));
-  function expand(ar, x) = AXI4_ARFlit {
+  n) provisos (Add#(id_, TLog#(n), sid_));
+  function expand(x, ar) = AXI4_ARFlit {
     arid: {x, ar.arid}, araddr: ar.araddr, arlen: ar.arlen, arsize: ar.arsize,
     arburst: ar.arburst, arlock: ar.arlock, arcache: ar.arcache,
     arprot: ar.arprot, arqos: ar.arqos, arregion: ar.arregion,
     aruser: ar.aruser
   };
-  function shrink(r) = tuple2(AXI4_RFlit {
+  function shrink(r) = tuple2(truncateLSB(r.rid), AXI4_RFlit {
     rid: truncate(r.rid), rdata: r.rdata, rresp: r.rresp,
     rlast: r.rlast, ruser: r.ruser
-  }, truncateLSB(r.rid));
+  });
+endinstance
+
+instance FallibleRoute#( AXI4_ARFlit#(sid_, addr_, aruser_)
+                       , AXI4_RFlit#(sid_, data_, ruser_));
+  module mkNoRouteSlave (Slave #( AXI4_ARFlit#(sid_, addr_, aruser_)
+                                , AXI4_RFlit#(sid_, data_, ruser_)));
+    Reg#(AXI4_ARFlit#(sid_, addr_, aruser_)) currentReq[2] <- mkCReg(2, ?);
+    Reg#(Bit#(TAdd#(SizeOf#(AXI4_Len), 1)))   flitCount[2] <- mkCReg(2, 0);
+    interface sink = interface Sink;
+      method canPut = flitCount[0] == 0;
+      method put (req) if (flitCount[0] == 0) = action
+        currentReq[0] <= req;
+        flitCount[0]  <= zeroExtend(req.arlen) + 1;
+      endaction;
+    endinterface;
+    interface source = interface Source;
+      method canPeek = flitCount[1] != 0;
+      method peek if (flitCount[1] != 0) = AXI4_RFlit{ rid: currentReq[1].arid
+                                                     , rdata: ?
+                                                     , rresp: DECERR
+                                                     , rlast: flitCount[1] == 1
+                                                     , ruser: ? };
+      method drop if (flitCount[1] != 0) = action
+        flitCount[1] <= flitCount[1] - 1;
+      endaction;
+    endinterface;
+  endmodule
 endinstance

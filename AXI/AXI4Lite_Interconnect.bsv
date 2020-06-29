@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2019 Alexandre Joannou
+ * Copyright (c) 2018-2020 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -34,7 +34,7 @@ import AXI4Lite_Types :: *;
 import AXI4Lite_Utils :: *;
 import SourceSink :: *;
 import MasterSlave :: *;
-import ListExtra :: *;
+//import ListExtra :: *;
 import Interconnect :: *;
 import Routable :: *;
 
@@ -44,71 +44,72 @@ import Routable :: *;
 
 `define PARAMS addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_
 
-module mkAXI4LiteBus#(
-    function Vector#(nRoutes, Bool) route (Bit#(addr_) val),
-    Vector#(nMasters, AXI4Lite_Master#(`PARAMS)) masters,
-    Vector#(nSlaves, AXI4Lite_Slave#(`PARAMS)) slaves
-  ) (Empty) provisos (
-    Routable#(
-      AXI4Lite_WriteFlit#(addr_, data_, awuser_, wuser_),
-      AXI4Lite_BFlit#(buser_),
-      Bit#(addr_)),
-    Routable#(
-      AXI4Lite_ARFlit#(addr_, aruser_),
-      AXI4Lite_RFlit#(data_, ruser_),
-      Bit#(addr_)),
-    // assertion on argument sizes
-    Add#(1, a__, nMasters), // at least one master is needed
-    Add#(1, b__, nSlaves), // at least one slave is needed
-    Add#(nRoutes, 0, nSlaves) // nRoutes == nSlaves
-  );
+module mkAXI4LiteBus_Synth #(
+  function Vector #(nSlaves, Bool) route (Bit #(addr_) val)
+, Vector #(nMasters, AXI4Lite_Master_Synth #(`PARAMS)) masters
+, Vector #(nSlaves,  AXI4Lite_Slave_Synth  #(`PARAMS)) slaves
+) (Empty) provisos (
+  Add #(1, a__, nSlaves)
+, Add #(1, b__, nMasters)
+);
+  let msNoSynth <- mapM (fromAXI4Lite_Master_Synth, masters);
+  let ssNoSynth <- mapM (fromAXI4Lite_Slave_Synth,  slaves);
+  mkAXI4LiteBus (route, msNoSynth, ssNoSynth);
+endmodule
+
+module mkAXI4LiteBus #(
+  function Vector #(nSlaves, Bool) route (Bit #(addr_) val)
+, Vector #(nMasters, AXI4Lite_Master #(`PARAMS)) masters
+, Vector #(nSlaves,  AXI4Lite_Slave  #(`PARAMS)) slaves
+) (Empty) provisos (
+  Add #(1, a__, nSlaves)
+, Add #(1, b__, nMasters)
+);
 
   // prepare masters
-  Vector#(nMasters,
-    Master#(AXI4Lite_WriteFlit#(addr_, data_, awuser_, wuser_),
-    AXI4Lite_BFlit#(buser_)))
+  Vector #( nMasters
+          , Master #( AXI4Lite_WriteFlit #(addr_, data_, awuser_, wuser_)
+                    , AXI4Lite_BFlit #(buser_)))
     write_masters = newVector;
-  Vector#(nMasters,
-    Master#(AXI4Lite_ARFlit#(addr_, aruser_),
-    AXI4Lite_RFlit#(data_, ruser_)))
-    read_masters  = newVector;
-  for (Integer i = 0; i < valueOf(nMasters); i = i + 1) begin
-    Bit#(TLog#(nMasters)) mid = fromInteger(i);
+  Vector #(nMasters, Master #( AXI4Lite_ARFlit #(addr_, aruser_)
+                             , AXI4Lite_RFlit #(data_, ruser_)))
+    read_masters = newVector;
+  for (Integer i = 0; i < valueOf (nMasters); i = i + 1) begin
+    Bit #(TLog #(nMasters)) mid = fromInteger (i);
     // merge from write masters
     write_masters[i] = interface Master;
-      interface source = mergeLiteWrite(masters[i].aw, masters[i].w);
+      interface source = mergeLiteWrite (masters[i].aw, masters[i].w);
       interface sink   = masters[i].b;
     endinterface;
-    read_masters[i]  = interface Master;
+    read_masters[i]    = interface Master;
       interface source = masters[i].ar;
       interface sink   = masters[i].r;
     endinterface;
   end
 
   // prepare slaves
-  Vector#(nSlaves,
-    Slave#(AXI4Lite_WriteFlit#(addr_, data_, awuser_, wuser_),
-    AXI4Lite_BFlit#(buser_)))
+  Vector #( nSlaves
+          , Slave #( AXI4Lite_WriteFlit #(addr_, data_, awuser_, wuser_)
+                   , AXI4Lite_BFlit #(buser_)))
     write_slaves = newVector;
-  Vector#(nSlaves,
-    Slave#(AXI4Lite_ARFlit#(addr_, aruser_),
-    AXI4Lite_RFlit#(data_, ruser_)))
-    read_slaves   = newVector;
-  for (Integer i = 0; i < valueOf(nSlaves); i = i + 1) begin  
+  Vector #(nSlaves, Slave #( AXI4Lite_ARFlit #(addr_, aruser_)
+                           , AXI4Lite_RFlit #(data_, ruser_)))
+    read_slaves = newVector;
+  for (Integer i = 0; i < valueOf (nSlaves); i = i + 1) begin
     // split to write slaves
     write_slaves[i] = interface Slave;
-      interface sink   = splitLiteWrite(slaves[i].aw, slaves[i].w);
+      interface sink   = splitLiteWrite (slaves[i].aw, slaves[i].w);
       interface source = slaves[i].b;
     endinterface;
-    read_slaves[i]  = interface Slave;
+    read_slaves[i] = interface Slave;
       interface sink   = slaves[i].ar;
       interface source = slaves[i].r;
     endinterface;
   end
 
   // connect with standard busses
-  mkInOrderTwoWayBus(route, write_masters, write_slaves);
-  mkInOrderTwoWayBus(route, read_masters, read_slaves);
+  mkInOrderTwoWayBus (route, write_masters, write_slaves);
+  mkInOrderTwoWayBus (route, read_masters,  read_slaves);
 
 endmodule
 

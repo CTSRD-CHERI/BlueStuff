@@ -26,10 +26,10 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
-import Routable :: *;
+import Routable   :: *;
+import ListExtra  :: *;
+import OneWayBus  :: *;
 import SourceSink :: *;
-import Interconnect :: *;
-import ListExtra :: *;
 
 import FIFOF :: *;
 import Vector :: *;
@@ -44,8 +44,11 @@ instance FShow#(Flit#(a,b));
   function fshow(x) =
     $format("[id = %0d, dest = %b]", x.id, x.dest);
 endinstance
-instance DetectLast#(Flit#(a,b));
-  function detectLast(x) = x.last; 
+instance Has_routingField #(Flit#(i,o), Vector#(o, Bool));
+  function routingField(x) = x.dest;
+endinstance
+instance Has_isLast #(Flit#(i,o));
+  function isLast(x) = x.last;
 endinstance
 
 function Vector#(n, Bool) route (Bit#(a) x);
@@ -57,6 +60,7 @@ endfunction
 
 typedef 4 NIns;
 typedef 3 NOuts;
+Integer nb_flits = 2;
 
 module top (Empty);
 
@@ -64,9 +68,8 @@ module top (Empty);
   Integer nOuts = valueOf(NOuts);
 
 
-  Vector#(NIns, FIFOF#(Tuple2#(Flit#(NIns, NOuts), Vector#(NOuts, Bool))))
-    ins <- replicateM(mkFIFOF);
-  Vector#(NOuts, FIFOF#(Flit#(NIns, NOuts))) outs  <- replicateM(mkFIFOF);
+  Vector#(NIns,  FIFOF#(Flit#(NIns, NOuts)))  ins <- replicateM(mkFIFOF);
+  Vector#(NOuts, FIFOF#(Flit#(NIns, NOuts))) outs <- replicateM(mkFIFOF);
 
   let cnt <- mkReg(0);
   rule count; cnt <= cnt + 1; endrule
@@ -75,17 +78,19 @@ module top (Empty);
     Reg#(Vector#(NOuts, Bool)) next <- mkConfigReg(cons(True, replicate(False)));
     let localCnt <- mkReg (0);
     rule doEnq;
-      ins[i].enq(tuple2(Flit {
-        id: fromInteger(i),
-        dest: next,
-        last: localCnt == 4
-      }, next));
-    endrule
-    rule iterate_flits;
-      if (localCnt >= 4) begin
+      if (localCnt >= fromInteger(nb_flits)) begin
         localCnt <= 0;
         next <= rotate(next);
-      end else localCnt <= localCnt + 1;
+      end else begin
+        localCnt <= localCnt + 1;
+        Flit#(NIns, NOuts) flit = Flit {
+          id: fromInteger(i),
+          dest: next,
+          last: localCnt == fromInteger(nb_flits - 1)
+        };
+        ins[i].enq(flit);
+        $display ("%0t - %m enq[%0d]: ", $time, i, fshow (flit));
+      end
     endrule
   end
   for (Integer i = 0; i < nOuts; i = i + 1)
@@ -94,7 +99,7 @@ module top (Empty);
       $display("%0t -- dest %0d received from id %0d -- ", $time, i, outs[i].first.id, fshow(outs[i].first));
     endrule
 
-  mkOneWayBus(ins, outs);
+  mkOneWayBus(id, ins, outs);
 
   rule terminate(cnt > 200); $finish(0); endrule
 
