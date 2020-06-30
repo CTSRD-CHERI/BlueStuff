@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2019 Alexandre Joannou
+ * Copyright (c) 2020 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -30,12 +30,12 @@ import FIFOF :: *;
 import SpecialFIFOs :: *;
 import SourceSink :: *;
 
-interface MySrcSnk#(type t);
+interface SrcSnk#(type t);
   interface Source#(t) source;
   interface Sink#(t) sink;
 endinterface
 
-module mkMySrcSnk (MySrcSnk#(t)) provisos (Bits#(t, t_sz));
+module mkGuardedSrcSnk_own (SrcSnk#(t)) provisos (Bits#(t, t_sz));
   Reg#(Bool) hasData <- mkReg(False);
   Reg#(t) r <- mkRegU;
   interface source = interface Source;
@@ -49,44 +49,52 @@ module mkMySrcSnk (MySrcSnk#(t)) provisos (Bits#(t, t_sz));
   endinterface;
 endmodule
 
+module mkGuardedSrcSnk_FIFOF (SrcSnk#(t)) provisos (Bits#(t, t_sz));
+  let ff <- mkFIFOF;
+  interface source = toSource (ff);
+  interface sink   = toSink   (ff);
+endmodule
+
+module mkGuardedSrcSnk_UGFIFOF (SrcSnk#(t)) provisos (Bits#(t, t_sz));
+  let ff <- mkUGFIFOF;
+  interface source = toGuardedSource (ff);
+  interface sink   = toGuardedSink   (ff);
+endmodule
+
 module top (Empty);
 
-  Reg#(Bit#(8)) count <- mkReg(0); rule countUp; count <= count + 1; endrule
+  Reg #(Bit #(8)) count <- mkReg (0);
+  rule countUp; count <= count + 1; endrule
 
-  `define WITH_MYSRCSNK
-  `ifdef WITH_MYSRCSNK
-  let srcsnk <- mkMySrcSnk;
-  let snk = debugSink(srcsnk.sink, $format("Sink G side"));
-  let src = debugSource(srcsnk.source, $format("Source G side"));
-  `else
-  let ff1 <- mkFIFOF;
-  let snk = debugSink(toSink(ff1), $format("Sink G side"));
-  let src = debugSource(toSource(ff1), $format("Source G side"));
-  `endif
+  //let srcsnk <- mkGuardedSrcSnk_own;
+  //let srcsnk <- mkGuardedSrcSnk_FIFOF;
+  let srcsnk <- mkGuardedSrcSnk_UGFIFOF;
+  let snk = debugSink (srcsnk.sink, $format ("Sink G side"));
+  let src = debugSource (srcsnk.source, $format ("Source G side"));
 
   `define NO_LOSS
   `ifdef NO_LOSS
   rule write;
-    $display("%0t - G - writing %0d", $time, count);
-    snk.put(count);
+    $display ("%0t - G - writing %0d", $time, count);
+    snk.put (count);
   endrule
   rule read;
-    $display("%0t - G - reading %0d", $time, src.peek);
+    $display ("%0t - G - reading %0d", $time, src.peek);
     src.drop;
   endrule
   `else
-  let tmp_snk <- toUnguardedSink(snk);
-  let tmp_src <- toUnguardedSource(src, 55);
-  let u_snk = debugSink(tmp_snk, $format("Sink UG side"));
-  let u_src = debugSource(tmp_src, $format("Source UG side"));
+  let tmp_snk <- toUnguardedSink (snk);
+  let tmp_src <- toUnguardedSource (src, 55);
+  let u_snk = debugSink (tmp_snk, $format ("Sink UG side"));
+  let u_src = debugSource (tmp_src, $format ("Source UG side"));
   rule u_write (count < 10);
-    $display("%0t - UG - writing %0d", $time, count);
-    u_snk.put(count);
+    $display ("%0t - UG - writing %0d", $time, count);
+    u_snk.put (count);
   endrule
   rule u_read (count >= 10);
-    $display("%0t - UG - reading %0d", $time, u_src.peek);
+    $display ("%0t - UG - reading %0d", $time, u_src.peek);
     u_src.drop;
-    if (count >= 30) $finish(0);
+    if (count >= 30) $finish (0);
   endrule
   `endif
 
