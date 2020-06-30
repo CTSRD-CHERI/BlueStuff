@@ -26,78 +26,107 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
-import FIFOF :: *;
-import SpecialFIFOs :: *;
+import FIFOF      :: *;
+import Vector     :: *;
+import ConfigReg  :: *;
 import SourceSink :: *;
 
-interface SrcSnk#(type t);
-  interface Source#(t) source;
-  interface Sink#(t) sink;
+module top (Empty);
+
+  Reg #(Bit #(8)) count <- mkReg (0);
+  Reg #(Bit #(8)) cycleCount <- mkReg (0);
+  rule cycleCountUp; cycleCount <= cycleCount + 1; endrule
+
+  // pick one here
+  let srcsnk <- mkUGSrcSnk_own;
+  //let srcsnk <- mkGSrcSnk_own;
+  //let srcsnk <- mkUGSrcSnk_UGFIFOF;
+  //let srcsnk <- mkGSrcSnk_UGFIFOF;
+  //let srcsnk <- mkGSrcSnk_FIFOF;
+
+  let raw_snk = debugSink (srcsnk.sink, $format ("Sink raw side"));
+  let raw_src = debugSource (srcsnk.source, $format ("Source raw side"));
+
+  `define NO_LOSS
+  `ifdef NO_LOSS
+  let snk = raw_snk;
+  let src = raw_src;
+  `else
+  let tmp_snk <- toUnguardedSink (raw_snk);
+  let tmp_src <- toUnguardedSource (raw_src, 55);
+  let snk = debugSink (tmp_snk, $format ("Sink UG side"));
+  let src = debugSource (tmp_src, $format ("Source UG side"));
+  `endif
+
+  rule write;
+    $display ("%0t - writing %0d", $time, count);
+    snk.put (count);
+    count <= count + 1;
+  endrule
+  rule read;
+    $display ("%0t - reading %0d", $time, src.peek);
+    src.drop;
+  endrule
+
+  rule finishing (cycleCount > 20); $finish(); endrule
+
+endmodule
+
+// test modules
+////////////////////////////////////////////////////////////////////////////////
+
+interface SrcSnk #(type t);
+  interface Source #(t) source;
+  interface Sink #(t)   sink;
 endinterface
 
-module mkGuardedSrcSnk_own (SrcSnk#(t)) provisos (Bits#(t, t_sz));
-  Reg#(Bool) hasData <- mkReg(False);
-  Reg#(t) r <- mkRegU;
+module mkUGSrcSnk_own (SrcSnk #(t))
+  provisos ( Bits #(t, t_sz)
+           , NumAlias #(2, depth)
+           , NumAlias #(TLog #(depth), idx));
+  Vector #(depth, Reg #(t)) data <- replicateM (mkRegU);
+  Reg #(Bit #(TAdd #(1, idx))) readPtr  <- mkConfigReg (0);
+  Reg #(Bit #(TAdd #(1, idx))) writePtr <- mkConfigReg (0);
+  Bit #(idx) readPtrLSB  = truncate (readPtr);
+  Bit #(idx) writePtrLSB = truncate (writePtr);
+  Bit #(1) readPtrMSB  = truncateLSB (readPtr);
+  Bit #(1) writePtrMSB = truncateLSB (writePtr);
+  Bool empty  = readPtrLSB == writePtrLSB && readPtrMSB == writePtrMSB;
+  Bool full  = readPtrLSB == writePtrLSB && readPtrMSB != writePtrMSB;
   interface source = interface Source;
-    method canPeek = hasData;
-    method peek if (hasData) = r;
-    method drop if (hasData) = action hasData <= False; endaction;
+    method canPeek = !empty;
+    method peek = data[readPtrLSB];
+    method drop = action readPtr <= readPtr + 1; endaction;
   endinterface;
   interface sink = interface Sink;
-    method canPut = !hasData;
-    method put (x) if (!hasData) = action r <= x; hasData <= True; endaction;
+    method canPut = !full;
+    method put (x) = action
+      data[writePtrLSB] <= x;
+      writePtr <= writePtr + 1;
+    endaction;
   endinterface;
 endmodule
 
-module mkGuardedSrcSnk_FIFOF (SrcSnk#(t)) provisos (Bits#(t, t_sz));
+module mkGSrcSnk_own (SrcSnk #(t)) provisos (Bits #(t, t_sz) );
+  let srcsnk <- mkUGSrcSnk_own;
+  interface source = toGuardedSource (srcsnk.source);
+  interface sink   = toGuardedSink   (srcsnk.sink);
+endmodule
+
+module mkGSrcSnk_FIFOF (SrcSnk #(t)) provisos (Bits#(t, t_sz));
   let ff <- mkFIFOF;
   interface source = toSource (ff);
   interface sink   = toSink   (ff);
 endmodule
 
-module mkGuardedSrcSnk_UGFIFOF (SrcSnk#(t)) provisos (Bits#(t, t_sz));
+module mkUGSrcSnk_UGFIFOF (SrcSnk #(t)) provisos (Bits #(t, t_sz));
   let ff <- mkUGFIFOF;
-  interface source = toGuardedSource (ff);
-  interface sink   = toGuardedSink   (ff);
+  interface source = toSource (ff);
+  interface sink   = toSink   (ff);
 endmodule
 
-module top (Empty);
-
-  Reg #(Bit #(8)) count <- mkReg (0);
-  rule countUp; count <= count + 1; endrule
-
-  //let srcsnk <- mkGuardedSrcSnk_own;
-  //let srcsnk <- mkGuardedSrcSnk_FIFOF;
-  let srcsnk <- mkGuardedSrcSnk_UGFIFOF;
-  let snk = debugSink (srcsnk.sink, $format ("Sink G side"));
-  let src = debugSource (srcsnk.source, $format ("Source G side"));
-
-  `define NO_LOSS
-  `ifdef NO_LOSS
-  rule write;
-    $display ("%0t - G - writing %0d", $time, count);
-    snk.put (count);
-  endrule
-  rule read;
-    $display ("%0t - G - reading %0d", $time, src.peek);
-    src.drop;
-  endrule
-  `else
-  let tmp_snk <- toUnguardedSink (snk);
-  let tmp_src <- toUnguardedSource (src, 55);
-  let u_snk = debugSink (tmp_snk, $format ("Sink UG side"));
-  let u_src = debugSource (tmp_src, $format ("Source UG side"));
-  rule u_write (count < 10);
-    $display ("%0t - UG - writing %0d", $time, count);
-    u_snk.put (count);
-  endrule
-  rule u_read (count >= 10);
-    $display ("%0t - UG - reading %0d", $time, u_src.peek);
-    u_src.drop;
-    if (count >= 30) $finish (0);
-  endrule
-  `endif
-
-  rule finishing (count > 15); $finish(); endrule
-
+module mkGSrcSnk_UGFIFOF (SrcSnk #(t)) provisos (Bits #(t, t_sz));
+  let srcsnk <- mkUGSrcSnk_UGFIFOF;
+  interface source = toGuardedSource (srcsnk.source);
+  interface sink   = toGuardedSink   (srcsnk.sink);
 endmodule
