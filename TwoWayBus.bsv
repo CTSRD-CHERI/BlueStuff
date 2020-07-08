@@ -32,10 +32,11 @@ export mkTwoWayBus;
 export mkRelaxedTwoWayBus;
 //export mkInOrderTwoWayBus;
 
-import Routable    :: *;
-import OneWayBus   :: *;
-import SourceSink  :: *;
-import MasterSlave :: *;
+import Routable            :: *;
+import OneWayBus           :: *;
+import SourceSink          :: *;
+import MasterSlave         :: *;
+import TransactionOrdering :: *;
 
 import FIFOF  :: *;
 import Vector :: *;
