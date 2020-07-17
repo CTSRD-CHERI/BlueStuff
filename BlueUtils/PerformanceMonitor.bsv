@@ -33,8 +33,7 @@ interface PerfCounters_IFC #(numeric type ctrs, numeric type ctrW, numeric type 
 endinterface
 
 
-module mkPerfCounters_Core (PerfCounters_IFC #(ctrs, ctrW, evts))
-  provisos (Add#(a__, TDiv#(ctrW, 2), ctrW));
+module mkPerfCounters_Core (PerfCounters_IFC #(ctrs, ctrW, evts));
   let ctrs = valueOf(ctrs);
   let ctrW = valueOf(ctrW);
   let evts = valueOf(evts);
@@ -105,7 +104,7 @@ module mkPerfCounters_Core (PerfCounters_IFC #(ctrs, ctrW, evts))
 endmodule
 
 // For a synthesize module, the values must be fixed
-`define ctrs 3
+`define ctrs 29
 `define ctrW 64
 `define evts 17
 
