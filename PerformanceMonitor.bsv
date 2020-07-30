@@ -5,8 +5,8 @@ import Vector :: * ;
 // A module which wants to count events must return some vector of events
 // However it is easier to count the events as a Struct within a module
 // So if the Struct is an instance of this class it can be returned as is
-typeclass EventsList#(type evts, numeric type n, numeric type m);
-  function Vector#(m, Bit#(n)) getList (evts e);
+typeclass BitVectorable #(type from, numeric type n, numeric type m);
+  function Vector #(m, Bit #(n)) toVector (from e);
 endtypeclass
 
 // Write is exposed to only one counter per cycle
@@ -93,11 +93,11 @@ module mkPerfCounters_Core (PerfCounters_IFC #(ctrs, ctrW, evts));
     regToReadOnly (wr_overflow);
 
 
-  method write_ctr_sel (Bit #(TLog #(ctrs)) idx) =
-    vec_rg_event_sel[idx]._write;
-
   method write_counter (Bit #(TLog #(ctrs)) idx) =
     vec_rg_counter[idx][1]._write;
+
+  method write_ctr_sel (Bit #(TLog #(ctrs)) idx) =
+    vec_rg_event_sel[idx]._write;
 
   method write_ctr_inhibit = rg_ctr_inhibit._write;
 
@@ -106,7 +106,7 @@ endmodule
 // For a synthesize module, the values must be fixed
 `define ctrs 29
 `define ctrW 64
-`define evts 17
+`define evts 63
 
 (* synthesize *)
 module mkPerfCounters (PerfCounters_IFC #(`ctrs, `ctrW, `evts));
