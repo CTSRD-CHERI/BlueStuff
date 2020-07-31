@@ -26,6 +26,8 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
+import SpecialWires :: *;
+
 import Vector :: *;
 import ConfigReg :: *;
 import Printf :: *;
@@ -140,25 +142,6 @@ module mkRegUndef#(String name) (Reg#(a));
     error(sprintf("%s register read but not initialised", name));
   method Action _write(a val) =
     error(sprintf("%s register written but not initialised", name));
-endmodule
-
-// make a Default Concurent Wire
-module mkDCWire#(Integer n, t dflt) (Array#(Wire#(t))) provisos (Bits#(t, tw));
-  Wire#(t) ifc[n];
-  if (n > 0) begin
-    List#(RWire#(t)) newVal <- List::replicateM(n, mkRWire);
-    List#(Wire#(t)) prevVal <- List::replicateM(n, mkWire);
-    rule defVal; prevVal[0] <= dflt; endrule
-    for (Integer i = 0; i < n; i = i + 1) begin
-      t readVal = fromMaybe(prevVal[i], newVal[i].wget);
-      if (i < n-1) rule propagateVal; prevVal[i+1] <= readVal; endrule
-      ifc[i] = interface Wire#(t);
-        method _write = newVal[i].wset;
-        method _read  = readVal;
-      endinterface;
-    end
-  end
-  return ifc;
 endmodule
 
 // CReg with a ConfigReg at its core
