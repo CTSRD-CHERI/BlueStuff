@@ -33,9 +33,21 @@ import Vector :: * ;
 // A module which wants to count events must return some vector of events
 // However it is easier to count the events as a Struct within a module
 // So if the Struct is an instance of this class it can be returned as is
-typeclass BitVectorable #(type from, numeric type n, numeric type m);
-  function Vector #(m, Bit #(n)) toVector (from e);
+typeclass BitVectorable #(type from, numeric type n, numeric type m) dependencies (from determines (n, m));
+  function Vector #(m, Bit #(n)) to_vector (from e);
 endtypeclass
+
+instance BitVectorable #(Vector #(m, b), nn, mm)
+   provisos (Bits #(b, n), Add #(a__, n, nn), Add #(b__, m, mm));
+   function Vector #(mm, Bit #(nn)) to_vector (Vector #(m, b) e);
+      return append (map (zeroExtend, map (pack, e)), replicate (0));
+   endfunction
+endinstance
+
+function Vector #(mm, Bit #(nn)) to_large_vector (from e)
+   provisos (BitVectorable #(from, n, m), Add #(a__, n, nn), Add #(b__, m, mm));
+   return append (map (zeroExtend, to_vector (e)), replicate (0));
+endfunction
 
 // Write is exposed to only one counter per cycle
 // Could change write_* methods to return WriteOnly Vector if needed
@@ -132,19 +144,19 @@ module mkPerfCounters_Core (PerfCounters_IFC #(ctrs, ctrW, evts));
 endmodule
 
 // For a synthesize module, the values must be fixed
-`ifndef ctrs
-`define ctrs 29
+`ifndef NO_OF_CTRS
+`define NO_OF_CTRS 29
 `endif
-`ifndef ctrW
-`define ctrW 64
+`ifndef COUNTER_WIDTH
+`define COUNTER_WIDTH 64
 `endif
-`ifndef evts
-`define evts 63
+`ifndef NO_OF_EVTS
+`define NO_OF_EVTS 96
 `endif
 
 (* synthesize *)
-module mkPerfCounters (PerfCounters_IFC #(`ctrs, `ctrW, `evts));
-  PerfCounters_IFC #(`ctrs, `ctrW, `evts) perf_counters <- mkPerfCounters_Core;
+module mkPerfCounters (PerfCounters_IFC #(`NO_OF_CTRS, `COUNTER_WIDTH, `NO_OF_EVTS));
+  PerfCounters_IFC #(`NO_OF_CTRS, `COUNTER_WIDTH, `NO_OF_EVTS) perf_counters <- mkPerfCounters_Core;
   return perf_counters;
 endmodule
 
