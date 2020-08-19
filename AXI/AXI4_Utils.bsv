@@ -39,7 +39,7 @@ import AXI4_R_Utils :: *;
 // BlueStuff import
 import Routable :: *;
 `ifdef PERFORMANCE_MONITORING
-import PerformanceMonitor :: *;
+import MonitorWrapper :: *;
 `endif
 // BlueBasics import
 import SourceSink :: *;
@@ -618,88 +618,64 @@ endmodule
 ////////////////////////////////////////////////////////////////////////////////
 
 `ifdef PERFORMANCE_MONITORING
-module toAXI4_Shim_Perf #(AXI4_Shim#(a, b, c, d, e, f, g, h) shim)
+module monitorAXI4_Shim #(AXI4_Shim#(a, b, c, d, e, f, g, h) shim)
                          (Monitored#(AXI4_Shim#(a, b, c, d, e, f, g, h), Tuple2#(EventsAXI4, EventsAXI4)));
-  let masterPerf <- toAXI4_Master_Perf(shim.master);
-  let  slavePerf <- toAXI4_Slave_Perf(shim.slave);
-  interface mdle = interface AXI4_Shim;
+  let masterMonitor <- monitorAXI4_Master(shim.master);
+  let  slaveMonitor <- monitorAXI4_Slave(shim.slave);
+  interface ifc = interface AXI4_Shim;
     interface  clear = shim.clear;
-    interface master = masterPerf.mdle;
-    interface  slave = slavePerf.mdle;
+    interface master = masterMonitor.ifc;
+    interface  slave = slaveMonitor.ifc;
   endinterface;
-  method events = tuple2(masterPerf.events, slavePerf.events);
+  method events = tuple2(masterMonitor.events, slaveMonitor.events);
 endmodule
 
-module toAXI4_Master_Perf #(AXI4_Master#(a, b, c, d, e, f, g, h) master)
+module monitorAXI4_Master #(AXI4_Master#(a, b, c, d, e, f, g, h) master)
                            (Monitored#(AXI4_Master#(a, b, c, d, e, f, g, h), EventsAXI4));
-  let awPerf <- perfSource(master.aw);
-  let wPerf  <- perfSource(master.w);
-  let bPerf  <- perfSink(master.b);
-  let arPerf <- perfSource(master.ar);
-  let rPerf  <- perf_R_Sink(master.r);
-  interface mdle = interface AXI4_Master;
-    interface aw = awPerf.mdle;
-    interface w  = wPerf.mdle;
-    interface b  = bPerf.mdle;
-    interface ar = arPerf.mdle;
-    interface r  = rPerf.mdle;
+  let awMonitor <- monitorSource(master.aw);
+  let wMonitor  <- monitorSource(master.w);
+  let bMonitor  <- monitorSink(master.b);
+  let arMonitor <- monitorSource(master.ar);
+  let rMonitor  <- monitorLastSink(master.r);
+  interface ifc = interface AXI4_Master;
+    interface aw = awMonitor.ifc;
+    interface w  = wMonitor.ifc;
+    interface b  = bMonitor.ifc;
+    interface ar = arMonitor.ifc;
+    interface r  = rMonitor.ifc;
   endinterface;
   method events = EventsAXI4 {
-   evt_AR_FLIT : unpack(arPerf.events),
-   evt_AW_FLIT : unpack(awPerf.events),
-   evt_W_FLIT :  unpack(wPerf.events),
-   evt_R_FLIT :  unpack(rPerf.events[0]),
-   evt_R_FLIT_FINAL : unpack(rPerf.events[1]),
-   evt_B_FLIT :  unpack(bPerf.events)
+   evt_AR_FLIT : unpack(arMonitor.events),
+   evt_AW_FLIT : unpack(awMonitor.events),
+   evt_W_FLIT :  unpack(wMonitor.events),
+   evt_R_FLIT :  unpack(rMonitor.events[0]),
+   evt_R_FLIT_FINAL : unpack(rMonitor.events[1]),
+   evt_B_FLIT :  unpack(bMonitor.events)
   };
 endmodule
 
-module toAXI4_Slave_Perf #(AXI4_Slave#(a, b, c, d, e, f, g, h) slave)
-                           (Monitored#(AXI4_Slave#(a, b, c, d, e, f, g, h), EventsAXI4));
-  let awPerf <- perfSink(slave.aw);
-  let wPerf  <- perfSink(slave.w);
-  let bPerf  <- perfSource(slave.b);
-  let arPerf <- perfSink(slave.ar);
-  let rPerf  <- perf_R_Source(slave.r);
-  interface mdle = interface AXI4_Slave;
-    interface aw = awPerf.mdle;
-    interface w  = wPerf.mdle;
-    interface b  = bPerf.mdle;
-    interface ar = arPerf.mdle;
-    interface r  = rPerf.mdle;
+module monitorAXI4_Slave #(AXI4_Slave#(a, b, c, d, e, f, g, h) slave)
+                          (Monitored#(AXI4_Slave#(a, b, c, d, e, f, g, h), EventsAXI4));
+  let awMonitor <- monitorSink(slave.aw);
+  let wMonitor  <- monitorSink(slave.w);
+  let bMonitor  <- monitorSource(slave.b);
+  let arMonitor <- monitorSink(slave.ar);
+  let rMonitor  <- monitorLastSource(slave.r);
+  interface ifc = interface AXI4_Slave;
+    interface aw = awMonitor.ifc;
+    interface w  = wMonitor.ifc;
+    interface b  = bMonitor.ifc;
+    interface ar = arMonitor.ifc;
+    interface r  = rMonitor.ifc;
   endinterface;
   method events = EventsAXI4 {
-   evt_AR_FLIT : unpack(arPerf.events),
-   evt_AW_FLIT : unpack(awPerf.events),
-   evt_W_FLIT :  unpack(wPerf.events),
-   evt_R_FLIT :  unpack(rPerf.events[0]),
-   evt_R_FLIT_FINAL : unpack(rPerf.events[1]),
-   evt_B_FLIT :  unpack(bPerf.events)
+   evt_AR_FLIT : unpack(arMonitor.events),
+   evt_AW_FLIT : unpack(awMonitor.events),
+   evt_W_FLIT :  unpack(wMonitor.events),
+   evt_R_FLIT :  unpack(rMonitor.events[0]),
+   evt_R_FLIT_FINAL : unpack(rMonitor.events[1]),
+   evt_B_FLIT :  unpack(bMonitor.events)
   };
-endmodule
-
-module perf_R_Source #(Source#(AXI4_RFlit#(id_, data_, ruser_)) s) (Monitored#(Source#(AXI4_RFlit#(id_, data_, ruser_)), Bit#(2)));
-  Wire#(Bit#(2)) evt <- mkDWire(0);
-  interface mdle = interface Source;
-    method canPeek = s.canPeek;
-    method peek = s.peek;
-    method drop = action
-      s.drop;
-      evt <= {pack(s.peek.rlast), 1};
-    endaction;
-  endinterface;
-  method events = evt;
-endmodule
-module perf_R_Sink #(Sink#(AXI4_RFlit#(id_, data_, ruser_)) s) (Monitored#(Sink#(AXI4_RFlit#(id_, data_, ruser_)), Bit#(2)));
-  Wire#(Bit#(2)) evt <- mkDWire(0);
-  interface mdle = interface Sink;
-    method canPut = s.canPut;
-    method put (x) = action
-      s.put(x);
-      evt <= {pack(x.rlast), 1};
-    endaction;
-  endinterface;
-  method events = evt;
 endmodule
 `endif
 

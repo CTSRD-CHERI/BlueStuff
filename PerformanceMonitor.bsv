@@ -60,12 +60,6 @@ function Vector#(m, Bit#(1)) struct_to_vector (from e) provisos (Bits#(from, m))
 endfunction
 
 
-// Wrapper interface for reporting events of a given module
-interface Monitored#(type original_module, type bitvec);
-  interface original_module mdle;
-  method bitvec events provisos (BitVectorable#(bitvec, n, m));
-endinterface
-
 // Write is exposed to only one counter per cycle
 // Could change write_* methods to return WriteOnly Vector if needed
 interface PerfCounters_IFC#(numeric type ctrs, numeric type ctrW, numeric type evts);   
