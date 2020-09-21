@@ -38,6 +38,10 @@ import MasterSlave :: *;
 
 import AXI4_AXI4Lite_Types :: *;
 
+`ifdef PERFORMANCE_MONITORING
+import PerformanceMonitor :: *;
+`endif
+
 //////////////////
 // helper types //
 ////////////////////////////////////////////////////////////////////////////////
@@ -878,6 +882,21 @@ interface AXI4_Shim_Synth#(
     id_, addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_
   ) slave;
 endinterface
+
+`ifdef PERFORMANCE_MONITORING
+typedef struct {
+   Bool evt_AR_FLIT;
+   Bool evt_AW_FLIT;
+   Bool evt_W_FLIT;
+   Bool evt_R_FLIT;
+   Bool evt_R_FLIT_FINAL;
+   Bool evt_B_FLIT;
+} EventsAXI4 deriving (Bits, FShow);
+
+instance BitVectorable#(EventsAXI4, 1, n) provisos (Bits#(EventsAXI4, n));
+   function to_vector = struct_to_vector;
+endinstance
+`endif
 
 ////////////////////////////////
 // AXI4 Connectable instances //
