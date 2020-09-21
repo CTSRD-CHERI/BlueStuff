@@ -144,11 +144,9 @@ module mkPerfCounters (PerfCounters_IFC#(ctrs, ctrW, evts));
     regToReadOnly(wr_overflow);
 
 
-  method write_counter (Bit#(TLog#(ctrs)) idx) =
-    vec_rg_counter[idx][1]._write;
+  method write_counter (idx) = vec_rg_counter[idx][1]._write;
 
-  method write_ctr_sel (Bit#(TLog#(ctrs)) idx) =
-    vec_rg_event_sel[idx]._write;
+  method write_ctr_sel (idx) = vec_rg_event_sel[idx]._write;
 
   method write_ctr_inhibit = rg_ctr_inhibit._write;
 endmodule
