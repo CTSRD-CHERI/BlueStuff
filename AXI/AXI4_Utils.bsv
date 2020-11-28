@@ -336,13 +336,13 @@ module mkSerialiser #(AXI4_Master#(a, b, c, d, e, f, g, h) m)
 
   (* mutually_exclusive = "takeR, takeB" *)
 
-  rule takeB;
+  rule takeB (state[1] == WAITING);
     let bFlit <- get(slv.b);
     m.b.put(bFlit);
     state[1] <= IDLE;
   endrule
 
-  rule takeR;
+  rule takeR (state[1] == WAITING);
     let rFlit <- get(slv.r);
     m.r.put(rFlit);
     if (rFlit.rlast) state[1] <= IDLE;
