@@ -958,23 +958,23 @@ instance FallibleRoute#( AXI4_WriteFlit#(sid_, addr_, data_, awuser_, wuser_)
                        , AXI4_BFlit#(sid_, buser_));
   module mkNoRouteSlave (Slave #( AXI4_WriteFlit#(sid_, addr_, data_, awuser_, wuser_)
                                 , AXI4_BFlit#(sid_, buser_)));
-    Reg #(Maybe #(Bit #(sid_))) m_send_rsp[2] <- mkCReg (2, Invalid);
-    Reg #(Bool)              drain_until_last <- mkReg (False);
+    Reg #(Maybe #(Bit #(sid_))) m_send_rsp       <- mkReg (Invalid);
+    Reg #(Bool)                 drain_until_last <- mkReg (False);
     interface sink = interface Sink;
-      method canPut = drain_until_last || !isValid (m_send_rsp[0]);
-      method put (req) if (drain_until_last || !isValid (m_send_rsp[0])) = action
+      method canPut = drain_until_last || !isValid (m_send_rsp);
+      method put (req) if (drain_until_last || !isValid (m_send_rsp)) = action
         case (req) matches
-          tagged FirstFlit {.aw, ._}: m_send_rsp[0] <= Valid (aw.awid);
+          tagged FirstFlit {.aw, ._}: m_send_rsp <= Valid (aw.awid);
         endcase
         drain_until_last <= !isLast (req);
       endaction;
     endinterface;
     interface source = interface Source;
-      method canPeek = isValid (m_send_rsp[1]);
-      method peek if (isValid (m_send_rsp[1])) =
-        AXI4_BFlit{ bid: m_send_rsp[1].Valid, bresp: DECERR, buser: ? };
-      method drop if (isValid (m_send_rsp[1])) =
-        writeReg (m_send_rsp[1], Invalid);
+      method canPeek = isValid (m_send_rsp);
+      method peek if (isValid (m_send_rsp)) =
+        AXI4_BFlit{ bid: m_send_rsp.Valid, bresp: DECERR, buser: ? };
+      method drop if (isValid (m_send_rsp)) =
+        writeReg (m_send_rsp, Invalid);
     endinterface;
   endmodule
 endinstance
@@ -1000,24 +1000,24 @@ instance FallibleRoute#( AXI4_ARFlit#(sid_, addr_, aruser_)
                        , AXI4_RFlit#(sid_, data_, ruser_));
   module mkNoRouteSlave (Slave #( AXI4_ARFlit#(sid_, addr_, aruser_)
                                 , AXI4_RFlit#(sid_, data_, ruser_)));
-    Reg#(AXI4_ARFlit#(sid_, addr_, aruser_)) currentReq[2] <- mkCReg(2, ?);
-    Reg#(Bit#(TAdd#(SizeOf#(AXI4_Len), 1)))   flitCount[2] <- mkCReg(2, 0);
+    Reg#(AXI4_ARFlit#(sid_, addr_, aruser_)) currentReq <- mkRegU;
+    Reg#(Bit#(TAdd#(SizeOf#(AXI4_Len), 1)))   flitCount <- mkReg(0);
     interface sink = interface Sink;
-      method canPut = flitCount[0] == 0;
-      method put (req) if (flitCount[0] == 0) = action
-        currentReq[0] <= req;
-        flitCount[0]  <= zeroExtend(req.arlen) + 1;
+      method canPut = flitCount == 0;
+      method put (req) if (flitCount == 0) = action
+        currentReq <= req;
+        flitCount  <= zeroExtend(req.arlen) + 1;
       endaction;
     endinterface;
     interface source = interface Source;
-      method canPeek = flitCount[1] != 0;
-      method peek if (flitCount[1] != 0) = AXI4_RFlit{ rid: currentReq[1].arid
-                                                     , rdata: ?
-                                                     , rresp: DECERR
-                                                     , rlast: flitCount[1] == 1
-                                                     , ruser: ? };
-      method drop if (flitCount[1] != 0) = action
-        flitCount[1] <= flitCount[1] - 1;
+      method canPeek = flitCount != 0;
+      method peek if (flitCount != 0) = AXI4_RFlit{ rid: currentReq.arid
+                                                  , rdata: ?
+                                                  , rresp: DECERR
+                                                  , rlast: flitCount == 1
+                                                  , ruser: ? };
+      method drop if (flitCount != 0) = action
+        flitCount <= flitCount - 1;
       endaction;
     endinterface;
   endmodule
