@@ -26,7 +26,7 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
-package MonitorWrapper; 
+package MonitorWrapper;
 
 import Vector :: *;
 
@@ -34,6 +34,7 @@ import SourceSink :: *;
 
 import Routable :: *;
 import PerformanceMonitor :: *;
+import Interconnect :: *;
 
 
 // Wrapper interface for reporting events of a given interface
@@ -70,27 +71,27 @@ module monitorSink #(Sink#(t) s) (Monitored#(Sink#(t), Bit#(1)));
 endmodule
 // Count drop (at events[0]) and drop last (at events[1])
 module monitorLastSource #(Source#(t) s) (Monitored#(Source#(t), Bit#(2)))
-  provisos (DetectLast#(t));
+  provisos (Has_isLast#(t));
   Wire#(Bit#(2)) evt <- mkDWire(0);
   interface ifc = interface Source;
     method canPeek = s.canPeek;
     method peek = s.peek;
     method drop = action
       s.drop;
-      evt <= {pack(detectLast(s.peek)), 1};
+      evt <= {pack(isLast(s.peek)), 1};
     endaction;
   endinterface;
   method events = evt;
 endmodule
 // Count put (at events[0]) and put last (at events[1])
 module monitorLastSink #(Sink#(t) s) (Monitored#(Sink#(t), Bit#(2)))
-  provisos (DetectLast#(t));
+  provisos (Has_isLast#(t));
   Wire#(Bit#(2)) evt <- mkDWire(0);
   interface ifc = interface Sink;
     method canPut = s.canPut;
     method put (x) = action
       s.put(x);
-      evt <= {pack(detectLast(x)), 1};
+      evt <= {pack(isLast(x)), 1};
     endaction;
   endinterface;
   method events = evt;

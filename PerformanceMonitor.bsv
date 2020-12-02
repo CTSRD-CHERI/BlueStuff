@@ -26,7 +26,7 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
-package PerformanceMonitor; 
+package PerformanceMonitor;
 
 import Vector :: *;
 
@@ -62,9 +62,9 @@ endfunction
 
 // Write is exposed to only one counter per cycle
 // Could change write_* methods to return WriteOnly Vector if needed
-interface PerfCounters_IFC#(numeric type ctrs, numeric type ctrW, numeric type evts);   
+interface PerfCounters_IFC#(numeric type ctrs, numeric type ctrW, numeric type rptW, numeric type evts);
   (* always_ready, always_enabled *)
-  method Action send_performance_events (Vector#(evts, Bit#(ctrW)) evts);
+  method Action send_performance_events (Vector#(evts, Bit#(rptW)) evts);
 
   (* always_ready *)
   method Vector#(ctrs, ReadOnly#(Bit#(ctrW))) read_counters;
@@ -84,7 +84,8 @@ interface PerfCounters_IFC#(numeric type ctrs, numeric type ctrW, numeric type e
 endinterface
 
 
-module mkPerfCounters (PerfCounters_IFC#(ctrs, ctrW, evts));
+module mkPerfCounters (PerfCounters_IFC#(ctrs, ctrW, rptW, evts))
+  provisos (Add#(rptW, _a, ctrW));
   let ctrs = valueOf(ctrs);
   let ctrW = valueOf(ctrW);
   let evts = valueOf(evts);
@@ -106,13 +107,13 @@ module mkPerfCounters (PerfCounters_IFC#(ctrs, ctrW, evts));
   // occured in the given cycle. The maximum is 2^ctrW, but an event 'should'
   // never happen so many times in a cycle:
   // So map zeroExtend to the vector before passing it to this method
-  method Action send_performance_events (Vector#(evts, Bit#(ctrW)) events);
+  method Action send_performance_events (Vector#(evts, Bit#(rptW)) events);
     Bit#(ctrs) overflow = 0;
     for (Integer i = 0; i < ctrs; i = i + 1) begin
       // Get the number of times the selected event fired this cycle
       Bit#(ctrW) event_count = 0;
       if (vec_rg_event_sel[i] <= fromInteger(evts - 1))
-      event_count = events[vec_rg_event_sel[i]];
+      event_count = zeroExtend(events[vec_rg_event_sel[i]]);
 
       // Check that the given counter is not inhibited
       Bool inhibit = unpack(rg_ctr_inhibit[i]);
