@@ -92,10 +92,10 @@ module mkPerfCounters (PerfCounters_IFC#(ctrs, ctrW, rptW, evts))
 
   // Event counters
   Vector#(ctrs, Array#(Reg#(Bit#(ctrW))))
-    vec_rg_counter <- replicateM(mkCRegU(2));
+    vec_rg_counter <- replicateM(mkCReg(2,0));
   // Which event the corresponding counter will count
   Vector#(ctrs, Reg#(Bit#(TLog#(evts))))
-    vec_rg_event_sel <- replicateM(mkRegU);
+    vec_rg_event_sel <- replicateM(mkReg(0));
 
   Reg#(Bit#(ctrs)) rg_ctr_inhibit <- mkReg(0);
   Wire#(Bit#(ctrs)) wr_overflow <- mkDWire(0);
