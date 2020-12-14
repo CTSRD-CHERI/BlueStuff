@@ -59,6 +59,11 @@ function Vector#(m, Bit#(1)) struct_to_vector (from e) provisos (Bits#(from, m))
    return reverse(unpack(pack(e)));
 endfunction
 
+function Bit#(n) saturating_truncate(Bit#(m) wide)
+    provisos (Add#(n,a_,m)); // SizeOf m > SizeOf n
+    Bit#(TSub#(m,n)) msb = truncateLSB(wide);
+    return (msb == 0) ? truncate(wide) : ~0;
+endfunction
 
 // Write is exposed to only one counter per cycle
 // Could change write_* methods to return WriteOnly Vector if needed
