@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2020 Jonas Fiala
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -26,20 +26,33 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
-package BlueUtils;
+package SpecialRegs;
 
-import SimpleUtils :: *;
-import SimUtils :: *;
-import Mem :: *;
-import FF :: *;
+export mkDRegOR;
+
+import List :: *;
 import SpecialWires :: *;
-import SpecialRegs :: *;
 
-export SimpleUtils :: *;
-export SimUtils :: *;
-export Mem :: *;
-export FF :: *;
-export SpecialWires :: *;
-export SpecialRegs :: *;
+module mkDRegOR #( Integer n
+                  , a_bits init
+  ) (Array #(Reg #(a_bits))) provisos (
+    Bits #(a_bits, bit_size));
+
+  let wires <- mkDWireOR (n, (init));
+  Reg #(a_bits) register <- mkReg(unpack(0));
+
+  rule update_reg;
+      register <= wires[0];
+  endrule
+
+  Reg#(a_bits) ifc[n];
+  for (Integer i = 0; i < n; i = i + 1) begin
+    ifc[i] = interface Wire;
+      method _read = register;
+      method _write = writeReg (wires[i]);
+    endinterface;
+  end
+  return ifc;
+endmodule
 
 endpackage
