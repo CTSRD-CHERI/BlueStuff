@@ -187,7 +187,8 @@ module mkOneWayBus_core #(
   // already transferring a multi-flit packet. The arbiter receives the
   // activeRequest vector and produces on the selectInput wire a one hot vector
   // identifying the unique selected input.
-  let arbiter <- mkOneHotArbiter (toList (activeRequest));
+  //let arbiter <- mkOneHotArbiter (toList (activeRequest)); // XXX something is wrong with the arbiter possibly due to compiler bug.
+  let arbiter <- mkOneHotArbiterStatic (toList (activeRequest));
   Vector#(nI, Wire#(Bool)) selectInput <- replicateM(mkDWire(False));
   rule arbitrate (!isValid (moreFlits));
     let nexts <- arbiter.next;

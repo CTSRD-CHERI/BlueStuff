@@ -95,4 +95,17 @@ module mkOneHotArbiter#(List#(t) xs) (OneHotArbiter) provisos (Arbitrable#(t));
   endactionvalue;
 endmodule
 
+module mkOneHotArbiterStatic#(List#(Bool) xs) (OneHotArbiter);
+  Integer n = length(xs);
+  method next = actionvalue
+    Bool found = False;
+    List#(Bool) newSel = xs;
+    for (Integer i = 0; i < n; i = i + 1) begin
+      if (found) newSel[i] = False;
+      if (!found && xs[i]) found = True;
+    end
+    return newSel;
+  endactionvalue;
+endmodule
+
 endpackage
