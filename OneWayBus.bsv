@@ -188,14 +188,13 @@ module mkOneWayBus_core #(
   // activeRequest vector and produces on the selectInput wire a one hot vector
   // identifying the unique selected input.
   //let arbiter <- mkOneHotArbiter (toList (activeRequest)); // XXX something is wrong with the arbiter possibly due to compiler bug.
-  let arbiter <- mkOneHotArbiterStatic (toList (activeRequest));
   Vector#(nI, Wire#(Bool)) selectInput <- replicateM(mkDWire(False));
   rule arbitrate (!isValid (moreFlits));
-    let nexts <- arbiter.next;
-    writeVReg (selectInput, toVector(nexts));
-    if (verbose_arbitration) $display (
-      "%0t -- %m debug: arbiter receives: ", $time, fshow (activeRequest)
-      , ", next selectInput: ", fshow (nexts));
+    function Bool id(Bool b) = b;
+    if (findIndex(id, activeRequest) matches tagged Valid .next) selectInput[next] <= True;
+    //if (verbose_arbitration) $display (
+    //  "%0t -- %m debug: arbiter receives: ", $time, fshow (activeRequest)
+    //  , ", next selectInput: ", fshow (nexts));
   endrule
   if (verbose_arbitration) begin
     rule arbitrate_debug;
