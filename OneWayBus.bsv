@@ -189,13 +189,18 @@ module mkOneWayBus_core #(
   // identifying the unique selected input.
   //let arbiter <- mkOneHotArbiter (toList (activeRequest)); // XXX something is wrong with the arbiter possibly due to compiler bug.
   Vector#(nI, Wire#(Bool)) selectInput <- replicateM(mkDWire(False));
-  Reg#(UInt#(TLog#(nI))) last <- mkRegU;
+  Bit#(TLog#(nI)) last_idx = fromInteger(valueOf(nI) - 1);
+  Reg#(Bit#(TLog#(nI))) prev <- mkReg(0);
   rule arbitrate (!isValid (moreFlits));
-    function Bool id(Bool b) = b;
-    UInt#(TLog#(nI)) sa = fromInteger(valueOf(nI) - 1) - last;
-    if (findIndex(id, rotateBy(activeRequest, sa)) matches tagged Valid .next) begin
-      selectInput[next - sa] <= True;
-      last <= next - sa;
+    Maybe#(Bit#(TLog#(nI))) found = Invalid;
+    Bit#(TLog#(nI)) idx = prev;
+    for (Integer n = 0; n < valueOf(nI); n = n + 1) begin
+      if (activeRequest[idx]) found = Valid(idx);
+      idx = (idx == last_idx) ? 0 : idx + 1;
+    end
+    if (found matches tagged Valid .idx) begin
+      selectInput[idx] <= True;
+      prev <= idx;
     end
     //if (verbose_arbitration) $display (
     //  "%0t -- %m debug: arbiter receives: ", $time, fshow (activeRequest)
