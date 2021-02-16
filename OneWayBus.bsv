@@ -37,6 +37,9 @@ import OneHotArbiter :: *;
 
 import Vector :: *;
 
+`define PREFERRED_ARBITER mkFairOneHotArbiter
+//`define PREFERRED_ARBITER mkStaticOneHotArbiter
+
 ///////////////////////////////
 // One-way bus core wrappers //
 ////////////////////////////////////////////////////////////////////////////////
@@ -53,7 +56,7 @@ module mkOneWayBus #(
 , Add #(1, a__, nI) // at least one input is needed
 , Add #(1, b__, nO) // at least one output is needed
 );
-  mkOneWayBus_core (route, Invalid, ins, outs);
+  mkOneWayBus_core (`PREFERRED_ARBITER, route, Invalid, ins, outs);
 endmodule
 module mkOneWayBusNoRoute #(
   function Vector #(nO, Bool) route (r_t x) // the routing function to use
@@ -69,20 +72,23 @@ module mkOneWayBusNoRoute #(
 , Add #(1, a__, nI) // at least one input is needed
 , Add #(1, b__, nO) // at least one output is needed
 );
-  mkOneWayBus_core (route, Valid (toSink (dflt_out)), ins, outs);
+  mkOneWayBus_core ( `PREFERRED_ARBITER, route, Valid (toSink (dflt_out))
+                   , ins, outs );
 endmodule
 
 /////////////////////////////
 // One-way bus core module //
 ////////////////////////////////////////////////////////////////////////////////
 module mkOneWayBus_core #(
-  // 1st arg - routing function
-  function Vector #(nO, Bool) route (r_t x)
-  // 2nd arg - Default output to use on route failure
+  // 1st arg - arbiter constructor
+  function module #(OneHotArbiter) mkOneHotArbiter (List#(Bool) reqs)
+  // 2nd arg - routing function
+, function Vector #(nO, Bool) route (r_t x)
+  // 3rd arg - Default output to use on route failure
 , Maybe #(Sink #(flit_t)) m_dfltOutputSnk
-  // 3rd arg - all inputs
+  // 4th arg - all inputs
 , Vector #(nI, in_t) ins
-  // 4th arg - all outputs
+  // 5th arg - all outputs
 , Vector #(nO, out_t) outs
 ) (Empty) provisos (
   ToSource #(in_t, flit_t)
@@ -187,24 +193,14 @@ module mkOneWayBus_core #(
   // already transferring a multi-flit packet. The arbiter receives the
   // activeRequest vector and produces on the selectInput wire a one hot vector
   // identifying the unique selected input.
-  //let arbiter <- mkOneHotArbiter (toList (activeRequest)); // XXX something is wrong with the arbiter possibly due to compiler bug.
+  let arbiter <- mkOneHotArbiter (toList (activeRequest));
   Vector#(nI, Wire#(Bool)) selectInput <- replicateM(mkDWire(False));
-  Bit#(TLog#(nI)) last_idx = fromInteger(valueOf(nI) - 1);
-  Reg#(Bit#(TLog#(nI))) prev <- mkReg(0);
   rule arbitrate (!isValid (moreFlits));
-    Maybe#(Bit#(TLog#(nI))) found = Invalid;
-    Bit#(TLog#(nI)) idx = prev;
-    for (Integer n = 0; n < valueOf(nI); n = n + 1) begin
-      if (activeRequest[idx]) found = Valid(idx);
-      idx = (idx == last_idx) ? 0 : idx + 1;
-    end
-    if (found matches tagged Valid .idx) begin
-      selectInput[idx] <= True;
-      prev <= idx;
-    end
-    //if (verbose_arbitration) $display (
-    //  "%0t -- %m debug: arbiter receives: ", $time, fshow (activeRequest)
-    //  , ", next selectInput: ", fshow (nexts));
+    let nexts <- arbiter.next;
+    writeVReg (selectInput, toVector(nexts));
+    if (verbose_arbitration) $display (
+      "%0t -- %m debug: arbiter receives: ", $time, fshow (activeRequest)
+      , ", next selectInput: ", fshow (nexts));
   endrule
   if (verbose_arbitration) begin
     rule arbitrate_debug;

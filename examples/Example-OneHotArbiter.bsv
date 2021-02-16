@@ -32,11 +32,14 @@ import List :: *;
 import FIFOF :: *;
 import LFSR :: *;
 
+//`define PREFERRED_ARBITER(x) mkFairOneHotArbiter(x)
+`define PREFERRED_ARBITER(x) mkStaticOneHotArbiter(x)
+
 module top (Empty);
 
   Integer n = 6;
   let participants <- replicateM(n, mkFIFOF);
-  let arbiter <- mkOneHotArbiter(participants);
+  let arbiter <- `PREFERRED_ARBITER(participants);
   let isNext <- replicateM(n, mkPulseWire);
 
   Reg#(Bool) isReset <- mkReg(True);

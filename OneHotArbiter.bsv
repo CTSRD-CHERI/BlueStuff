@@ -60,11 +60,11 @@ endinterface
 
 // Arbiter module
 
-module mkOneHotArbiter#(List#(t) xs) (OneHotArbiter) provisos (Arbitrable#(t));
+module mkFairOneHotArbiter#(List#(t) xs) (OneHotArbiter) provisos (Arbitrable#(t));
   // assertion
   Integer n = length(xs);
   if (n < 1)
-    error(sprintf("mkOneHotArbiter can't arbitrate less than 1 participant (%0d given)", n));
+    error(sprintf("mkFairOneHotArbiter can't arbitrate less than 1 participant (%0d given)", n));
   // internal state
   //////////////////////////////////////////////////////////////////////////////
   Reg#(Bool)          firstHot <- mkReg(True);
@@ -81,9 +81,9 @@ module mkOneHotArbiter#(List#(t) xs) (OneHotArbiter) provisos (Arbitrable#(t));
     // elect the next participant
     List#(Bool) newSel = lastSel;
     Maybe#(List#(Bool)) elected = firstHotToOneHot(searchList);
-    if (isValid(elected)) newSel = oneHotRotateRBy(elected.Valid, lastSel);
+    if (isValid(elected)) newSel = oneHotRotateRBy(lastSel, elected.Valid);
     else begin // This should never happen
-      $display("mkOneHotArbiter: next method should not be run with no pending request");
+      $display("mkFairOneHotArbiter: next method should not be run with no pending request");
       $finish(0);
     end
     // update lastSel
@@ -95,14 +95,21 @@ module mkOneHotArbiter#(List#(t) xs) (OneHotArbiter) provisos (Arbitrable#(t));
   endactionvalue;
 endmodule
 
-module mkOneHotArbiterStatic#(List#(Bool) xs) (OneHotArbiter);
+module mkStaticOneHotArbiter#(List#(t) xs) (OneHotArbiter) provisos (Arbitrable#(t));
   Integer n = length(xs);
-  method next = actionvalue
+  if (n < 1)
+    error(sprintf("mkStaticOneHotArbiter can't arbitrate less than 1 participant (%0d given)", n));
+  List#(Bool) pending = map(isRequesting, xs);
+  method next if (\or (pending)) = actionvalue
     Bool found = False;
-    List#(Bool) newSel = xs;
-    for (Integer i = 0; i < n; i = i + 1) begin
-      if (found) newSel[i] = False;
-      if (!found && xs[i]) found = True;
+    List#(Bool) newSel = replicate (n, False);
+    for (Integer i = 0; i < n; i = i + 1) if (pending[i] && !found) begin
+      newSel[i] = True;
+      found = True;
+    end
+    if (!found) begin
+      $display("mkStaticOneHotArbiter: next method should not be run with no pending request");
+      $finish(0);
     end
     return newSel;
   endactionvalue;
