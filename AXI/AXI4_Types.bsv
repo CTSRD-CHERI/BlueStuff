@@ -1,6 +1,7 @@
 /*-
  * Copyright (c) 2018-2020 Alexandre Joannou
  * Copyright (c) 2019 Peter Rugg
+ * Copyright (c) 2021 Marno van der Maas
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -84,7 +85,7 @@ instance Has_isLast #(AXI4_AWFlit #(id_, addr_, user_));
   function isLast = constFn (True);
 endinstance
 
-// Master interfaces
+// Initiator/Master interfaces
 (* always_ready, always_enabled *)
 interface AXI4_AW_Master_Synth#(numeric type id_,
                                 numeric type addr_,
@@ -103,6 +104,7 @@ interface AXI4_AW_Master_Synth#(numeric type id_,
   method Bool        awvalid;
   (* prefix="" *) method Action awready(Bool awready);
 endinterface
+typedef AXI4_AW_Master_Synth AXI4_AW_Initiator_Synth;
 
 instance CulDeSac#(AXI4_AW_Master_Synth#(id_, addr_, user_));
   function culDeSac = interface AXI4_AW_Master_Synth;
@@ -141,6 +143,7 @@ interface AXI4_AW_Slave_Synth#(numeric type id_,
                                        , Bit#(user_) awuser);
   method Bool awready;
 endinterface
+typedef AXI4_AW_Slave_Synth AXI4_AW_Target_Synth;
 
 instance CulDeSac#(AXI4_AW_Slave_Synth#(id_, addr_, user_));
   function culDeSac = interface AXI4_AW_Slave_Synth;
@@ -200,7 +203,7 @@ instance Has_isLast #(AXI4_WFlit #(data_, user_));
   function isLast (x) = x.wlast;
 endinstance
 
-// Master interfaces
+// Initiator/Master interfaces
 (* always_ready, always_enabled *)
 interface AXI4_W_Master_Synth#(numeric type data_, numeric type user_);
   method Bit#(data_)           wdata;
@@ -210,6 +213,7 @@ interface AXI4_W_Master_Synth#(numeric type data_, numeric type user_);
   method Bool                  wvalid;
   (* prefix="" *) method Action wready(Bool wready);
 endinterface
+typedef AXI4_W_Master_Synth AXI4_W_Initiator_Synth;
 
 instance CulDeSac#(AXI4_W_Master_Synth#(data_, user_));
   function culDeSac = interface AXI4_W_Master_Synth;
@@ -222,7 +226,7 @@ instance CulDeSac#(AXI4_W_Master_Synth#(data_, user_));
   endinterface;
 endinstance
 
-// Slave interfaces
+// Target/Slave interfaces
 (* always_ready, always_enabled *)
 interface AXI4_W_Slave_Synth#(numeric type data_, numeric type user_);
   (* prefix="" *) method Action wflit ( Bool                  wvalid
@@ -232,6 +236,7 @@ interface AXI4_W_Slave_Synth#(numeric type data_, numeric type user_);
                                       , Bit#(user_)           wuser);
   method Bool wready;
 endinterface
+typedef AXI4_W_Slave_Synth AXI4_W_Target_Synth;
 
 instance CulDeSac#(AXI4_W_Slave_Synth#(data_, user_));
   function culDeSac = interface AXI4_W_Slave_Synth;
@@ -275,7 +280,7 @@ instance Has_isLast #(AXI4_BFlit #(id_, user_));
   function isLast = constFn (True);
 endinstance
 
-// Master interfaces
+// Initiator/Master interfaces
 (* always_ready, always_enabled *)
 interface AXI4_B_Master_Synth#(numeric type id_, numeric type user_);
   (* prefix="" *) method Action bflit ( Bool        bvalid
@@ -284,6 +289,7 @@ interface AXI4_B_Master_Synth#(numeric type id_, numeric type user_);
                                       , Bit#(user_) buser);
   method Bool bready;
 endinterface
+typedef AXI4_B_Master_Synth AXI4_B_Initiator_Synth;
 
 instance CulDeSac#(AXI4_B_Master_Synth#(id_, user_));
   function culDeSac = interface AXI4_B_Master_Synth;
@@ -292,7 +298,7 @@ instance CulDeSac#(AXI4_B_Master_Synth#(id_, user_));
   endinterface;
 endinstance
 
-// Slave interfaces
+// Target/Slave interfaces
 (* always_ready, always_enabled *)
 interface AXI4_B_Slave_Synth#(numeric type id_, numeric type user_);
   method Bit#(id_)   bid;
@@ -301,6 +307,7 @@ interface AXI4_B_Slave_Synth#(numeric type id_, numeric type user_);
   method Bool        bvalid;
   (* prefix="" *) method Action bready(Bool bready);
 endinterface
+typedef AXI4_B_Slave_Synth AXI4_B_Target_Synth;
 
 instance CulDeSac#(AXI4_B_Slave_Synth#(id_, user_));
   function culDeSac = interface AXI4_B_Slave_Synth;
@@ -363,7 +370,7 @@ instance Has_isLast #(AXI4_ARFlit #(id_, addr_, user_));
   function isLast = constFn (True);
 endinstance
 
-// Master interfaces
+// Initiator/Master interfaces
 (* always_ready, always_enabled *)
 interface AXI4_AR_Master_Synth#(numeric type id_,
                                 numeric type addr_,
@@ -382,6 +389,7 @@ interface AXI4_AR_Master_Synth#(numeric type id_,
   method Bool        arvalid;
   (* prefix="" *) method Action arready(Bool arready);
 endinterface
+typedef AXI4_AR_Master_Synth AXI4_AR_Initiator_Synth;
 
 instance CulDeSac#(AXI4_AR_Master_Synth#(id_, addr_, user_));
   function culDeSac = interface AXI4_AR_Master_Synth;
@@ -401,7 +409,7 @@ instance CulDeSac#(AXI4_AR_Master_Synth#(id_, addr_, user_));
   endinterface;
 endinstance
 
-// Slave interfaces
+// Target/Slave interfaces
 (* always_ready, always_enabled *)
 interface AXI4_AR_Slave_Synth#(numeric type id_,
                                numeric type addr_,
@@ -420,6 +428,7 @@ interface AXI4_AR_Slave_Synth#(numeric type id_,
                                        , Bit#(user_) aruser);
   method Bool arready;
 endinterface
+typedef AXI4_AR_Slave_Synth AXI4_AR_Target_Synth;
 
 instance CulDeSac#(AXI4_AR_Slave_Synth#(id_, addr_, user_));
   function culDeSac = interface AXI4_AR_Slave_Synth;
@@ -481,7 +490,7 @@ instance Has_isLast #(AXI4_RFlit #(id_, data_, user_));
   function isLast (x) = x.rlast;
 endinstance
 
-// Master interfaces
+// Initiator/Master interfaces
 (* always_ready, always_enabled *)
 interface AXI4_R_Master_Synth#(numeric type id_,
                                numeric type data_,
@@ -494,6 +503,7 @@ interface AXI4_R_Master_Synth#(numeric type id_,
                                       , Bit#(user_) ruser);
   method Bool rready;
 endinterface
+typedef AXI4_R_Master_Synth AXI4_R_Initiator_Synth;
 
 instance CulDeSac#(AXI4_R_Master_Synth#(id_, data_, user_));
   function culDeSac = interface AXI4_R_Master_Synth;
@@ -502,7 +512,7 @@ instance CulDeSac#(AXI4_R_Master_Synth#(id_, data_, user_));
   endinterface;
 endinstance
 
-// Slave interfaces
+// Target/Slave interfaces
 (* always_ready, always_enabled *)
 interface AXI4_R_Slave_Synth#(numeric type id_,
                               numeric type data_,
@@ -515,6 +525,7 @@ interface AXI4_R_Slave_Synth#(numeric type id_,
   method Bool        rvalid;
   (* prefix="" *) method Action rready(Bool rready);
 endinterface
+typedef AXI4_R_Slave_Synth AXI4_R_Target_Synth;
 
 instance CulDeSac#(AXI4_R_Slave_Synth#(id_, data_, user_));
   function culDeSac = interface AXI4_R_Slave_Synth;
@@ -549,7 +560,7 @@ instance Connectable#(AXI4_R_Slave_Synth#(a, b, c),
 endinstance
 
 /////////////////
-// AXI4 Master //
+// AXI4 Initiator/Master //
 ////////////////////////////////////////////////////////////////////////////////
 
 interface AXI4_Master#(
@@ -567,6 +578,7 @@ interface AXI4_Master#(
   interface Source#(AXI4_ARFlit#(id_, addr_, aruser_)) ar;
   interface Sink#(AXI4_RFlit#(id_, data_, ruser_))     r;
 endinterface
+typedef AXI4_Master AXI4_Initiator;
 
 instance CulDeSac#(AXI4_Master#(id_,
                                 addr_,
@@ -600,6 +612,7 @@ interface AXI4_Master_Synth#(
   (* prefix = "" *) interface AXI4_AR_Master_Synth#(id_, addr_, aruser_) ar;
   (* prefix = "" *) interface AXI4_R_Master_Synth#(id_, data_, ruser_)   r;
 endinterface
+typedef AXI4_Master_Synth AXI4_Initiator_Synth;
 
 instance CulDeSac#(AXI4_Master_Synth#(id_,
                                       addr_,
@@ -652,9 +665,10 @@ interface AXI4_Master_Xactor#(
                                aruser_,
                                ruser_) masterSynth;
 endinterface
+typedef AXI4_Master_Xactor AXI4_Initiator_Xactor;
 
 ////////////////
-// AXI4 Slave //
+// AXI4 Target/Slave //
 ////////////////////////////////////////////////////////////////////////////////
 
 interface AXI4_Slave#(
@@ -672,6 +686,7 @@ interface AXI4_Slave#(
   interface Sink#(AXI4_ARFlit#(id_, addr_, aruser_)) ar;
   interface Source#(AXI4_RFlit#(id_, data_, ruser_)) r;
 endinterface
+typedef AXI4_Slave AXI4_Target;
 
 instance CulDeSac#(AXI4_Slave#(id_,
                                addr_,
@@ -705,6 +720,7 @@ interface AXI4_Slave_Synth#(
   (* prefix = "" *) interface AXI4_AR_Slave_Synth#(id_, addr_, aruser_) ar;
   (* prefix = "" *) interface AXI4_R_Slave_Synth#(id_, data_, ruser_)   r;
 endinterface
+typedef AXI4_Slave_Synth AXI4_Target_Synth;
 
 instance CulDeSac#(AXI4_Slave_Synth#(id_,
                                      addr_,
@@ -757,6 +773,7 @@ interface AXI4_Slave_Xactor#(
                               aruser_,
                               ruser_) slaveSynth;
 endinterface
+typedef AXI4_Slave_Xactor AXI4_Target_Xactor;
 
 interface AXI4_Slave_Width_Xactor#(
   numeric type id_,
@@ -792,9 +809,10 @@ interface AXI4_Slave_Width_Xactor#(
                               saruser_,
                               sruser_) slaveSynth;
 endinterface
+typedef AXI4_Slave_Width_Xactor AXI4_Target_Width_Xactor;
 
 ////////////////////////////////
-// AXI4 Shim Master <-> Slave //
+// AXI4 Shim Initiator/Master <-> Target/Slave //
 ////////////////////////////////////////////////////////////////////////////////
 
 interface AXI4_Shim#(
