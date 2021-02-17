@@ -32,14 +32,14 @@ interface AXI4_Initiator_Performance #(
     numeric type buser_,
     numeric type aruser_,
     numeric type ruser_);
-  interface AXI4_Master #(id_, addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_) initiator;
+  interface AXI4_Initiator #(id_, addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_) initiator;
   method AXI4_Events events;
 endinterface
 
 // toAXI4PerformanceInitiator module definition
 ///////////////////////////////////////////////////////////////////////////////
 
-module toAXI4PerformanceInitiator #(AXI4_Master #(a, b, c, d, e, f, g, h) i)
+module toAXI4PerformanceInitiator #(AXI4_Initiator #(a, b, c, d, e, f, g, h) i)
   (AXI4_Initiator_Performance #(a, b, c, d, e, f, g, h));
 
     PulseWire awWire <- mkPulseWire;
@@ -48,20 +48,18 @@ module toAXI4PerformanceInitiator #(AXI4_Master #(a, b, c, d, e, f, g, h) i)
     PulseWire arWire <- mkPulseWire;
     PulseWire  rWire <- mkPulseWire;
 
-    //interface AXI4_Initiator_Performance ret;
-      interface initiator = interface AXI4_Master;
-                              interface aw = onDrop(i.aw, awWire.send);
-                              interface  w = onDrop(i.w, wWire.send);
-                              interface  b = onPut(i.b, constFn(bWire.send));
-                              interface ar = onDrop(i.ar, arWire.send);
-                              interface  r = onPut(i.r, constFn(rWire.send));
-                            endinterface;
-      method events = AXI4_Events {
-        evt_AW_REQ: awWire ? 1 : 0,
-        evt_W_REQ:   wWire ? 1 : 0,
-        evt_B_RSP:   bWire ? 1 : 0,
-        evt_AR_REQ: arWire ? 1 : 0,
-        evt_R_RSP:   rWire ? 1 : 0
-      };
-    //endinterface
+    interface initiator = interface AXI4_Initiator;
+                            interface aw = onDrop(i.aw, awWire.send);
+                            interface  w = onDrop(i.w, wWire.send);
+                            interface  b = onPut(i.b, constFn(bWire.send));
+                            interface ar = onDrop(i.ar, arWire.send);
+                            interface  r = onPut(i.r, constFn(rWire.send));
+                          endinterface;
+    method events = AXI4_Events {
+      evt_AW_REQ: awWire ? 1 : 0,
+      evt_W_REQ:   wWire ? 1 : 0,
+      evt_B_RSP:   bWire ? 1 : 0,
+      evt_AR_REQ: arWire ? 1 : 0,
+      evt_R_RSP:   rWire ? 1 : 0
+    };
 endmodule
