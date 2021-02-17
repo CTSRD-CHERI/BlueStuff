@@ -11,74 +11,56 @@ import AXI4::*;
 typedef 8 Report_Width;
 typedef Bit#(Report_Width) HpmRpt;
 typedef struct {
-   HpmRpt evt_READ_REQ;
-   HpmRpt evt_WRITE_REQ;
-   HpmRpt evt_WRITE_REQ_FLIT;
-   HpmRpt evt_READ_RSP;
-   HpmRpt evt_READ_RSP_FLIT;
-   HpmRpt evt_WIRTE_RSP;
-} EventsAxi4 deriving (Bits, FShow); // Memory needs more space for reporting delays
-typedef TDiv#(SizeOf#(EventsAxi4),Report_Width) EventsAxi4Elements;
+   HpmRpt evt_AW_REQ;
+   HpmRpt evt_W_REQ;
+   HpmRpt evt_B_RSP;
+   HpmRpt evt_AR_REQ;
+   HpmRpt evt_R_RSP;
+} AXI4_Events deriving (Bits, FShow);
+//typedef TDiv#(SizeOf#(AXI4_Events),Report_Width) AXI4_Events_Elements;
 
 // interface types
 ///////////////////////////////////////////////////////////////////////////////
 
-interface AXI4_Performance_IFC;
-  interface AXI4_Master#(a, b, c, d, e, f, g, h) initiator;
-  EventAxi4 events;
+interface AXI4_Initiator_Performance#(
+    numeric type id_,
+    numeric type addr_,
+    numeric type data_,
+    numeric type awuser_,
+    numeric type wuser_,
+    numeric type buser_,
+    numeric type aruser_,
+    numeric type ruser_);
+  interface AXI4_Master#(id_, addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_) initiator;
+  method AXI4_Events events;
 endinterface
 
-// mkAxiPerformance module definition
+// toAXI4PerformanceInitiator module definition
 ///////////////////////////////////////////////////////////////////////////////
 
-//(*synthesize*)
-module mkAxiPerformance#(AXI4_Master#(a, b, c, d, e, f, g, h) i)(AXI4_Performance_IFC);
+module toAXI4PerformanceInitiator#(AXI4_Master#(a, b, c, d, e, f, g, h) i)
+  (AXI4_Initiator_Performance#(a, b, c, d, e, f, g, h));
 
-  EventsAxi4 axi4Evnt = unpack(0);
+    PulseWire awWire <- mkPulseWire;
+    PulseWire  wWire <- mkPulseWire;
+    PulseWire  bWire <- mkPulseWire;
+    PulseWire arWire <- mkPulseWire;
+    PulseWire  rWire <- mkPulseWire;
 
-  interface initiator = interface AXI4_Master;
-    interface aw = i.aw;
-    interface w  = i.w;
-    interface b  = i.b;
-    interface ar = i.ar;
-    interface r  = i.r;
-  endinterface;
-
-  rule countEvents;
-    HpmRpt reqRead      = 0;
-    HpmRpt reqWrite     = 0;
-    HpmRpt reqWriteLast = 0;
-    HpmRpt rspRead      = 0;
-    HpmRpt rspReadLast  = 0;
-    HpmRpt rspWrite     = 0;
-    //TODO rewrite the rest of this rule...
-    case (reqGet) matches
-      tagged Valid .r: case (r.operation) matches
-        tagged Read .rr: reqRead = True;
-        tagged Write .wr: begin
-          reqWrite = True;
-          reqWriteLast = wr.last;
-        end
-      endcase
-    endcase
-    case (rspPut) matches
-      tagged Valid .r: case (r.operation) matches
-        tagged Read .rr: begin
-          rspRead = True;
-          rspReadLast = rr.last;
-        end
-        tagged Write: rspWrite = True;
-      endcase
-    endcase
-    masterEvnt <= MasterEvents {
-      id: 0,
-      incReadReq:      reqRead,
-      incWriteReq:     reqWrite && reqWriteLast,
-      incWriteReqFlit: reqWrite,
-      incReadRsp:      rspRead && rspReadLast,
-      incReadRspFlit:  rspRead,
-      incWriteRsp:     rspWrite
-    };
-  endrule
-
+    interface AXI4_Initiator_Performance;
+      interface initiator = interface AXI4_Master;
+        interface aw = onDrop(i.aw, awWire.send);
+        interface  w = onDrop(i.aw, wWire.send);
+        interface  b = onPut(i.b, constFn(bWire.send));
+        interface ar = onDrop(i.ar, arWire.send);
+        interface  r = onPut(i.r, constFn(rWire.send));
+      endinterface;
+      method events = AXI4_Events {
+        evt_AW_REQ: awWire ? 1 : 0,
+        evt_W_REQ:   wWire ? 1 : 0,
+        evt_B_RSP:   bWire ? 1 : 0
+        evt_AR_REQ: arWire ? 1 : 0,
+        evt_R_RSP:   rWire ? 1 : 0,
+      };
+    endinterface;
 endmodule
