@@ -859,9 +859,9 @@ typedef struct {
    Bool evt_R_FLIT;
    Bool evt_R_FLIT_FINAL;
    Bool evt_B_FLIT;
-} EventsAXI4 deriving (Bits, FShow);
+} AXI4_Events deriving (Bits, FShow);
 
-instance BitVectorable#(EventsAXI4, 1, n) provisos (Bits#(EventsAXI4, n));
+instance BitVectorable#(AXI4_Events, 1, n) provisos (Bits#(AXI4_Events, n));
    function to_vector = struct_to_vector;
 endinstance
 `endif

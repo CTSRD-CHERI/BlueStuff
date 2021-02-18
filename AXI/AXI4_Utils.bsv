@@ -619,7 +619,7 @@ endmodule
 
 `ifdef PERFORMANCE_MONITORING
 module monitorAXI4_Shim #(AXI4_Shim#(a, b, c, d, e, f, g, h) shim)
-                         (Monitored#(AXI4_Shim#(a, b, c, d, e, f, g, h), Tuple2#(EventsAXI4, EventsAXI4)));
+                         (Monitored#(AXI4_Shim#(a, b, c, d, e, f, g, h), Tuple2#(AXI4_Events, AXI4_Events)));
   let masterMonitor <- monitorAXI4_Master(shim.master);
   let  slaveMonitor <- monitorAXI4_Slave(shim.slave);
   interface ifc = interface AXI4_Shim;
@@ -631,7 +631,7 @@ module monitorAXI4_Shim #(AXI4_Shim#(a, b, c, d, e, f, g, h) shim)
 endmodule
 
 module monitorAXI4_Master #(AXI4_Master#(a, b, c, d, e, f, g, h) master)
-                           (Monitored#(AXI4_Master#(a, b, c, d, e, f, g, h), EventsAXI4));
+                           (Monitored#(AXI4_Master#(a, b, c, d, e, f, g, h), AXI4_Events));
   let awMonitor <- monitorSource(master.aw);
   let wMonitor  <- monitorSource(master.w);
   let bMonitor  <- monitorSink(master.b);
@@ -644,7 +644,7 @@ module monitorAXI4_Master #(AXI4_Master#(a, b, c, d, e, f, g, h) master)
     interface ar = arMonitor.ifc;
     interface r  = rMonitor.ifc;
   endinterface;
-  method events = EventsAXI4 {
+  method events = AXI4_Events {
    evt_AR_FLIT : unpack(arMonitor.events),
    evt_AW_FLIT : unpack(awMonitor.events),
    evt_W_FLIT :  unpack(wMonitor.events),
@@ -655,7 +655,7 @@ module monitorAXI4_Master #(AXI4_Master#(a, b, c, d, e, f, g, h) master)
 endmodule
 
 module monitorAXI4_Slave #(AXI4_Slave#(a, b, c, d, e, f, g, h) slave)
-                          (Monitored#(AXI4_Slave#(a, b, c, d, e, f, g, h), EventsAXI4));
+                          (Monitored#(AXI4_Slave#(a, b, c, d, e, f, g, h), AXI4_Events));
   let awMonitor <- monitorSink(slave.aw);
   let wMonitor  <- monitorSink(slave.w);
   let bMonitor  <- monitorSource(slave.b);
@@ -668,7 +668,7 @@ module monitorAXI4_Slave #(AXI4_Slave#(a, b, c, d, e, f, g, h) slave)
     interface ar = arMonitor.ifc;
     interface r  = rMonitor.ifc;
   endinterface;
-  method events = EventsAXI4 {
+  method events = AXI4_Events {
    evt_AR_FLIT : unpack(arMonitor.events),
    evt_AW_FLIT : unpack(awMonitor.events),
    evt_W_FLIT :  unpack(wMonitor.events),
