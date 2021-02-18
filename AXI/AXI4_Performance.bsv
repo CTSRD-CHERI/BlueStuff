@@ -2,7 +2,7 @@
  * Copyright (c) 2021 Marno van der Maas
  * Copyright (c) 2021 Alexandre Joannou
  */
-
+/*
 import AXI4 :: *;
 import SourceSink :: *;
 
@@ -63,3 +63,4 @@ module toAXI4PerformanceInitiator #(AXI4_Initiator #(a, b, c, d, e, f, g, h) i)
       evt_R_RSP:   rWire ? 1 : 0
     };
 endmodule
+*/
