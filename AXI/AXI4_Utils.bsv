@@ -514,7 +514,7 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
 endmodule
 
 ////////////////////////////////
-// AXI4 Shim Master <-> Slave //
+// AXI4 Shim Initiator/Master <-> Target/Slave //
 ////////////////////////////////////////////////////////////////////////////////
 
 // XXX
@@ -653,6 +653,11 @@ module monitorAXI4_Master #(AXI4_Master#(a, b, c, d, e, f, g, h) master)
    evt_B_FLIT :  unpack(bMonitor.events)
   };
 endmodule
+module monitorAXI4_Initiator #(AXI4_Initiator#(a, b, c, d, e, f, g, h) initiator)
+                           (Monitored#(AXI4_Initiator#(a, b, c, d, e, f, g, h), AXI4_Events));
+  let ret <- monitorAXI4_Master(initiator);
+  return ret;
+endmodule
 
 module monitorAXI4_Slave #(AXI4_Slave#(a, b, c, d, e, f, g, h) slave)
                           (Monitored#(AXI4_Slave#(a, b, c, d, e, f, g, h), AXI4_Events));
@@ -683,7 +688,7 @@ endmodule
 // to/from "Synth" interface utils //
 ////////////////////////////////////////////////////////////////////////////////
 
-// AXI4 Master
+// AXI4 Initiator/Master
 module toAXI4_Master_Synth #(AXI4_Master#(a, b, c, d, e, f, g, h) master)
                             (AXI4_Master_Synth#(a, b, c, d, e, f, g, h));
   let awSynth <- toAXI4_AW_Master_Synth(master.aw);
@@ -722,7 +727,7 @@ module liftAXI4_Master_Synth
   return ret;
 endmodule
 
-// AXI4 Slave
+// AXI4 Target/Slave
 module toAXI4_Slave_Synth #(AXI4_Slave#(a, b, c, d, e, f, g, h) slave)
                            (AXI4_Slave_Synth#(a, b, c, d, e, f, g, h));
   let awSynth <- toAXI4_AW_Slave_Synth(slave.aw);
@@ -964,7 +969,7 @@ function AXI4_Master#(a,b,c,d,e,f,g,h) zeroMasterUserFields (AXI4_Master#(a,b,c,
   endinterface;
 endfunction
 
-// Transform a slave that expects zeroed user fields to a slave that ignores user fields
+// Transform a target/slave that expects zeroed user fields to a slave that ignores user fields
 function AXI4_Slave#(a,b,c,d,e,f,g,h) zeroSlaveUserFields (AXI4_Slave#(a,b,c,d_,e_,f_,g_,h_) slv);
   return interface AXI4_Slave;
     interface Sink aw;
@@ -1144,7 +1149,7 @@ endmodule
 
 typedef enum { COMBINE, PAD_FIRST, PAD_LAST } ReadSplitOption deriving (Bits, Eq, FShow);
 
-//Module to double the data width of a slave. Assumes no bursts, data address aligned to data size.
+//Module to double the data width of a target/slave. Assumes no bursts, data address aligned to data size.
 module toWider_AXI4_Slave #(AXI4_Slave#(id_, addr_,  narrow_, awuser_, wuser_, buser_, aruser_, ruser_) narrow)
   (AXI4_Slave#(id_, addr_, wide_, awuser_, wuser_, buser_, aruser_, ruser_)) provisos (Add#(narrow_, narrow_, wide_), Add#(wide_, a__, 128), Add#(b__, SizeOf#(AXI4_Size_Bits), addr_));
 
