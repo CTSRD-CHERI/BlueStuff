@@ -1,6 +1,7 @@
 /*-
- * Copyright (c) 2018-2020 Alexandre Joannou
+ * Copyright (c) 2018-2021 Alexandre Joannou
  * Copyright (c) 2019 Peter Rugg
+ * Copyright (c) 2020 Jonas Fiala
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -38,12 +39,9 @@ import AXI4_R_Utils :: *;
 
 // BlueStuff import
 import Routable :: *;
-`ifdef PERFORMANCE_MONITORING
-import MonitorWrapper :: *;
-`endif
+import Monitored :: *;
 // BlueBasics import
 import SourceSink :: *;
-import MasterSlave :: *;
 
 // Standard
 import FIFOF :: *;
@@ -613,13 +611,13 @@ module mkAXI4DebugShim #(String debugTag) (AXI4_Shim#(a,b,c,d,e,f,g,h));
   interface  clear = shim.clear;
 endmodule
 
-//////////////////////////////
-// AXI4 Performance monitor utils //
+///////////////////////////
+// AXI4 monitoring utils //
 ////////////////////////////////////////////////////////////////////////////////
 
-`ifdef PERFORMANCE_MONITORING
 module monitorAXI4_Shim #(AXI4_Shim#(a, b, c, d, e, f, g, h) shim)
-                         (Monitored#(AXI4_Shim#(a, b, c, d, e, f, g, h), Tuple2#(EventsAXI4, EventsAXI4)));
+                         (Monitored#( AXI4_Shim#(a, b, c, d, e, f, g, h)
+                                    , Tuple2#(AXI4_Events, AXI4_Events)));
   let masterMonitor <- monitorAXI4_Master(shim.master);
   let  slaveMonitor <- monitorAXI4_Slave(shim.slave);
   interface ifc = interface AXI4_Shim;
@@ -627,57 +625,64 @@ module monitorAXI4_Shim #(AXI4_Shim#(a, b, c, d, e, f, g, h) shim)
     interface master = masterMonitor.ifc;
     interface  slave = slaveMonitor.ifc;
   endinterface;
-  method events = tuple2(masterMonitor.events, slaveMonitor.events);
+  interface events = interface ReadOnly;
+    method _read = tuple2(masterMonitor.events, slaveMonitor.events);
+  endinterface;
 endmodule
 
 module monitorAXI4_Master #(AXI4_Master#(a, b, c, d, e, f, g, h) master)
-                           (Monitored#(AXI4_Master#(a, b, c, d, e, f, g, h), EventsAXI4));
+                           (Monitored#( AXI4_Master#(a, b, c, d, e, f, g, h)
+                                      , AXI4_Events));
+  function f (x) = tuple2(True, isLast(x));
   let awMonitor <- monitorSource(master.aw);
-  let wMonitor  <- monitorSource(master.w);
-  let bMonitor  <- monitorSink(master.b);
+  let  wMonitor <- monitorSourceWith(master.w, f);
+  let  bMonitor <- monitorSink(master.b);
   let arMonitor <- monitorSource(master.ar);
-  let rMonitor  <- monitorLastSink(master.r);
+  let  rMonitor <- monitorSinkWith(master.r, f);
   interface ifc = interface AXI4_Master;
     interface aw = awMonitor.ifc;
-    interface w  = wMonitor.ifc;
-    interface b  = bMonitor.ifc;
+    interface  w = wMonitor.ifc;
+    interface  b = bMonitor.ifc;
     interface ar = arMonitor.ifc;
-    interface r  = rMonitor.ifc;
+    interface  r = rMonitor.ifc;
   endinterface;
-  method events = EventsAXI4 {
-   evt_AR_FLIT : unpack(arMonitor.events),
-   evt_AW_FLIT : unpack(awMonitor.events),
-   evt_W_FLIT :  unpack(wMonitor.events),
-   evt_R_FLIT :  unpack(rMonitor.events[0]),
-   evt_R_FLIT_FINAL : unpack(rMonitor.events[1]),
-   evt_B_FLIT :  unpack(bMonitor.events)
-  };
+  interface events = interface ReadOnly;
+    method _read = AXI4_Events { evt_AW_FLIT:      awMonitor.events
+                               , evt_W_FLIT:       tpl_1(wMonitor.events)
+                               , evt_W_FLIT_FINAL: tpl_2(wMonitor.events)
+                               , evt_B_FLIT:       bMonitor.events
+                               , evt_AR_FLIT:      arMonitor.events
+                               , evt_R_FLIT:       tpl_1(rMonitor.events)
+                               , evt_R_FLIT_FINAL: tpl_2(rMonitor.events) };
+  endinterface;
 endmodule
 
 module monitorAXI4_Slave #(AXI4_Slave#(a, b, c, d, e, f, g, h) slave)
-                          (Monitored#(AXI4_Slave#(a, b, c, d, e, f, g, h), EventsAXI4));
+                          (Monitored#( AXI4_Slave#(a, b, c, d, e, f, g, h)
+                                     , AXI4_Events));
+  function f (x) = tuple2(True, isLast(x));
   let awMonitor <- monitorSink(slave.aw);
-  let wMonitor  <- monitorSink(slave.w);
-  let bMonitor  <- monitorSource(slave.b);
+  let  wMonitor <- monitorSinkWith(slave.w, f);
+  let  bMonitor <- monitorSource(slave.b);
   let arMonitor <- monitorSink(slave.ar);
-  let rMonitor  <- monitorLastSource(slave.r);
+  let  rMonitor <- monitorSourceWith(slave.r, f);
   interface ifc = interface AXI4_Slave;
     interface aw = awMonitor.ifc;
-    interface w  = wMonitor.ifc;
-    interface b  = bMonitor.ifc;
+    interface  w = wMonitor.ifc;
+    interface  b = bMonitor.ifc;
     interface ar = arMonitor.ifc;
-    interface r  = rMonitor.ifc;
+    interface  r = rMonitor.ifc;
   endinterface;
-  method events = EventsAXI4 {
-   evt_AR_FLIT : unpack(arMonitor.events),
-   evt_AW_FLIT : unpack(awMonitor.events),
-   evt_W_FLIT :  unpack(wMonitor.events),
-   evt_R_FLIT :  unpack(rMonitor.events[0]),
-   evt_R_FLIT_FINAL : unpack(rMonitor.events[1]),
-   evt_B_FLIT :  unpack(bMonitor.events)
-  };
+  interface events = interface ReadOnly;
+    method _read = AXI4_Events { evt_AW_FLIT:      awMonitor.events
+                               , evt_W_FLIT:       tpl_1(wMonitor.events)
+                               , evt_W_FLIT_FINAL: tpl_2(wMonitor.events)
+                               , evt_B_FLIT:       bMonitor.events
+                               , evt_AR_FLIT:      arMonitor.events
+                               , evt_R_FLIT:       tpl_1(rMonitor.events)
+                               , evt_R_FLIT_FINAL: tpl_2(rMonitor.events) };
+  endinterface;
 endmodule
-`endif
 
 /////////////////////////////////////
 // to/from "Synth" interface utils //

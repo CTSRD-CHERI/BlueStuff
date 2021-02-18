@@ -33,41 +33,49 @@ import Vector :: *;
 // A module which wants to count events must return some vector of events
 // However it is easier to count the events as a Struct within a module
 // So if the Struct is an instance of this class it can be returned as is
-typeclass BitVectorable#(type from, numeric type n, numeric type m) dependencies (from determines (n, m));
+typeclass BitVectorable#(type from, numeric type n, numeric type m)
+  dependencies (from determines (n, m));
   function Vector#(m, Bit#(n)) to_vector (from e);
 endtypeclass
 
 instance BitVectorable#(Vector#(m, Bit#(n)), n, m);
-   function to_vector = id;
+  function to_vector = id;
 endinstance
 
 // A Bit#(n) will be converted to a 1 element vector
 instance BitVectorable#(Bit#(n), n, 1);
-   function to_vector = replicate;
+  function to_vector = replicate;
 endinstance
 
+instance BitVectorable#(AXI4_Events, 1, n) provisos (Bits#(AXI4_Events, n));
+   function to_vector = struct_to_vector;
+endinstance
 
 function Vector#(mm, Bit#(nn)) to_large_vector (from e)
-   provisos (BitVectorable#(from, n, m), Add#(a__, n, nn), Add#(b__, m, mm));
-   return append(map(zeroExtend, to_vector(e)), replicate(0));
+  provisos (BitVectorable#(from, n, m), Add#(a__, n, nn), Add#(b__, m, mm));
+  return append(map(zeroExtend, to_vector(e)), replicate(0));
 endfunction
 
 // Use to_vector = struct_to_vector
 // with BitVectorable instances for structs of events
 // The struct must only contain Bools (or Bit#(1)) for this fn to be reasonable
-function Vector#(m, Bit#(1)) struct_to_vector (from e) provisos (Bits#(from, m));
-   return reverse(unpack(pack(e)));
+function Vector#(m, Bit#(1)) struct_to_vector (from e)
+  provisos (Bits#(from, m));
+  return reverse(unpack(pack(e)));
 endfunction
 
 function Bit#(n) saturating_truncate(Bit#(m) wide)
-    provisos (Add#(n,a_,m)); // SizeOf m > SizeOf n
-    Bit#(TSub#(m,n)) msb = truncateLSB(wide);
-    return (msb == 0) ? truncate(wide) : ~0;
+  provisos (Add#(n,a_,m)); // SizeOf m > SizeOf n
+  Bit#(TSub#(m,n)) msb = truncateLSB(wide);
+  return (msb == 0) ? truncate(wide) : ~0;
 endfunction
 
 // Write is exposed to only one counter per cycle
 // Could change write_* methods to return WriteOnly Vector if needed
-interface PerfCounters_IFC#(numeric type ctrs, numeric type ctrW, numeric type rptW, numeric type evts);
+interface PerfCounters_IFC#( numeric type ctrs
+                           , numeric type ctrW
+                           , numeric type rptW
+                           , numeric type evts);
   (* always_ready, always_enabled *)
   method Action send_performance_events (Vector#(evts, Bit#(rptW)) evts);
 
@@ -125,7 +133,7 @@ module mkPerfCounters (PerfCounters_IFC#(ctrs, ctrW, rptW, evts))
       // Count event
       if (!inhibit) begin
         Bit#(TAdd#(ctrW, 1)) count_sum = zeroExtend(vec_rg_counter[i][0])
-                                          + zeroExtend(event_count);
+                                       + zeroExtend(event_count);
         vec_rg_counter[i][0] <= truncate(count_sum);
         overflow[i] = truncateLSB(count_sum);
       end
@@ -156,4 +164,5 @@ module mkPerfCounters (PerfCounters_IFC#(ctrs, ctrW, rptW, evts))
 
   method write_ctr_inhibit = rg_ctr_inhibit._write;
 endmodule
+
 endpackage

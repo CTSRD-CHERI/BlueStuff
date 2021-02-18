@@ -1,6 +1,7 @@
 /*-
  * Copyright (c) 2018-2020 Alexandre Joannou
  * Copyright (c) 2019 Peter Rugg
+ * Copyright (c) 2020 Jonas Fiala
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -37,10 +38,6 @@ import SourceSink :: *;
 import MasterSlave :: *;
 
 import AXI4_AXI4Lite_Types :: *;
-
-`ifdef PERFORMANCE_MONITORING
-import PerformanceMonitor :: *;
-`endif
 
 //////////////////
 // helper types //
@@ -833,20 +830,16 @@ interface AXI4_Shim_Synth#(
   ) slave;
 endinterface
 
-`ifdef PERFORMANCE_MONITORING
+// Type of events that can be monitored on an AXI4 port
 typedef struct {
-   Bool evt_AR_FLIT;
    Bool evt_AW_FLIT;
    Bool evt_W_FLIT;
+   Bool evt_W_FLIT_FINAL;
+   Bool evt_B_FLIT;
+   Bool evt_AR_FLIT;
    Bool evt_R_FLIT;
    Bool evt_R_FLIT_FINAL;
-   Bool evt_B_FLIT;
-} EventsAXI4 deriving (Bits, FShow);
-
-instance BitVectorable#(EventsAXI4, 1, n) provisos (Bits#(EventsAXI4, n));
-   function to_vector = struct_to_vector;
-endinstance
-`endif
+} AXI4_Events deriving (Bits, DefaultValue, FShow);
 
 ////////////////////////////////
 // AXI4 Connectable instances //
