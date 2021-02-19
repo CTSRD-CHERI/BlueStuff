@@ -1,6 +1,7 @@
 // Copyright Marno van der Maas
 
 //From AXI4_Types.bsv
+import AXI4_Types :: *;
 
 typedef AXI4_AW_Master_Synth AXI4_AW_Initiator_Synth;
 typedef AXI4_AW_Slave_Synth AXI4_AW_Target_Synth;
@@ -21,6 +22,9 @@ typedef AXI4_Slave_Xactor AXI4_Target_Xactor;
 typedef AXI4_Slave_Width_Xactor AXI4_Target_Width_Xactor;
 
 //From AXI4_Utils.bsv
+import AXI4_Utils :: *;
+import Monitored :: *;
+
 module monitorAXI4_Initiator #(AXI4_Initiator#(a, b, c, d, e, f, g, h) initiator)
                               (Monitored#(AXI4_Initiator#(a, b, c, d, e, f, g, h)
                                          , AXI4_Events));
