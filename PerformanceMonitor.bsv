@@ -47,10 +47,6 @@ instance BitVectorable#(Bit#(n), n, 1);
   function to_vector = replicate;
 endinstance
 
-instance BitVectorable#(AXI4_Events, 1, n) provisos (Bits#(AXI4_Events, n));
-   function to_vector = struct_to_vector;
-endinstance
-
 function Vector#(mm, Bit#(nn)) to_large_vector (from e)
   provisos (BitVectorable#(from, n, m), Add#(a__, n, nn), Add#(b__, m, mm));
   return append(map(zeroExtend, to_vector(e)), replicate(0));
