@@ -30,6 +30,7 @@
 package Monitored;
 
 import SourceSink :: *;
+import DefaultValue :: *;
 //import MasterSlave :: *;
 
 // Wrapper interface for reporting events of a given interface

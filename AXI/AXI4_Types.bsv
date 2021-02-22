@@ -839,7 +839,18 @@ typedef struct {
    Bool evt_AR_FLIT;
    Bool evt_R_FLIT;
    Bool evt_R_FLIT_FINAL;
-} AXI4_Events deriving (Bits, DefaultValue, FShow);
+} AXI4_Events deriving (Bits, FShow);
+instance DefaultValue#(AXI4_Events);
+  function defaultValue = AXI4_Events {
+    evt_AW_FLIT: False,
+    evt_W_FLIT: False,
+    evt_W_FLIT_FINAL: False,
+    evt_B_FLIT: False,
+    evt_AR_FLIT: False,
+    evt_R_FLIT: False,
+    evt_R_FLIT_FINAL: False
+  };
+endinstance
 
 ////////////////////////////////
 // AXI4 Connectable instances //
