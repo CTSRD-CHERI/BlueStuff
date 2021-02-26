@@ -25,6 +25,24 @@ typedef AXI4_Slave_Width_Xactor AXI4_Target_Width_Xactor;
 import AXI4_Utils :: *;
 import Monitored :: *;
 
+interface AXI4_InitiatorTarget_Shim#(
+  numeric type id_,
+  numeric type addr_,
+  numeric type data_,
+  numeric type awuser_,
+  numeric type wuser_,
+  numeric type buser_,
+  numeric type aruser_,
+  numeric type ruser_);
+  method Action clear;
+  interface AXI4_Initiator#(
+    id_, addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_
+  ) initiator;
+  interface AXI4_Target#(
+    id_, addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_
+  ) target;
+endinterface
+
 module monitorAXI4_Initiator #(AXI4_Initiator#(a, b, c, d, e, f, g, h) initiator)
                               (Monitored#(AXI4_Initiator#(a, b, c, d, e, f, g, h)
                                          , AXI4_Events));
