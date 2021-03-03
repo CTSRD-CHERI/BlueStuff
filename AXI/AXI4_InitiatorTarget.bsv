@@ -55,3 +55,42 @@ module monitorAXI4_Target #(AXI4_Target#(a, b, c, d, e, f, g, h) target)
                                      , AXI4_Events));
   let ret <- monitorAXI4_Slave(target);
 endmodule
+
+`define defAXI4InitiatorTargetShimFIFOF (name, mkFF)\
+module mkAXI4InitiatorTargetShim``name (AXI4_InitiatorTarget_Shim#(a, b, c, d, e, f, g, h));\
+  let awff <- mkFF;\
+  let  wff <- mkFF;\
+  let  bff <- mkFF;\
+  let arff <- mkFF;\
+  let  rff <- mkFF;\
+  method clear = action\
+    awff.clear;\
+    wff.clear;\
+    bff.clear;\
+    arff.clear;\
+    rff.clear;\
+  endaction;\
+  interface master = interface AXI4_Master;\
+    interface aw = toSource(awff);\
+    interface  w = toSource(wff);\
+    interface  b = toSink(bff);\
+    interface ar = toSource(arff);\
+    interface  r = toSink(rff);\
+  endinterface;\
+  interface slave = interface AXI4_Slave;\
+    interface aw = toSink(awff);\
+    interface  w = toSink(wff);\
+    interface  b = toSource(bff);\
+    interface ar = toSink(arff);\
+    interface  r = toSource(rff);\
+  endinterface;\
+endmodule
+
+`defAXI4InitiatorTargetShimFIFOF(BypassFIFOF, mkBypassFIFOF)
+`defAXI4InitiatorTargetShimFIFOF(BypassFF1, mkSizedBypassFIFOF(1))
+`defAXI4InitiatorTargetShimFIFOF(FF1, mkFIFOF1)
+`defAXI4InitiatorTargetShimFIFOF(FF, mkFIFOF)
+`defAXI4InitiatorTargetShimFIFOF(SizedFIFOF4, mkSizedFIFOF(4))
+`defAXI4InitiatorTargetShimFIFOF(SizedFIFOF32, mkSizedFIFOF(32))
+`defAXI4InitiatorTargetShimFIFOF(UGSizedFIFOF32, mkUGSizedFIFOF(32))
+`defAXI4InitiatorTargetShimFIFOF(UGSizedFIFOF4, mkUGSizedFIFOF(4))
