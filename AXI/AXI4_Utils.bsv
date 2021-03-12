@@ -377,7 +377,8 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
   let countWriteRspFF <- mkSizedFIFOF(4);
   Reg#(Bit#(SizeOf#(AXI4_Len))) writesSent[2] <- mkCReg(2, 0);
   Reg#(Bit#(SizeOf#(AXI4_Len))) readsSent[2] <- mkCReg(2, 0);
-  Reg#(Bit#(SizeOf#(AXI4_Len))) flitReceived[2] <- mkCReg(2, 0);
+  let defaultBResp = AXI4_BFlit {bid: ?, bresp: EXOKAY, buser: ?};
+  Reg#(Tuple2#(Bit#(SizeOf#(AXI4_Len)), AXI4_BFlit #(a, f))) flitReceived[3] <- mkCReg(3, tuple2(0, defaultBResp));
 
   // helper functions
   function getFlitAddr(addr, size, burst, cnt) = case (burst)
@@ -402,7 +403,7 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
                 + $format("\toutR.canPeek:\t ", fshow(outR.canPeek));
     Fmt state_str = $format(" writesSent: %d", writesSent[0],
                             " readsSent: %d", readsSent[0],
-                            " flitReceived: %d", flitReceived[0]);
+                            " flitReceived: %d", fshow(flitReceived[0]));
     $display("%0t: ", $time, dbg_str);
     $display("%0t: ", $time, state_str);
   endrule
@@ -443,19 +444,43 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
                         "\n", fshow(awflit), "\n", fshow(inW.peek),
                         "\n", fshow(newawflit), "\n", fshow(newwflit));
   endrule
-  rule handle_write_rsp;
-    // always consume the response
+  rule consume_bresp;
+    // always consume the response and save the "aggregated" response
     outB.drop;
-    // count up if not last
-    if (countWriteRspFF.first > flitReceived[0]) flitReceived[0] <= flitReceived[0] + 1;
-    // on last response, forward it and reset book keeping
-    else begin
-      countWriteRspFF.deq;
-      inB.put(outB.peek);
-      flitReceived[0] <= 0;
-    end
+    // combine the old and new response, keeping the "lower" bresp value of the two, and for the
+    // other fields use the new response's values
+    // The ordering of bresp values used here is EXOKAY > OKAY > DECERR > SLVERR
+    function AXI4_BFlit #(a, f) combine_bresp (AXI4_BFlit #(a, f) bflit_a, AXI4_BFlit #(a, f) bflit_b);
+      let bresp_a = bflit_a.bresp;
+      let bresp_b = bflit_b.bresp;
+      return case (tuple2(bresp_a, bresp_b)) matches
+        {EXOKAY, .x}: bflit_b;
+        {OKAY,   .x} &&& (x != EXOKAY): bflit_b;
+        {DECERR, .x} &&& (x != EXOKAY && x != OKAY): bflit_b;
+        // in all other cases, including when bresp_a is SLVERR, we return bresp_a
+        // but with corrected id and user fields
+        default: AXI4_BFlit { bid   : bflit_b.bid
+                            , bresp : bresp_a
+                            , buser : bflit_b.buser };
+      endcase;
+    endfunction
+    flitReceived[0] <= tuple2(tpl_1(flitReceived[0]) + 1
+                             ,combine_bresp(tpl_2(flitReceived[0])
+                                           ,outB.peek));
+
     // DEBUG //
-    if (debug) $display("%0t: handle_write_rsp - ", $time, fshow(outB.peek));
+    if (debug) $display("%0t: consume_bresp - ", $time, fshow(outB.peek));
+  endrule
+
+  // on last response, forward the aggregated response and reset book keeping
+  rule produce_bresp (countWriteRspFF.notEmpty
+                     && tpl_1(flitReceived[1]) >= countWriteRspFF.first);
+    flitReceived[1] <= tuple2(0, defaultBResp);
+    countWriteRspFF.deq;
+    inB.put(tpl_2(flitReceived[1]));
+
+    // DEBUG //
+    if (debug) $display("%0t: produce_bresp - ", $time, fshow(tpl_2(flitReceived[1])));
   endrule
 
   // Reads
@@ -504,7 +529,7 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
     countWriteRspFF.clear;
     writesSent[1]   <= 0;
     readsSent[1]    <= 0;
-    flitReceived[1] <= 0;
+    flitReceived[2] <= tuple2(0, defaultBResp);
   endaction;
   interface slave  = inShim.slave;
   interface master = outShim.master;
