@@ -73,3 +73,7 @@ endmodule
 `defAXI4InitiatorTargetShimFIFOF(SizedFIFOF32)
 `defAXI4InitiatorTargetShimFIFOF(UGSizedFIFOF32)
 `defAXI4InitiatorTargetShimFIFOF(UGSizedFIFOF4)
+
+function AXI4_Initiator#(a,b,c,d,e,f,g,h) zeroInitiatorUserFields (AXI4_Initiator#(a,b,c,d_,e_,f_,g_,h_) i);
+  return zeroMasterUserFields(i);
+endfunction
