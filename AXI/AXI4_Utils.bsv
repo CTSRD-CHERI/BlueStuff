@@ -2,6 +2,7 @@
  * Copyright (c) 2018-2021 Alexandre Joannou
  * Copyright (c) 2019 Peter Rugg
  * Copyright (c) 2020 Jonas Fiala
+ * Copyright (c) 2021 Marno van der Maas
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -543,13 +544,13 @@ endmodule
 // XXX
 // Macro to work around the fact that we cannot pass FIFOF module constructor
 // and use it for different channels with different types (need Rank2Types)...?
-`define defAXI4ShimFIFOF (name, mkFF)\
+`define defAXI4ShimFIFOFs (name, mkAWFF, mkWFF, mkBFF, mkARFF, mkRFF)\
 module mkAXI4Shim``name (AXI4_Shim#(a, b, c, d, e, f, g, h));\
-  let awff <- mkFF;\
-  let  wff <- mkFF;\
-  let  bff <- mkFF;\
-  let arff <- mkFF;\
-  let  rff <- mkFF;\
+  let awff <- mkAWFF;\
+  let  wff <- mkWFF;\
+  let  bff <- mkBFF;\
+  let arff <- mkARFF;\
+  let  rff <- mkRFF;\
   method clear = action\
     awff.clear;\
     wff.clear;\
@@ -572,6 +573,8 @@ module mkAXI4Shim``name (AXI4_Shim#(a, b, c, d, e, f, g, h));\
     interface  r = toSource(rff);\
   endinterface;\
 endmodule
+
+`define defAXI4ShimFIFOF (name, mkFF) `defAXI4ShimFIFOFs(name, mkFF, mkFF, mkFF, mkFF, mkFF)
 
 `defAXI4ShimFIFOF(BypassFIFOF, mkBypassFIFOF)
 `defAXI4ShimFIFOF(BypassFF1, mkSizedBypassFIFOF(1))
