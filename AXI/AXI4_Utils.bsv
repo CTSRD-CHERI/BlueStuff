@@ -379,7 +379,7 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
   Reg#(Bit#(SizeOf#(AXI4_Len))) writesSent[2] <- mkCReg(2, 0);
   Reg#(Bit#(SizeOf#(AXI4_Len))) readsSent[2] <- mkCReg(2, 0);
   let defaultBResp = AXI4_BFlit {bid: ?, bresp: EXOKAY, buser: ?};
-  Reg#(Tuple2#(Bit#(SizeOf#(AXI4_Len)), AXI4_BFlit #(a, f))) flitReceived[3] <- mkCReg(3, tuple2(0, defaultBResp));
+  Reg#(Tuple2#(Bit#(TAdd#(SizeOf#(AXI4_Len), 1)), AXI4_BFlit #(a, f))) flitReceived[3] <- mkCReg(3, tuple2(0, defaultBResp));
 
   // helper functions
   function getFlitAddr(addr, size, burst, cnt) = case (burst)
@@ -475,7 +475,7 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
 
   // on last response, forward the aggregated response and reset book keeping
   rule produce_bresp (countWriteRspFF.notEmpty
-                     && tpl_1(flitReceived[1]) >= countWriteRspFF.first);
+                     && tpl_1(flitReceived[1]) > zeroExtend (countWriteRspFF.first));
     flitReceived[1] <= tuple2(0, defaultBResp);
     countWriteRspFF.deq;
     inB.put(tpl_2(flitReceived[1]));
