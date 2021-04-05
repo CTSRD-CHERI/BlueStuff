@@ -29,6 +29,7 @@
 package PerformanceMonitor;
 
 import Vector :: *;
+import ConfigReg :: *;
 
 // A module which wants to count events must return some vector of events
 // However it is easier to count the events as a Struct within a module
@@ -100,49 +101,57 @@ module mkPerfCounters (PerfCounters_IFC#(ctrs, ctrW, rptW, evts))
   let evts = valueOf(evts);
 
   // Event counters
-  Vector#(ctrs, Array#(Reg#(Bit#(ctrW))))
-    vec_rg_counter <- replicateM(mkCReg(2,0));
+  Vector#(ctrs, Reg#(Bit#(ctrW)))
+    vec_rg_counter <- replicateM(mkConfigReg(0));
   // Which event the corresponding counter will count
   Vector#(ctrs, Reg#(Bit#(TLog#(evts))))
-    vec_rg_event_sel <- replicateM(mkReg(0));
+    vec_rg_event_sel <- replicateM(mkConfigReg(0));
 
-  Reg#(Bit#(ctrs)) rg_ctr_inhibit <- mkReg(0);
+  Reg#(Bit#(ctrs)) rg_ctr_inhibit <- mkConfigReg(0);
   Wire#(Bit#(ctrs)) wr_overflow <- mkDWire(0);
 
-  // Since [i] is not a function, cannot map it to a Vector
-  function a_type sel_snd_port (Array#(a_type) arr) = arr[1];
+  RWire#(Tuple2#(Bit#(TLog#(ctrs)), Bit#(ctrW))) write_counter_wire <- mkRWire;
+  RWire#(Tuple2#(Bit#(TLog#(ctrs)), Bit#(TLog#(evts)))) write_ctr_sel_wire <- mkRWire;
+  RWire#(Vector#(evts, Bit#(rptW))) events_wire <- mkRWire;
 
-  // Should be called every cycle with vector of how many times each event
-  // occured in the given cycle. The maximum is 2^ctrW, but an event 'should'
-  // never happen so many times in a cycle:
-  // So map zeroExtend to the vector before passing it to this method
-  method Action send_performance_events (Vector#(evts, Bit#(rptW)) events);
-    Bit#(ctrs) overflow = 0;
-    for (Integer i = 0; i < ctrs; i = i + 1) begin
-      // Get the number of times the selected event fired this cycle
-      Bit#(ctrW) event_count = 0;
-      if (vec_rg_event_sel[i] <= fromInteger(evts - 1))
-      event_count = zeroExtend(events[vec_rg_event_sel[i]]);
-
-      // Check that the given counter is not inhibited
-      Bool inhibit = unpack(rg_ctr_inhibit[i]);
-      // Count event
-      if (!inhibit) begin
-        Bit#(TAdd#(ctrW, 1)) count_sum = zeroExtend(vec_rg_counter[i][0])
-                                       + zeroExtend(event_count);
-        vec_rg_counter[i][0] <= truncate(count_sum);
-        overflow[i] = truncateLSB(count_sum);
-      end
-
-      // $display("<time %0t, StatCounters> Counter #%2d Counting event %0d: Adding %0d to %0d (Inhibit %0d)",
-      //   $time, i, vec_rg_event_sel[i], event_count, vec_rg_counter[i][0], inhibit);
+  (* no_implicit_conditions *)
+  rule do_writes;
+    if (write_ctr_sel_wire.wget matches tagged Valid .v) begin
+      match {.idx, .val} = v;
+      vec_rg_event_sel[idx] <= val;
     end
-    wr_overflow <= overflow;
-    // $display("-------------------------CLK-------------------------");
-  endmethod
+    if (write_counter_wire.wget matches tagged Valid .v) begin
+      match {.idx, .val} = v;
+      vec_rg_counter[idx] <= val;
+    end else if (events_wire.wget matches tagged Valid .events) begin
+      Bit#(ctrs) overflow = 0;
+		  for (Integer i = 0; i < ctrs; i = i + 1) begin
+		    // Get the number of times the selected event fired this cycle
+		    Bit#(ctrW) event_count = 0;
+		    if (vec_rg_event_sel[i] <= fromInteger(evts - 1))
+		    event_count = zeroExtend(events[vec_rg_event_sel[i]]);
+
+		    // Check that the given counter is not inhibited
+		    Bool inhibit = unpack(rg_ctr_inhibit[i]);
+		    // Count event
+		    if (!inhibit) begin
+					Bit#(TAdd#(ctrW, 1)) count_sum = zeroExtend(vec_rg_counter[i][0])
+									                       + zeroExtend(event_count);
+					vec_rg_counter[i][0] <= truncate(count_sum);
+					overflow[i] = truncateLSB(count_sum);
+		    end
+
+		    // $display("<time %0t, StatCounters> Counter #%2d Counting event %0d: Adding %0d to %0d (Inhibit %0d)",
+		    //   $time, i, vec_rg_event_sel[i], event_count, vec_rg_counter[i][0], inhibit);
+		  end
+		  wr_overflow <= overflow;
+    end
+  endrule
+
+  method Action send_performance_events (Vector#(evts, Bit#(rptW)) events) = events_wire.wset(events);
 
   method Vector#(ctrs, ReadOnly#(Bit#(ctrW))) read_counters =
-    map(compose(regToReadOnly, sel_snd_port), vec_rg_counter);
+    map(regToReadOnly, vec_rg_counter);
 
   method Vector#(ctrs, ReadOnly#(Bit#(TLog#(evts)))) read_ctr_sels =
     map(regToReadOnly, vec_rg_event_sel);
@@ -154,9 +163,9 @@ module mkPerfCounters (PerfCounters_IFC#(ctrs, ctrW, rptW, evts))
     regToReadOnly(wr_overflow);
 
 
-  method write_counter (idx) = vec_rg_counter[idx][1]._write;
+  method write_counter (idx, val) = write_counter_wire.wset(tuple2(idx, val));
 
-  method write_ctr_sel (idx) = vec_rg_event_sel[idx]._write;
+  method write_ctr_sel (idx, val) = write_ctr_sel_wire.wset(tuple2(idx, val));
 
   method write_ctr_inhibit = rg_ctr_inhibit._write;
 endmodule
