@@ -114,16 +114,14 @@ module mkPerfCounters (PerfCounters_IFC#(ctrs, ctrW, rptW, evts))
   RWire#(Tuple2#(Bit#(TLog#(ctrs)), Bit#(TLog#(evts)))) write_ctr_sel_wire <- mkRWire;
   RWire#(Vector#(evts, Bit#(rptW))) events_wire <- mkRWire;
 
-  (* no_implicit_conditions *)
+  (* no_implicit_conditions, fire_when_enabled *)
   rule do_writes;
     if (write_ctr_sel_wire.wget matches tagged Valid .v) begin
       match {.idx, .val} = v;
       vec_rg_event_sel[idx] <= val;
     end
-    if (write_counter_wire.wget matches tagged Valid .v) begin
-      match {.idx, .val} = v;
-      vec_rg_counter[idx] <= val;
-    end else if (events_wire.wget matches tagged Valid .events) begin
+    Vector#(ctrs, Bit#(ctrW)) new_ctrs = readVReg(vec_rg_counter);
+    if (events_wire.wget matches tagged Valid .events) begin
       Bit#(ctrs) overflow = 0;
 		  for (Integer i = 0; i < ctrs; i = i + 1) begin
 		    // Get the number of times the selected event fired this cycle
@@ -135,9 +133,9 @@ module mkPerfCounters (PerfCounters_IFC#(ctrs, ctrW, rptW, evts))
 		    Bool inhibit = unpack(rg_ctr_inhibit[i]);
 		    // Count event
 		    if (!inhibit) begin
-					Bit#(TAdd#(ctrW, 1)) count_sum = zeroExtend(vec_rg_counter[i][0])
+					Bit#(TAdd#(ctrW, 1)) count_sum = zeroExtend(vec_rg_counter[i])
 									                       + zeroExtend(event_count);
-					vec_rg_counter[i][0] <= truncate(count_sum);
+					new_ctrs[i] = truncate(count_sum);
 					overflow[i] = truncateLSB(count_sum);
 		    end
 
@@ -146,6 +144,11 @@ module mkPerfCounters (PerfCounters_IFC#(ctrs, ctrW, rptW, evts))
 		  end
 		  wr_overflow <= overflow;
     end
+    if (write_counter_wire.wget matches tagged Valid .v) begin
+      match {.idx, .val} = v;
+      new_ctrs[idx] = val;
+    end
+    writeVReg(vec_rg_counter, new_ctrs);
   endrule
 
   method Action send_performance_events (Vector#(evts, Bit#(rptW)) events) = events_wire.wset(events);
