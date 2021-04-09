@@ -86,6 +86,7 @@ endfunction
 module mkBurstToNoBurst_ManagerSubordinate (AXI4_ManagerSubordinate_Shim#(a, b, c, d, e, f, g, h))
     provisos(Add#(a__, SizeOf#(AXI4_Len), b));
   let internal <- mkBurstToNoBurst;
+  method clear = internal.clear;
   interface manager = internal.master;
   interface subordinate = internal.slave;
 endmodule
