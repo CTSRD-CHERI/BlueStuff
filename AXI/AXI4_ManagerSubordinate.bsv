@@ -24,6 +24,7 @@ typedef AXI4_Slave_Width_Xactor AXI4_Subordinate_Width_Xactor;
 //From AXI4_Utils.bsv
 import AXI4_Utils :: *;
 import Monitored :: *;
+import AXI4_AXI4Lite_Types :: *;
 
 interface AXI4_ManagerSubordinate_Shim#(
   numeric type id_,
@@ -82,7 +83,8 @@ function AXI4_Subordinate#(a,b,c,d,e,f,g,h) zeroSubordinateUserFields (AXI4_Subo
   return zeroSlaveUserFields(s);
 endfunction
 
-module mkBurstToNoBurst_ManagerSubordinate (AXI4_ManagerSubordinate_Shim#(a, b, c, d, e, f, g, h));
+module mkBurstToNoBurst_ManagerSubordinate (AXI4_ManagerSubordinate_Shim#(a, b, c, d, e, f, g, h))
+    provisos(Add#(a__, SizeOf#(AXI4_Len), b));
   let internal <- mkBurstToNoBurst;
   interface manager = internal.master;
   interface subordinate = internal.slave;
