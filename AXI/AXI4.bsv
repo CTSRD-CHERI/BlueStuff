@@ -37,7 +37,7 @@ import AXI4_AR_Utils :: *;
 import AXI4_R_Utils :: *;
 import AXI4_Utils :: *;
 import AXI4_Interconnect :: *;
-import AXI4_InitiatorTarget :: *;
+import AXI4_ManagerSubordinate :: *;
 
 export AXI4_AXI4Lite_Types :: *;
 export AXI4_Types :: *;
@@ -48,6 +48,6 @@ export AXI4_AR_Utils :: *;
 export AXI4_R_Utils :: *;
 export AXI4_Utils :: *;
 export AXI4_Interconnect :: *;
-export AXI4_InitiatorTarget :: *;
+export AXI4_ManagerSubordinate :: *;
 
 endpackage
