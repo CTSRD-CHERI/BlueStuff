@@ -218,6 +218,56 @@ function AXI4_Slave#(a, addr_out, c, d, e, f, g, h) expandAXI4_Slave_Addr
   endinterface;
 endfunction
 
+/////////////////////////
+// AXI4 "dummy" Slaves //
+////////////////////////////////////////////////////////////////////////////////
+
+module mkPerpetualValueAXI4Slave #(parameter Integer thatOneValue)
+                                  (AXI4_Slave#(a, b, c, d, e, f, g, h));
+  let inShim <- mkAXI4ShimFF;
+  let m = inShim.master;
+  let arFlitFF <- mkSizedBypassFIFOF(1);
+  let arFlitCnt <- mkReg(0);
+  // ignore writes, provide an OK response
+  rule drainNonLastW (m.w.canPeek && !m.w.peek.wlast); m.w.drop; endrule
+  rule genBFlits (m.w.canPeek && m.w.peek.wlast && m.aw.canPeek && m.b.canPut);
+    m.aw.drop;
+    m.w.drop;
+    m.b.put(AXI4_BFlit { bid: m.aw.peek.awid
+                       , bresp: OKAY
+                       , buser: ? });
+  endrule
+  // on read, always return the appropriate number of flits with
+  // the perpetual value
+  rule grabARFlit (m.ar.canPeek && arFlitFF.notFull);
+    let arFlit <- get(m.ar);
+    arFlitFF.enq(arFlit);
+  endrule
+  rule genRFlits (arFlitFF.notEmpty && m.r.canPut);
+    // XXX TODO XXX
+    // not currently shifting the value in place within the flit:
+    // consider arsize together with arFlitCnt current value and arburst
+    let arFlit = arFlitFF.first;
+    let isLast = False;
+    if (arFlitCnt >= {1'b0, arFlit.arlen}) begin
+      arFlitFF.deq;
+      arFlitCnt <= 0;
+      isLast = True;
+    end else arFlitCnt <= arFlitCnt + 1;
+    m.r.put(AXI4_RFlit { rid: arFlit.arid
+                       , rdata: fromInteger(thatOneValue)
+                       , rresp: OKAY
+                       , rlast: isLast
+                       , ruser: ? });
+  endrule
+  return inShim.slave;
+endmodule
+
+module mkPerpetualZeroAXI4Slave (AXI4_Slave#(a, b, c, d, e, f, g, h));
+  let ifc <- mkPerpetualValueAXI4Slave (0);
+  return ifc;
+endmodule
+
 //////////////////
 // AXI4 Limiter //
 ////////////////////////////////////////////////////////////////////////////////

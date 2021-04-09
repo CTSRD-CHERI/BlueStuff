@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2020 Alexandre Joannou
+ * Copyright (c) 2018-2021 Alexandre Joannou
  * Copyright (c) 2019 Peter Rugg
  * Copyright (c) 2020 Jonas Fiala
  * All rights reserved.
@@ -38,15 +38,6 @@ import SourceSink :: *;
 import MasterSlave :: *;
 
 import AXI4_AXI4Lite_Types :: *;
-
-//////////////////
-// helper types //
-////////////////////////////////////////////////////////////////////////////////
-
-// return an interface acting as a dead end
-typeclass CulDeSac#(type t);
-  function t culDeSac;
-endtypeclass
 
 ////////////////////////////////
 // AXI4 Address Write Channel //

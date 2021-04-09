@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2019 Alexandre Joannou
+ * Copyright (c) 2018-2021 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -174,3 +174,8 @@ typedef Bit#(4) AXI4_Region;
 typedef enum {
   OKAY = 2'b00, EXOKAY = 2'b01, SLVERR = 2'b10, DECERR = 2'b11
 } AXI4_Resp deriving (Bits, Eq, FShow);
+
+// return an interface acting as a dead end
+typeclass CulDeSac#(type t);
+  function t culDeSac;
+endtypeclass
