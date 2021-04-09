@@ -90,3 +90,27 @@ module mkBurstToNoBurst_ManagerSubordinate (AXI4_ManagerSubordinate_Shim#(a, b, 
   interface manager = internal.master;
   interface subordinate = internal.slave;
 endmodule
+
+module toAXI4_Manager_Synth #(AXI4_Manager#(a, b, c, d, e, f, g, h) m)
+                            (AXI4_Manager_Synth#(a, b, c, d, e, f, g, h));
+  let ret <- toAXI4_Master_Synth(m);
+  return ret;
+endmodule
+
+module fromAXI4_Manager_Synth #(AXI4_Manager_Synth#(a, b, c, d, e, f, g, h) m)
+                              (AXI4_Manager#(a, b, c, d, e, f, g, h));
+  let ret <- fromAXI4_Master_Synth(m);
+  return ret;
+endmodule
+
+module toAXI4_Subordinate_Synth #(AXI4_Subordinate#(a, b, c, d, e, f, g, h) s)
+                           (AXI4_Subordinate_Synth#(a, b, c, d, e, f, g, h));
+  let ret <- toAXI4_Slave_Synth(s);
+  return ret;
+endmodule
+
+module fromAXI4_Subordinate_Synth #(AXI4_Subordinate_Synth#(a, b, c, d, e, f, g, h) s)
+                             (AXI4_Subordinate#(a, b, c, d, e, f, g, h));
+  let ret <- fromAXI4_Slave_Synth(s);
+  return ret;
+endmodule
