@@ -74,6 +74,16 @@ endmodule
 `defAXI4ManagerSubordinateShimFIFOF(UGSizedFIFOF32)
 `defAXI4ManagerSubordinateShimFIFOF(UGSizedFIFOF4)
 
-function AXI4_Manager#(a,b,c,d,e,f,g,h) zeroManagerUserFields (AXI4_Manager#(a,b,c,d_,e_,f_,g_,h_) i);
-  return zeroMasterUserFields(i);
+function AXI4_Manager#(a,b,c,d,e,f,g,h) zeroManagerUserFields (AXI4_Manager#(a,b,c,d_,e_,f_,g_,h_) m);
+  return zeroMasterUserFields(m);
 endfunction
+
+function AXI4_Subordinate#(a,b,c,d,e,f,g,h) zeroSubordinateUserFields (AXI4_Subordinate#(a,b,c,d_,e_,f_,g_,h_) s);
+  return zeroSlaveUserFields(s);
+endfunction
+
+module mkBurstToNoBurst_ManagerSubordinate (AXI4_ManagerSubordinate_Shim#(a, b, c, d, e, f, g, h));
+  let internal <- mkBurstToNoBurst;
+  interface manager = internal.master;
+  interface subordinate = internal.slave;
+endmodule
