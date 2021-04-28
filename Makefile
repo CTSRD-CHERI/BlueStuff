@@ -55,7 +55,8 @@ BSCFLAGS += -show-range-conflict
 EXAMPLESDIR = examples
 SIMEXAMPLESSRC = $(wildcard $(EXAMPLESDIR)/Example-*.bsv)
 SIMEXAMPLES = $(addprefix sim, $notdir($(basename $(SIMEXAMPLESSRC))))
-VERILOGEXAMPLESSRC = $(wildcard $(EXAMPLESDIR)/VerilogExample*.bsv)
+VERILOGEXAMPLESSRC = $(EXAMPLESDIR)/Example-AXI4-MasterSlave.bsv
+VERILOGEXAMPLESSRC += $(EXAMPLESDIR)/Example-AXI4Lite-MasterSlave.bsv
 VERILOGEXAMPLES = $(addprefix verilog, $(notdir $(basename $(VERILOGEXAMPLESSRC))))
 
 all: simExamples verilogExamples
@@ -89,7 +90,7 @@ verilogExample-%.v:
 	cat $^ > $@
 
 .gatherModules-%: $(EXAMPLESDIR)/%
-	awk '/\<module/ {print "verilogExample-"$$2".v: $(EXAMPLESDIR)/$*"; print "verilogExamples: " "verilogExample-"$$2".v"}' $(EXAMPLESDIR)/$* > $@
+	awk '/^module/ {print "verilogExample-"$$2".v: $(EXAMPLESDIR)/$*"; print "verilogExamples: " "verilogExample-"$$2".v"}' $(EXAMPLESDIR)/$* > $@
 
 .PHONY: clean mrproper verilogExamples simExamples
 

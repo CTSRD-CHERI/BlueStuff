@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2020 Alexandre Joannou
+ * Copyright (c) 2018-2021 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -41,12 +41,12 @@ import Vector :: *;
 typedef 1 NMASTERS;
 typedef 1 NSLAVES;
 
-typedef 4096 SlaveWidth;
+typedef TExp#(19) SlaveWidth;
 
 typedef 0 MID_sz;
 typedef TAdd#(MID_sz, TLog#(NMASTERS)) SID_sz;
 typedef TAdd#(1, TLog#(TMul#(NSLAVES, SlaveWidth))) ADDR_sz;
-typedef 128 DATA_sz;
+typedef  32 DATA_sz;
 typedef   0 AWUSER_sz;
 typedef   0 WUSER_sz;
 typedef   0 BUSER_sz;
@@ -58,6 +58,8 @@ typedef   0 RUSER_sz;
 `define SPARAMS SID_sz, `PARAMS
 `define MASTER_T AXI4_Master#(`MPARAMS)
 `define SLAVE_T  AXI4_Slave#(`SPARAMS)
+`define MASTER_SYNTH_T AXI4_Master_Synth#(`MPARAMS)
+`define SLAVE_SYNTH_T  AXI4_Slave_Synth#(`SPARAMS)
 
 Integer nb_flit = 3;
 Integer nb_rsp = 2;
@@ -110,6 +112,12 @@ module axiMaster (`MASTER_T);
 
 endmodule
 
+module axiMasterSynth (`MASTER_SYNTH_T);
+  let noSynth <- axiMaster;
+  let synth <- toAXI4_Master_Synth (noSynth);
+  return synth;
+endmodule
+
 module axiSlave (`SLAVE_T);
 
   // AXI slave shim
@@ -118,6 +126,7 @@ module axiSlave (`SLAVE_T);
   // arbitrary work for each channel
   let awResp <- mkFIFOF;
   let wResp <- mkFIFOF;
+  let rResp <- mkFIFOF;
   rule getAXI4_AWFlit;
     let req <- get(shim.master.aw);
     awResp.enq(AXI4_BFlit{
@@ -136,10 +145,26 @@ module axiSlave (`SLAVE_T);
     shim.master.b.put(awResp.first);
     $display("%0t ---- SLAVE - sending ", $time, fshow(awResp.first));
   endrule
+  rule getAXI4_ARFlit;
+    let req <- get(shim.master.ar);
+    rResp.enq(AXI4_RFlit{
+      rid: req.arid, rresp: OKAY, rdata: zeroExtend(req.araddr), rlast: True, ruser: ?
+    });
+  endrule
+  rule putAXI4_RFlit;
+    rResp.deq;
+    shim.master.r.put(rResp.first);
+  endrule
 
   // return AXI interface
   return shim.slave;
 
+endmodule
+
+module axiSlaveSynth (`SLAVE_SYNTH_T);
+  let noSynth <- axiSlave;
+  let synth <- toAXI4_Slave_Synth (noSynth);
+  return synth;
 endmodule
 
 module top (Empty);
