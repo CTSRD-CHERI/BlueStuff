@@ -1,4 +1,4 @@
-package AXI4S_Types;
+package AXI4Stream_Types;
 
 import Connectable :: *;
 
@@ -15,11 +15,11 @@ typedef struct {
    Bit #(id_)              tid;
    Bit #(dest_)            tdest;
    Bit #(user_)            tuser;
-} AXI4S_TFlit #(numeric type id_, numeric type data_, numeric type dest_, numeric type user_)
+} AXI4Stream_Flit #(numeric type id_, numeric type data_, numeric type dest_, numeric type user_)
 deriving (Bits, FShow);
 
 (* always_ready, always_enabled *)
-interface AXI4S_T_Master_Synth #(
+interface AXI4Stream_Master_Synth #(
    numeric type id_,
    numeric type data_,
    numeric type dest_,
@@ -36,7 +36,7 @@ interface AXI4S_T_Master_Synth #(
 endinterface
 
 (* always_ready, always_enabled *)
-interface AXI4S_T_Slave_Synth #(
+interface AXI4Stream_Slave_Synth #(
    numeric type id_,
    numeric type data_,
    numeric type dest_,
@@ -52,81 +52,37 @@ interface AXI4S_T_Slave_Synth #(
    method Bool tready;
 endinterface
 
-interface AXI4S_Master #(
-   numeric type id_,
-   numeric type data_,
-   numeric type dest_,
-   numeric type user_);
-   interface Source #(AXI4S_TFlit #(id_, data_, dest_, user_)) t;
-endinterface
+typedef Source #(AXI4Stream_Flit #(id_, data_, dest_, user_))
+        AXI4Stream_Master #(numeric type id_,
+                            numeric type data_,
+                            numeric type dest_,
+                            numeric type user_);
 
-interface AXI4S_Master_Synth #(
-   numeric type id_,
-   numeric type data_,
-   numeric type dest_,
-   numeric type user_);
-   interface AXI4S_T_Master_Synth #(id_, data_, dest_, user_) t;
-endinterface
+typedef Sink #(AXI4Stream_Flit #(id_, data_, dest_, user_))
+        AXI4Stream_Slave #(numeric type id_,
+                           numeric type data_,
+                           numeric type dest_,
+                           numeric type user_);
 
-instance CulDeSac#(AXI4S_Master#(id_, data_, dest_, user_));
-  function culDeSac = interface AXI4S_Master;
-    interface t = nullSource;
-  endinterface;
+
+instance CulDeSac#(AXI4Stream_Master#(id_, data_, dest_, user_));
+  function culDeSac = nullSource;
 endinstance
 
-interface AXI4S_Slave #(
-   numeric type id_,
-   numeric type data_,
-   numeric type dest_,
-   numeric type user_);
-   interface Sink #(AXI4S_TFlit #(id_, data_, dest_, user_)) t;
-endinterface
-
-interface AXI4S_Slave_Synth #(
-   numeric type id_,
-   numeric type data_,
-   numeric type dest_,
-   numeric type user_);
-   interface AXI4S_T_Slave_Synth #(id_, data_, dest_, user_) t;
-endinterface
-
-instance CulDeSac#(AXI4S_Slave#(id_, data_, dest_, user_));
-  function culDeSac = interface AXI4S_Slave;
-    interface t = nullSink;
-  endinterface;
+instance CulDeSac#(AXI4Stream_Slave#(id_, data_, dest_, user_));
+  function culDeSac = nullSink;
 endinstance
 
-instance Connectable#(
-  AXI4S_Master#(a, b, c, d),
-  AXI4S_Slave#(a, b, c, d));
-  module mkConnection#(
-    AXI4S_Master#(a, b, c, d) m,
-    AXI4S_Slave#(a, b, c, d) s)
-    (Empty);
-    mkConnection(m.t, s.t);
-  endmodule
-endinstance
-instance Connectable#(
-  AXI4S_Slave#(a, b, c, d),
-  AXI4S_Master#(a, b, c, d));
-  module mkConnection#(
-    AXI4S_Slave#(a, b, c, d) s,
-    AXI4S_Master#(a, b, c, d) m)
-    (Empty);
-    mkConnection(m, s);
-  endmodule
-endinstance
-
-interface AXI4S_Shim#(
+interface AXI4Stream_Shim#(
   numeric type id_,
   numeric type data_,
   numeric type dest_,
   numeric type user_);
   method Action clear;
-  interface AXI4S_Master#(
+  interface AXI4Stream_Master#(
     id_, data_, dest_, user_
   ) master;
-  interface AXI4S_Slave#(
+  interface AXI4Stream_Slave#(
     id_, data_, dest_, user_
   ) slave;
 endinterface
