@@ -823,13 +823,13 @@ endinterface
 
 // Type of events that can be monitored on an AXI4 port
 typedef struct {
-   Bool evt_AW_FLIT;
-   Bool evt_W_FLIT;
-   Bool evt_W_FLIT_FINAL;
-   Bool evt_B_FLIT;
-   Bool evt_AR_FLIT;
-   Bool evt_R_FLIT;
-   Bool evt_R_FLIT_FINAL;
+  Bool evt_AW_FLIT;
+  Bool evt_W_FLIT;
+  Bool evt_W_FLIT_FINAL;
+  Bool evt_B_FLIT;
+  Bool evt_AR_FLIT;
+  Bool evt_R_FLIT;
+  Bool evt_R_FLIT_FINAL;
 } AXI4_Events deriving (Bits, FShow);
 instance DefaultValue#(AXI4_Events);
   function defaultValue = AXI4_Events {
