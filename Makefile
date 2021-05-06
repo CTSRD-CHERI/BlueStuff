@@ -66,7 +66,8 @@ include .verilogExamples
 
 simExample-%: $(EXAMPLESDIR)/Example-%.bsv
 	mkdir -p $(OUTPUTDIR)/$@-info $(BDIR) $(SIMDIR)
-	$(BSC) -cpp -Xcpp -I. -info-dir $(OUTPUTDIR)/$@-info -simdir $(SIMDIR) $(BSCFLAGS) -sim -g top -u $<
+	#$(BSC) -cpp -Xcpp -I. -info-dir $(OUTPUTDIR)/$@-info -simdir $(SIMDIR) $(BSCFLAGS) -sim -g top -u $<
+	$(BSC) -info-dir $(OUTPUTDIR)/$@-info -simdir $(SIMDIR) $(BSCFLAGS) -sim -g top -u $<
 	CC=$(CC) CXX=$(CXX) $(BSC) -simdir $(SIMDIR) $(BSCFLAGS) -sim -e top -o $(OUTPUTDIR)/$@
 	dot -Tsvg $(OUTPUTDIR)/$@-info/top_combined.dot > $(OUTPUTDIR)/$@-info/top_combined.svg
 	dot -Tsvg $(OUTPUTDIR)/$@-info/top_combined_full.dot > $(OUTPUTDIR)/$@-info/top_combined_full.svg

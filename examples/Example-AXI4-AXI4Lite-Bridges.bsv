@@ -210,16 +210,16 @@ endmodule
 module top (Empty);
   `MASTER_LITE_T mlite0 <- axiMasterLite;
   `SLAVE_T           s0 <- axiSlave;
-  `MASTER_T          m0 <- fromAXI4Lite_Master(mlite0);
+  `MASTER_T          m0 = fromAXI4LiteToAXI4_Master (mlite0);
   mkConnection(m0, s0);
   //`MASTER_T         m1 <- axiMaster;
   //`SLAVE_LITE_T slite1 <- axiSlaveLite;
-  //`SLAVE_T          s1 <- fromAXI4Lite_Slave(slite1);
+  //`SLAVE_T          s1 = fromAXI4LiteToAXI4_Slave (slite1);
   //mkConnection(m1, s1);
   `MASTER_LITE_T mlite2 <- axiMasterLite;
-  `MASTER_T          m2 <- fromAXI4Lite_Master(mlite2);
+  `MASTER_T          m2 = fromAXI4LiteToAXI4_Master (mlite2);
   `SLAVE_LITE_T  slite2 <- axiSlaveLite;
-  `SLAVE_T           s2 <- fromAXI4Lite_Slave(slite2);
+  `SLAVE_T           s2 = fromAXI4LiteToAXI4_Slave (slite2);
   mkConnection(m2, s2);
 endmodule
 
