@@ -222,15 +222,15 @@ function (AXI4Lite_Master #( addr_, data_
                         , aruser_, ruser_) m) = interface AXI4Lite_Master;
   let busSize = fromInteger(valueOf(data_)/8);
   interface aw = mapSource ( toAXI4Lite_AW
-                           , onDrop (m.aw, checkAXI4_AWFlit (busSize)) );
+                           , onDrop (checkAXI4_AWFlit (busSize), m.aw) );
   interface  w = mapSource ( toAXI4Lite_W
-                           , onDrop (m.w, checkAXI4_WFlit) );
+                           , onDrop (checkAXI4_WFlit, m.w) );
   interface  b = mapSink   ( fromAXI4Lite_B
-                           , onPut (m.b, checkAXI4_BFlit) );
+                           , onPut (checkAXI4_BFlit, m.b) );
   interface ar = mapSource ( toAXI4Lite_AR
-                           , onDrop (m.ar, checkAXI4_ARFlit (busSize)) );
+                           , onDrop (checkAXI4_ARFlit (busSize), m.ar) );
   interface  r = mapSink   ( fromAXI4Lite_R
-                           , onPut (m.r, checkAXI4_RFlit) );
+                           , onPut (checkAXI4_RFlit, m.r) );
 endinterface;
 
 function (AXI4_Master #( id_, addr_, data_
@@ -241,16 +241,16 @@ function (AXI4_Master #( id_, addr_, data_
                             , awuser_, wuser_, buser_
                             , aruser_, ruser_) mLite) = interface AXI4_Master;
   let busSize = fromInteger(valueOf(data_)/8);
-  interface aw = onDrop ( mapSource (fromAXI4Lite_AW, mLite.aw)
-                        , checkAXI4_AWFlit (busSize) );
-  interface  w = onDrop ( mapSource (fromAXI4Lite_W, mLite.w)
-                        , checkAXI4_WFlit );
-  interface  b = onPut  ( mapSink (toAXI4Lite_B, mLite.b)
-                        , checkAXI4_BFlit );
-  interface ar = onDrop ( mapSource (fromAXI4Lite_AR, mLite.ar)
-                        , checkAXI4_ARFlit (busSize) );
-  interface  r = onPut  ( mapSink (toAXI4Lite_R, mLite.r)
-                        , checkAXI4_RFlit );
+  interface aw = onDrop ( checkAXI4_AWFlit (busSize)
+                        , mapSource (fromAXI4Lite_AW, mLite.aw) );
+  interface  w = onDrop ( checkAXI4_WFlit
+                        , mapSource (fromAXI4Lite_W, mLite.w) );
+  interface  b = onPut  ( checkAXI4_BFlit
+                        , mapSink (toAXI4Lite_B, mLite.b) );
+  interface ar = onDrop ( checkAXI4_ARFlit (busSize)
+                        , mapSource (fromAXI4Lite_AR, mLite.ar) );
+  interface  r = onPut  ( checkAXI4_RFlit
+                        , mapSink (toAXI4Lite_R, mLite.r) );
 endinterface;
 
 ///////////////////////
@@ -266,15 +266,15 @@ function (AXI4Lite_Slave #( addr_, data_
                        , aruser_, ruser_) s) = interface AXI4Lite_Slave;
   let busSize = fromInteger(valueOf(data_)/8);
   interface aw = mapSink   ( fromAXI4Lite_AW
-                           , onPut (s.aw, checkAXI4_AWFlit (busSize) ));
+                           , onPut (checkAXI4_AWFlit (busSize), s.aw) );
   interface  w = mapSink   ( fromAXI4Lite_W
-                           , onPut (s.w, checkAXI4_WFlit) );
+                           , onPut (checkAXI4_WFlit, s.w) );
   interface  b = mapSource ( toAXI4Lite_B
-                           , onDrop (s.b, checkAXI4_BFlit) );
+                           , onDrop (checkAXI4_BFlit, s.b) );
   interface ar = mapSink   ( fromAXI4Lite_AR
-                           , onPut (s.ar, checkAXI4_ARFlit (busSize)) );
+                           , onPut (checkAXI4_ARFlit (busSize), s.ar) );
   interface  r = mapSource ( toAXI4Lite_R
-                           , onDrop (s.r, checkAXI4_RFlit) );
+                           , onDrop (checkAXI4_RFlit, s.r) );
 endinterface;
 
 function (AXI4_Slave #( id_, addr_, data_
@@ -285,14 +285,14 @@ function (AXI4_Slave #( id_, addr_, data_
                            , awuser_, wuser_, buser_
                            , aruser_, ruser_) sLite) = interface AXI4_Slave;
   let busSize = fromInteger(valueOf(data_)/8);
-  interface aw = onPut  ( mapSink (toAXI4Lite_AW, sLite.aw)
-                        , checkAXI4_AWFlit (busSize) );
-  interface  w = onPut  ( mapSink (toAXI4Lite_W, sLite.w)
-                        , checkAXI4_WFlit );
-  interface  b = onDrop ( mapSource (fromAXI4Lite_B, sLite.b)
-                        , checkAXI4_BFlit );
-  interface ar = onPut  ( mapSink (toAXI4Lite_AR, sLite.ar)
-                        , checkAXI4_ARFlit (busSize) );
-  interface  r = onDrop ( mapSource (fromAXI4Lite_R, sLite.r)
-                        , checkAXI4_RFlit );
+  interface aw = onPut  ( checkAXI4_AWFlit (busSize)
+                        , mapSink (toAXI4Lite_AW, sLite.aw) );
+  interface  w = onPut  ( checkAXI4_WFlit
+                        , mapSink (toAXI4Lite_W, sLite.w) );
+  interface  b = onDrop ( checkAXI4_BFlit
+                        , mapSource (fromAXI4Lite_B, sLite.b) );
+  interface ar = onPut  ( checkAXI4_ARFlit (busSize)
+                        , mapSink (toAXI4Lite_AR, sLite.ar) );
+  interface  r = onDrop ( checkAXI4_RFlit
+                        , mapSource (fromAXI4Lite_R, sLite.r) );
 endinterface;
