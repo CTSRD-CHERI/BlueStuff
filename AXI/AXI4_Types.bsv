@@ -36,7 +36,6 @@ import Routable :: *;
 // BlueBasics import
 import SourceSink :: *;
 import MasterSlave :: *;
-import ConfigReg :: *;
 
 import AXI4_AXI4Lite_Types :: *;
 
