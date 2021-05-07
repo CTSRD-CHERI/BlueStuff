@@ -60,6 +60,9 @@ module mergeWrite#(
   (Source#(AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_)));
   let debug = False;
 
+  let awug <- toUnguardedSource (aw, ?);
+  let wug <- toUnguardedSource (w, ?);
+
   let awff <- mkFIFOF;
   let wff  <- mkFIFOF;
   let flitLeft <- mkReg(0);
@@ -73,8 +76,8 @@ module mergeWrite#(
   //                             : OtherFlit(w.peek);
   //endrule
 
-  rule awFlit; awff.enq (aw.peek); aw.drop; endrule
-  rule wFlit; wff.enq (w.peek); w.drop; endrule
+  rule awFlit(awug.canPeek); awff.enq (awug.peek); awug.drop; endrule
+  rule wFlit(wug.canPeek); wff.enq (wug.peek); wug.drop; endrule
 
   rule passFlit (flitLeft == 0);
     outflit <= FirstFlit(tuple2(awff.first, wff.first));
@@ -120,15 +123,21 @@ module splitWrite#(
   (Sink#(AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_)));
   let debug = False;
 
+  let awug <- toUnguardedSink (aw);
+  let wug <- toUnguardedSink (w);
+
   let flitLeft <- mkReg(0);
   let doPut <- mkWire;
-  let canDoPut = (flitLeft == 0) ? aw.canPut && w.canPut : w.canPut;
+  let canDoPut = (flitLeft == 0) ? awug.canPut && wug.canPut
+                                 : wug.canPut;
 
-  rule putFirst (flitLeft == 0);
+  rule putFirst (flitLeft == 0
+                 && awug.canPut
+                 && wug.canPut);
     case (doPut) matches
       tagged FirstFlit{.awflit, .wflit}: begin
-        aw.put(awflit);
-        w.put(wflit);
+        awug.put(awflit);
+        wug.put(wflit);
         // burst length given by AxLEN + 1
         flitLeft <= awflit.awlen;
       end
@@ -139,10 +148,11 @@ module splitWrite#(
     endcase
   endrule
 
-  rule putOther (flitLeft > 0);
+  rule putOther (flitLeft > 0
+                 && wug.canPut);
     case (doPut) matches
       tagged OtherFlit .wflit: begin
-        w.put(wflit);
+        wug.put(wflit);
         // decrement flit counter
         flitLeft <= flitLeft - 1;
         // check for error conditions
