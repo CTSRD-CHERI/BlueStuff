@@ -1,5 +1,4 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
  * Copyright (c) 2021 Ivan Ribeiro
  * All rights reserved.
  *
@@ -27,26 +26,14 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
-package AXI4;
+package AXI4Stream;
 
 import AXI4_AXI4Lite_AXI4Stream_Types :: *;
-import AXI4_Types :: *;
-import AXI4_AW_Utils :: *;
-import AXI4_W_Utils :: *;
-import AXI4_B_Utils :: *;
-import AXI4_AR_Utils :: *;
-import AXI4_R_Utils :: *;
-import AXI4_Utils :: *;
-import AXI4_Interconnect :: *;
+import AXI4Stream_Types :: *;
+import AXI4Stream_Utils :: *;
 
 export AXI4_AXI4Lite_AXI4Stream_Types :: *;
-export AXI4_Types :: *;
-export AXI4_AW_Utils :: *;
-export AXI4_W_Utils :: *;
-export AXI4_B_Utils :: *;
-export AXI4_AR_Utils :: *;
-export AXI4_R_Utils :: *;
-export AXI4_Utils :: *;
-export AXI4_Interconnect :: *;
+export AXI4Stream_Types :: *;
+export AXI4Stream_Utils :: *;
 
 endpackage

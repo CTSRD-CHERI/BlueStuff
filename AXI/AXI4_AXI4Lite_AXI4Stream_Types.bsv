@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2018-2021 Alexandre Joannou
+ * Copyright (c) 2021 Ivan Ribeiro
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -31,6 +32,8 @@
 // AMBA AXI and ACE Protocol Specification
 // AXI3, AXI4, AXI5, ACE and ACE5
 // ARM IHI 0022F.b (ID122117)
+
+package AXI4_AXI4Lite_AXI4Stream_Types;
 
 import Printf :: *;
 
@@ -179,3 +182,5 @@ typedef enum {
 typeclass CulDeSac#(type t);
   function t culDeSac;
 endtypeclass
+
+endpackage

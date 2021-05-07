@@ -2,6 +2,7 @@
  * Copyright (c) 2018-2021 Alexandre Joannou
  * Copyright (c) 2019 Peter Rugg
  * Copyright (c) 2020 Jonas Fiala
+ * Copyright (c) 2021 Ivan Ribeiro
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -37,7 +38,7 @@ import Routable :: *;
 import SourceSink :: *;
 import MasterSlave :: *;
 
-import AXI4_AXI4Lite_Types :: *;
+import AXI4_AXI4Lite_AXI4Stream_Types :: *;
 
 ////////////////////////////////
 // AXI4 Address Write Channel //

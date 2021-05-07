@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2021 Ivan Ribeiro
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -28,7 +29,7 @@
 
 package AXI4Lite;
 
-import AXI4_AXI4Lite_Types :: *;
+import AXI4_AXI4Lite_AXI4Stream_Types :: *;
 import AXI4Lite_Types :: *;
 import AXI4Lite_AW_Utils :: *;
 import AXI4Lite_W_Utils :: *;
@@ -38,7 +39,7 @@ import AXI4Lite_R_Utils :: *;
 import AXI4Lite_Utils :: *;
 import AXI4Lite_Interconnect :: *;
 
-export AXI4_AXI4Lite_Types :: *;
+export AXI4_AXI4Lite_AXI4Stream_Types :: *;
 export AXI4Lite_Types :: *;
 export AXI4Lite_AW_Utils :: *;
 export AXI4Lite_W_Utils :: *;
