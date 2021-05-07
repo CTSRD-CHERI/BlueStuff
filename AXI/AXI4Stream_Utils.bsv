@@ -29,18 +29,17 @@ endmodule
 `defAXI4StreamShimFIFOF(UGSizedFIFOF4, mkUGSizedFIFOF(4))
 
 
-
-
 typeclass ToAXI4Stream_Flit #( type t
                              , numeric type id_
                              , numeric type data_
                              , numeric type dest_
                              , numeric type user_);
-   function AXI4Stream_Flit #(id_, data_, dest_, user_) toAXI4Stream_Flit (t x);
+  function AXI4Stream_Flit #(id_, data_, dest_, user_) toAXI4Stream_Flit (t x);
 endtypeclass
 
-instance ToAXI4Stream_Flit #(AXI4Stream_Flit #(id_, data_, dest_, user_), id_, data_, dest_, user_);
-   function toAXI4Stream_Flit = id;
+instance ToAXI4Stream_Flit #( AXI4Stream_Flit #(id_, data_, dest_, user_)
+                            , id_, data_, dest_, user_);
+  function toAXI4Stream_Flit = id;
 endinstance
 
 typeclass FromAXI4Stream_Flit #( type t
@@ -48,69 +47,63 @@ typeclass FromAXI4Stream_Flit #( type t
                                , numeric type data_
                                , numeric type dest_
                                , numeric type user_);
-   function t fromAXI4Stream_Flit (AXI4Stream_Flit #(id_, data_, dest_, user_) x);
+  function t
+    fromAXI4Stream_Flit (AXI4Stream_Flit #(id_, data_, dest_, user_) x);
 endtypeclass
 
-instance FromAXI4Stream_Flit #(AXI4Stream_Flit #(id_, data_, dest_, user_), id_, data_, dest_, user_);
-   function fromAXI4Stream_Flit = id;
+instance FromAXI4Stream_Flit #( AXI4Stream_Flit #(id_, data_, dest_, user_)
+                              , id_, data_, dest_, user_);
+  function fromAXI4Stream_Flit = id;
 endinstance
 
 
-
-
 module toAXI4Stream_Master_Synth #(src_t #(t) s)
-                                  (AXI4Stream_Master_Synth #(id_, data_, dest_, user_))
-   provisos ( ToSource #(src_t #(t), t)
-            , ToAXI4Stream_Flit #(t, id_, data_, dest_, user_)
-            , Bits #(t, t_sz));
-   let src <- toUnguardedSource (s, ?);
-   AXI4Stream_Flit #(id_, data_, dest_, user_) flit = toAXI4Stream_Flit (src.peek);
-   method tdata   = flit.tdata;
-   method tstrb   = flit.tstrb;
-   method tkeep   = flit.tkeep;
-   method tlast   = flit.tlast;
-   method tid     = flit.tid;
-   method tdest   = flit.tdest;
-   method tuser   = flit.tuser;
-   method tvalid  = src.canPeek;
-   method tready (rdy) = action if (src.canPeek && rdy) src.drop; endaction;
+  (AXI4Stream_Master_Synth #(id_, data_, dest_, user_))
+  provisos ( ToSource #(src_t #(t), t)
+           , ToAXI4Stream_Flit #(t, id_, data_, dest_, user_)
+           , Bits #(t, t_sz));
+  let src <- toUnguardedSource (s, ?);
+  AXI4Stream_Flit #(id_, data_, dest_, user_)
+    flit = toAXI4Stream_Flit (src.peek);
+  method tdata  = flit.tdata;
+  method tstrb  = flit.tstrb;
+  method tkeep  = flit.tkeep;
+  method tlast  = flit.tlast;
+  method tid    = flit.tid;
+  method tdest  = flit.tdest;
+  method tuser  = flit.tuser;
+  method tvalid = src.canPeek;
+  method tready (rdy) = action if (src.canPeek && rdy) src.drop; endaction;
 endmodule
 
 
 module toAXI4Stream_Slave_Synth #(snk_t s)
-                                 (AXI4Stream_Slave_Synth #(id_, data_, dest_, user_))
-   provisos ( ToSink #(snk_t, t)
-            , FromAXI4Stream_Flit #(t, id_, data_, dest_, user_)
-            , Bits #(t, t_sz));
-   let snk <- toUnguardedSink (s);
+  (AXI4Stream_Slave_Synth #(id_, data_, dest_, user_))
+  provisos ( ToSink #(snk_t, t)
+           , FromAXI4Stream_Flit #(t, id_, data_, dest_, user_)
+           , Bits #(t, t_sz));
+  let snk <- toUnguardedSink (s);
 
-   method tflit ( tvalid
-                , tdata
-                , tstrb
-                , tkeep
-                , tlast
-                , tid
-                , tdest
-                , tuser) =
-      action
-         if (tvalid && snk.canPut)
-            snk.put (fromAXI4Stream_Flit (AXI4Stream_Flit { tdata: tdata
-                                                          , tstrb: tstrb
-                                                          , tkeep: tkeep
-                                                          , tlast: tlast
-                                                          , tid  : tid
-                                                          , tdest: tdest
-                                                          , tuser: tuser }));
-      endaction;
-   method tready = snk.canPut;
+  method tflit (tvalid, tdata, tstrb, tkeep, tlast, tid, tdest, tuser) =
+    action
+      if (tvalid && snk.canPut)
+        snk.put (fromAXI4Stream_Flit (AXI4Stream_Flit { tdata: tdata
+                                                      , tstrb: tstrb
+                                                      , tkeep: tkeep
+                                                      , tlast: tlast
+                                                      , tid  : tid
+                                                      , tdest: tdest
+                                                      , tuser: tuser }));
+    endaction;
+  method tready = snk.canPut;
 endmodule
 
 function AXI4Stream_Master #(id_, data_, dest_, user_)
-         debugAXI4Stream_Master (AXI4Stream_Master #(id_, data_, dest_, user_) m, Fmt msg) =
-      debugSource (m, $format (msg, " t"));
+  debugAXI4Stream_Master ( AXI4Stream_Master #(id_, data_, dest_, user_) m
+                         , Fmt msg) = debugSource (m, $format (msg, " t"));
 
 function AXI4Stream_Slave #(id_, data_, dest_, user_)
-         debugAXI4Stream_Slave (AXI4Stream_Slave #(id_, data_, dest_, user_) s, Fmt msg) =
-      debugSink (s, $format (msg, " t"));
+  debugAXI4Stream_Slave ( AXI4Stream_Slave #(id_, data_, dest_, user_) s
+                        , Fmt msg) = debugSink (s,$format (msg, " t"));
 
 endpackage
