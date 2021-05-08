@@ -56,7 +56,7 @@ module mkMemToAXI4Lite_Slave#(Mem#(addr_t, data_t) mem)
     let  wflit <- get(shim.master.w);
     Bit#(lowIdx) lowAddr = awflit.awaddr[valueOf(lowIdx)-1:0];
     Bit#(data_sz) shiftAmount = zeroExtend(lowAddr) << 3;
-    mem.sink.put(WriteReq {
+    mem.sink.put(tagged WriteReq {
       addr: unpack(awflit.awaddr),
       byteEnable: unpack(wflit.wstrb) >> lowAddr,
       data: unpack(wflit.wdata >> shiftAmount)
@@ -70,7 +70,7 @@ module mkMemToAXI4Lite_Slave#(Mem#(addr_t, data_t) mem)
   endrule
   rule readReq;
     let arflit <- get(shim.master.ar);
-    mem.sink.put(ReadReq {
+    mem.sink.put(tagged ReadReq {
       addr: unpack(arflit.araddr),
       numBytes: fromInteger(valueOf(data_sz)/8)}
     );

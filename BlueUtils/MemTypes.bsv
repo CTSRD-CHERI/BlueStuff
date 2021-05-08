@@ -95,11 +95,11 @@ function MemReq#(addr_t, content_t) offsetMemReq(
   Int#(addr_sz) o)
   provisos (Bits#(addr_t, addr_sz), Bits#(content_t, content_sz)) =
   case (r) matches
-    tagged ReadReq .rr: ReadReq {
+    tagged ReadReq .rr: tagged ReadReq {
       addr: unpack(pack(unpack(pack(rr.addr)) + o)),
       numBytes: rr.numBytes
     };
-    tagged WriteReq .wr: WriteReq {
+    tagged WriteReq .wr: tagged WriteReq {
       addr: unpack(pack(unpack(pack(wr.addr)) + o)),
       byteEnable: wr.byteEnable,
       data: wr.data
