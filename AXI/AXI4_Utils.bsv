@@ -60,6 +60,9 @@ module mergeWrite#(
   (Source#(AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_)));
   let debug = False;
 
+  let awug <- toUnguardedSource (aw, ?);
+  let wug <- toUnguardedSource (w, ?);
+
   let awff <- mkFIFOF;
   let wff  <- mkFIFOF;
   let flitLeft <- mkReg(0);
@@ -73,8 +76,8 @@ module mergeWrite#(
   //                             : OtherFlit(w.peek);
   //endrule
 
-  rule awFlit; awff.enq (aw.peek); aw.drop; endrule
-  rule wFlit; wff.enq (w.peek); w.drop; endrule
+  rule awFlit(awug.canPeek); awff.enq (awug.peek); awug.drop; endrule
+  rule wFlit(wug.canPeek); wff.enq (wug.peek); wug.drop; endrule
 
   rule passFlit (flitLeft == 0);
     outflit <= FirstFlit(tuple2(awff.first, wff.first));
@@ -120,15 +123,21 @@ module splitWrite#(
   (Sink#(AXI4_WriteFlit#(id_, addr_, data_, awuser_, wuser_)));
   let debug = False;
 
+  let awug <- toUnguardedSink (aw);
+  let wug <- toUnguardedSink (w);
+
   let flitLeft <- mkReg(0);
   let doPut <- mkWire;
-  let canDoPut = (flitLeft == 0) ? aw.canPut && w.canPut : w.canPut;
+  let canDoPut = (flitLeft == 0) ? awug.canPut && wug.canPut
+                                 : wug.canPut;
 
-  rule putFirst (flitLeft == 0);
+  rule putFirst (flitLeft == 0
+                 && awug.canPut
+                 && wug.canPut);
     case (doPut) matches
       tagged FirstFlit{.awflit, .wflit}: begin
-        aw.put(awflit);
-        w.put(wflit);
+        awug.put(awflit);
+        wug.put(wflit);
         // burst length given by AxLEN + 1
         flitLeft <= awflit.awlen;
       end
@@ -139,10 +148,11 @@ module splitWrite#(
     endcase
   endrule
 
-  rule putOther (flitLeft > 0);
+  rule putOther (flitLeft > 0
+                 && wug.canPut);
     case (doPut) matches
       tagged OtherFlit .wflit: begin
-        w.put(wflit);
+        wug.put(wflit);
         // decrement flit counter
         flitLeft <= flitLeft - 1;
         // check for error conditions
@@ -217,6 +227,56 @@ function AXI4_Slave#(a, addr_out, c, d, e, f, g, h) expandAXI4_Slave_Addr
     interface  r = s.r;
   endinterface;
 endfunction
+
+/////////////////////////
+// AXI4 "dummy" Slaves //
+////////////////////////////////////////////////////////////////////////////////
+
+module mkPerpetualValueAXI4Slave #(parameter Integer thatOneValue)
+                                  (AXI4_Slave#(a, b, c, d, e, f, g, h));
+  let inShim <- mkAXI4ShimFF;
+  let m = inShim.master;
+  let arFlitFF <- mkSizedBypassFIFOF(1);
+  let arFlitCnt <- mkReg(0);
+  // ignore writes, provide an OK response
+  rule drainNonLastW (m.w.canPeek && !m.w.peek.wlast); m.w.drop; endrule
+  rule genBFlits (m.w.canPeek && m.w.peek.wlast && m.aw.canPeek && m.b.canPut);
+    m.aw.drop;
+    m.w.drop;
+    m.b.put(AXI4_BFlit { bid: m.aw.peek.awid
+                       , bresp: OKAY
+                       , buser: ? });
+  endrule
+  // on read, always return the appropriate number of flits with
+  // the perpetual value
+  rule grabARFlit (m.ar.canPeek && arFlitFF.notFull);
+    let arFlit <- get(m.ar);
+    arFlitFF.enq(arFlit);
+  endrule
+  rule genRFlits (arFlitFF.notEmpty && m.r.canPut);
+    // XXX TODO XXX
+    // not currently shifting the value in place within the flit:
+    // consider arsize together with arFlitCnt current value and arburst
+    let arFlit = arFlitFF.first;
+    let isLast = False;
+    if (arFlitCnt >= {1'b0, arFlit.arlen}) begin
+      arFlitFF.deq;
+      arFlitCnt <= 0;
+      isLast = True;
+    end else arFlitCnt <= arFlitCnt + 1;
+    m.r.put(AXI4_RFlit { rid: arFlit.arid
+                       , rdata: fromInteger(thatOneValue)
+                       , rresp: OKAY
+                       , rlast: isLast
+                       , ruser: ? });
+  endrule
+  return inShim.slave;
+endmodule
+
+module mkPerpetualZeroAXI4Slave (AXI4_Slave#(a, b, c, d, e, f, g, h));
+  let ifc <- mkPerpetualValueAXI4Slave (0);
+  return ifc;
+endmodule
 
 //////////////////
 // AXI4 Limiter //
@@ -379,7 +439,7 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
   Reg#(Bit#(SizeOf#(AXI4_Len))) writesSent[2] <- mkCReg(2, 0);
   Reg#(Bit#(SizeOf#(AXI4_Len))) readsSent[2] <- mkCReg(2, 0);
   let defaultBResp = AXI4_BFlit {bid: ?, bresp: EXOKAY, buser: ?};
-  Reg#(Tuple2#(Bit#(SizeOf#(AXI4_Len)), AXI4_BFlit #(a, f))) flitReceived[3] <- mkCReg(3, tuple2(0, defaultBResp));
+  Reg#(Tuple2#(Bit#(TAdd#(SizeOf#(AXI4_Len), 1)), AXI4_BFlit #(a, f))) flitReceived[3] <- mkCReg(3, tuple2(0, defaultBResp));
 
   // helper functions
   function getFlitAddr(addr, size, burst, cnt) = case (burst)
@@ -475,7 +535,7 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
 
   // on last response, forward the aggregated response and reset book keeping
   rule produce_bresp (countWriteRspFF.notEmpty
-                     && tpl_1(flitReceived[1]) >= countWriteRspFF.first);
+                     && tpl_1(flitReceived[1]) > zeroExtend (countWriteRspFF.first));
     flitReceived[1] <= tuple2(0, defaultBResp);
     countWriteRspFF.deq;
     inB.put(tpl_2(flitReceived[1]));

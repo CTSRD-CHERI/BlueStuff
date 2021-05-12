@@ -42,7 +42,7 @@ endinterface
 // Report drop events on a Source
 module monitorSource #(Source#(t) s) (Monitored#(Source#(t), Bool));
   PulseWire evt <- mkPulseWire;
-  interface ifc = onDrop(s, constFn(evt.send));
+  interface ifc = onDrop (constFn (evt.send), s);
   interface events = pulseWireToReadOnly(evt);
 endmodule
 
@@ -52,14 +52,14 @@ module monitorSourceWith #(Source#(t) s, function evt_t f(t x))
   provisos (DefaultValue#(evt_t), Bits#(evt_t, evt_sz));
   Wire#(evt_t) evt <- mkDWire(defaultValue);
   function fAct (x) = evt._write(f(x));
-  interface ifc = onDrop(s, fAct);
+  interface ifc = onDrop (fAct, s);
   interface events = regToReadOnly(evt); // NOTE: Wire ifc == Reg ifc
 endmodule
 
 // Report put events on a Sink
 module monitorSink #(Sink#(t) s) (Monitored#(Sink#(t), Bool));
   PulseWire evt <- mkPulseWire;
-  interface ifc = onPut(s, constFn(evt.send));
+  interface ifc = onPut (constFn (evt.send), s);
   interface events = pulseWireToReadOnly(evt);
 endmodule
 
@@ -69,7 +69,7 @@ module monitorSinkWith #(Sink#(t) s, function evt_t f(t x))
   provisos (DefaultValue#(evt_t), Bits#(evt_t, evt_sz));
   Wire#(evt_t) evt <- mkDWire(defaultValue);
   function fAct (x) = evt._write(f(x));
-  interface ifc = onPut(s, fAct);
+  interface ifc = onPut (fAct, s);
   interface events = regToReadOnly(evt); // NOTE: Wire ifc == Reg ifc
 endmodule
 

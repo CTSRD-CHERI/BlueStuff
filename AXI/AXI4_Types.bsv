@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2020 Alexandre Joannou
+ * Copyright (c) 2018-2021 Alexandre Joannou
  * Copyright (c) 2019 Peter Rugg
  * Copyright (c) 2020 Jonas Fiala
  * All rights reserved.
@@ -38,15 +38,6 @@ import SourceSink :: *;
 import MasterSlave :: *;
 
 import AXI4_AXI4Lite_Types :: *;
-
-//////////////////
-// helper types //
-////////////////////////////////////////////////////////////////////////////////
-
-// return an interface acting as a dead end
-typeclass CulDeSac#(type t);
-  function t culDeSac;
-endtypeclass
 
 ////////////////////////////////
 // AXI4 Address Write Channel //
@@ -832,13 +823,13 @@ endinterface
 
 // Type of events that can be monitored on an AXI4 port
 typedef struct {
-   Bool evt_AW_FLIT;
-   Bool evt_W_FLIT;
-   Bool evt_W_FLIT_FINAL;
-   Bool evt_B_FLIT;
-   Bool evt_AR_FLIT;
-   Bool evt_R_FLIT;
-   Bool evt_R_FLIT_FINAL;
+  Bool evt_AW_FLIT;
+  Bool evt_W_FLIT;
+  Bool evt_W_FLIT_FINAL;
+  Bool evt_B_FLIT;
+  Bool evt_AR_FLIT;
+  Bool evt_R_FLIT;
+  Bool evt_R_FLIT_FINAL;
 } AXI4_Events deriving (Bits, FShow);
 instance DefaultValue#(AXI4_Events);
   function defaultValue = AXI4_Events {
@@ -962,13 +953,18 @@ instance FallibleRoute#( AXI4_WriteFlit#(sid_, addr_, data_, awuser_, wuser_)
                        , AXI4_BFlit#(sid_, buser_));
   module mkNoRouteSlave (Slave #( AXI4_WriteFlit#(sid_, addr_, data_, awuser_, wuser_)
                                 , AXI4_BFlit#(sid_, buser_)));
-    Reg #(Maybe #(Bit #(sid_))) m_send_rsp       <- mkReg (Invalid);
-    Reg #(Bool)                 drain_until_last <- mkReg (False);
+    Reg #(Maybe #(Bit #(sid_))) m_send_rsp <- mkReg (Invalid);
+    Wire #(Bit #(sid_))            putWire <- mkWire;
+    PulseWire                     dropWire <- mkPulseWire;
+    Reg #(Bool)           drain_until_last <- mkReg (False);
+    (* mutually_exclusive = "set_m_send_rsp, clear_m_send_rsp" *)
+    rule set_m_send_rsp; m_send_rsp <= Valid (putWire); endrule
+    rule clear_m_send_rsp (dropWire); m_send_rsp <= Invalid; endrule
     interface sink = interface Sink;
       method canPut = drain_until_last || !isValid (m_send_rsp);
       method put (req) if (drain_until_last || !isValid (m_send_rsp)) = action
         case (req) matches
-          tagged FirstFlit {.aw, ._}: m_send_rsp <= Valid (aw.awid);
+          tagged FirstFlit {.aw, ._}: putWire <= aw.awid;
         endcase
         drain_until_last <= !isLast (req);
       endaction;
@@ -977,8 +973,7 @@ instance FallibleRoute#( AXI4_WriteFlit#(sid_, addr_, data_, awuser_, wuser_)
       method canPeek = isValid (m_send_rsp);
       method peek if (isValid (m_send_rsp)) =
         AXI4_BFlit{ bid: m_send_rsp.Valid, bresp: DECERR, buser: ? };
-      method drop if (isValid (m_send_rsp)) =
-        writeReg (m_send_rsp, Invalid);
+      method drop if (isValid (m_send_rsp)) = dropWire.send;
     endinterface;
   endmodule
 endinstance

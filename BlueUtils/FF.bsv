@@ -513,14 +513,14 @@ provisos(
 
   rule deqRule(doDeqA || doDeqB);
     ltail <= ltail+1;
-    mem.sink.put(ReadReq{
+    mem.sink.put(tagged ReadReq{
       addr: truncate(ltail+1),
       numBytes: fromInteger(valueOf(data_width)/8)
     });
   endrule
 
   method Action enq(data in);
-    mem.sink.put(WriteReq{
+    mem.sink.put(tagged WriteReq{
       addr: head,
       byteEnable: ~0,
       data: in

@@ -363,6 +363,153 @@ function AXI4Lite_Slave#(a,b,c,d,e,f,g) guard_AXI4Lite_Slave
     interface r  = guardSource(raw.r, block);
   endinterface;
 
+///////////////////////
+// addr field utils //
+////////////////////////////////////////////////////////////////////////////////
+
+function AXI4Lite_Master #(aPost,t0,t1,t2,t3,t4,t5)
+         fmapAddress_AXI4Lite_Master
+         ( function Bit #(aPost) f (Bit #(aPre) x)
+         , AXI4Lite_Master #(aPre,t0,t1,t2,t3,t4,t5) m);
+  return interface AXI4Lite_Master;
+    interface Source aw;
+      method drop = m.aw.drop;
+      method canPeek = m.aw.canPeek;
+      method peek;
+        let x = m.aw.peek;
+        return AXI4Lite_AWFlit { awaddr: f (x.awaddr)
+                               , awprot: x.awprot
+                               , awuser: x.awuser };
+      endmethod
+    endinterface
+    interface w = m.w;
+    interface b = m.b;
+    interface Source ar;
+      method drop = m.ar.drop;
+      method canPeek = m.ar.canPeek;
+      method peek;
+        let x = m.ar.peek;
+        return AXI4Lite_ARFlit { araddr: f (x.araddr)
+                               , arprot: x.arprot
+                               , aruser: x.aruser };
+      endmethod
+    endinterface
+    interface r = m.r;
+  endinterface;
+endfunction
+
+function AXI4Lite_Slave #(aPost,t0,t1,t2,t3,t4,t5)
+         fmapAddress_AXI4Lite_Slave
+         ( function Bit #(aPre) f (Bit #(aPost) x)
+         , AXI4Lite_Slave #(aPre,t0,t1,t2,t3,t4,t5) s);
+  return interface AXI4Lite_Slave;
+    interface Sink aw;
+      method canPut = s.aw.canPut;
+      method put (x) = s.aw.put (AXI4Lite_AWFlit { awaddr: f (x.awaddr)
+                                                 , awprot: x.awprot
+                                                 , awuser: x.awuser });
+    endinterface
+    interface w = s.w;
+    interface b = s.b;
+    interface Sink ar;
+      method canPut = s.ar.canPut;
+      method put (x) = s.ar.put (AXI4Lite_ARFlit { araddr: f (x.araddr)
+                                                 , arprot: x.arprot
+                                                 , aruser: x.aruser });
+    endinterface
+    interface r = s.r;
+  endinterface;
+endfunction
+
+///////////////////////
+// User field utils //
+////////////////////////////////////////////////////////////////////////////////
+
+function AXI4Lite_Master #(a,b,c,d,e,f,g)
+         zeroUserFields_AXI4Lite_Master
+         (AXI4Lite_Master #(a,b,c_,d_,e_,f_,g_) m);
+  return interface AXI4Lite_Master;
+    interface Source aw;
+      method drop = m.aw.drop;
+      method canPeek = m.aw.canPeek;
+      method peek;
+        let x = m.aw.peek;
+        return AXI4Lite_AWFlit { awaddr: x.awaddr
+                               , awprot: x.awprot
+                               , awuser: 0 };
+      endmethod
+    endinterface
+    interface Source w;
+      method drop = m.w.drop;
+      method canPeek = m.w.canPeek;
+      method peek;
+        let x = m.w.peek;
+        return AXI4Lite_WFlit { wdata: x.wdata, wstrb: x.wstrb, wuser: 0 };
+      endmethod
+    endinterface
+    interface Sink b;
+      method canPut = m.b.canPut;
+      method put (x) = m.b.put (AXI4Lite_BFlit { bresp: x.bresp, buser: 0 });
+    endinterface
+    interface Source ar;
+      method drop = m.ar.drop;
+      method canPeek = m.ar.canPeek;
+      method peek;
+        let x = m.ar.peek;
+        return AXI4Lite_ARFlit { araddr: x.araddr
+                               , arprot: x.arprot
+                               , aruser: 0 };
+      endmethod
+    endinterface
+    interface Sink r;
+      method canPut = m.r.canPut;
+      method put (x) = m.r.put (AXI4Lite_RFlit { rdata: x.rdata
+                                               , rresp: x.rresp
+                                               , ruser: 0 });
+    endinterface
+  endinterface;
+endfunction
+
+function AXI4Lite_Slave#(a,b,c,d,e,f,g)
+         zeroUserFields_AXI4Lite_Slave
+         (AXI4Lite_Slave #(a,b,c_,d_,e_,f_,g_) s);
+  return interface AXI4Lite_Slave;
+    interface Sink aw;
+      method canPut = s.aw.canPut;
+      method put (x) = s.aw.put (AXI4Lite_AWFlit { awaddr: x.awaddr
+                                                 , awprot: x.awprot
+                                                 , awuser: 0 });
+    endinterface
+    interface Sink w;
+      method canPut = s.w.canPut;
+      method put (x) = s.w.put (AXI4Lite_WFlit { wdata: x.wdata
+                                               , wstrb: x.wstrb
+                                               , wuser: 0 });
+    endinterface
+    interface Source b;
+      method drop = s.b.drop;
+      method canPeek = s.b.canPeek;
+      method peek = AXI4Lite_BFlit { bresp: s.b.peek.bresp, buser: 0 };
+    endinterface
+    interface Sink ar;
+      method canPut = s.ar.canPut;
+      method put (x) = s.ar.put (AXI4Lite_ARFlit { araddr: x.araddr
+                                                 , arprot: x.arprot
+                                                 , aruser: 0 });
+    endinterface
+    interface Source r;
+      method drop = s.r.drop;
+      method canPeek = s.r.canPeek;
+      method peek;
+        let x = s.r.peek;
+        return AXI4Lite_RFlit { rdata: x.rdata
+                              , rresp: x.rresp
+                              , ruser: 0 };
+      endmethod
+    endinterface
+  endinterface;
+endfunction
+
 /*
 module mkAXI4Lite_Master_Xactor (AXI4Lite_Master_Xactor#(a, b, c, d, e, f, g));
   let shim <- mkAXI4LiteShimBypassFIFOF;
