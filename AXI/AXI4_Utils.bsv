@@ -896,6 +896,56 @@ function AXI4_Slave#(a,b,c,d,e,f,g,h) truncateAddrFields (AXI4_Slave#(a,b_,c,d,e
   endinterface;
 endfunction
 
+// Truncate addr field of outgoing flits
+function AXI4_Master#(a,b_,c,d,e,f,g,h) truncateAddrFieldsMaster (AXI4_Master#(a,b,c,d,e,f,g,h) mstr)
+  provisos (Add#(a__, b_, b));
+  return interface AXI4_Master;
+    interface aw = interface Source;
+      method canPeek = mstr.aw.canPeek;
+      method peek;
+        AXI4_AWFlit#(a, b,  d) x = mstr.aw.peek;
+        AXI4_AWFlit#(a, b_, d) ret = ?;
+        ret.awid = x.awid;
+        ret.awaddr = truncate(x.awaddr);
+        ret.awlen = x.awlen;
+        ret.awsize = x.awsize;
+        ret.awburst = x.awburst;
+        ret.awlock = x.awlock;
+        ret.awcache = x.awcache;
+        ret.awprot = x.awprot;
+        ret.awqos = x.awqos;
+        ret.awregion = x.awregion;
+        ret.awuser = x.awuser;
+        return ret;
+      endmethod
+      method drop = mstr.aw.drop;
+    endinterface;
+    interface w = mstr.w;
+    interface b = mstr.b;
+    interface ar = interface Source;
+      method canPeek = mstr.ar.canPeek;
+      method peek;
+        AXI4_ARFlit#(a, b,  g) x = mstr.ar.peek;
+        AXI4_ARFlit#(a, b_, g) ret = ?;
+        ret.arid = x.arid;
+        ret.araddr = truncate(x.araddr);
+        ret.arlen = x.arlen;
+        ret.arsize = x.arsize;
+        ret.arburst = x.arburst;
+        ret.arlock = x.arlock;
+        ret.arcache = x.arcache;
+        ret.arprot = x.arprot;
+        ret.arqos = x.arqos;
+        ret.arregion = x.arregion;
+        ret.aruser = x.aruser;
+        return ret;
+      endmethod
+      method drop = mstr.ar.drop;
+    endinterface;
+    interface r = mstr.r;
+  endinterface;
+endfunction
+
 ////////////////////
 // ID field utils //
 ////////////////////////////////////////////////////////////////////////////////
