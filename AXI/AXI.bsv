@@ -1,8 +1,11 @@
 /*-
  * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2021 Ivan Ribeiro
  * All rights reserved.
  *
- * This software was developed by SRI International and the University of
+ * This hardware design was developed by the University of Cambridge Computer
+ * Laboratory (Department of Computer Science and Technology) under EPSRC award
+ * EP/S030867/1 ("SIPP"); and by SRI International and the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
  * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
  * DARPA SSITH research programme.
@@ -28,7 +31,7 @@
 
 package AXI;
 
-import AXI4_AXI4Lite_Types :: *;
+import AXI4_Common_Types :: *;
 import AXI4_Types :: *;
 import AXI4_AW_Utils :: *;
 import AXI4_W_Utils :: *;
@@ -47,7 +50,7 @@ import AXI4Lite_Utils :: *;
 import AXI4Lite_Interconnect :: *;
 import AXI4_AXI4Lite_Bridges :: *;
 
-export AXI4_AXI4Lite_Types :: *;
+export AXI4_Common_Types :: *;
 export AXI4_Types :: *;
 export AXI4_AW_Utils :: *;
 export AXI4_W_Utils :: *;

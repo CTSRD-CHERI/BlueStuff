@@ -3,9 +3,12 @@
  * Copyright (c) 2019 Peter Rugg
  * Copyright (c) 2020 Jonas Fiala
  * Copyright (c) 2021 Marno van der Maas
+ * Copyright (c) 2021 Ivan Ribeiro
  * All rights reserved.
  *
- * This software was developed by SRI International and the University of
+ * This hardware design was developed by the University of Cambridge Computer
+ * Laboratory (Department of Computer Science and Technology) under EPSRC award
+ * EP/S030867/1 ("SIPP"); and by SRI International and the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
  * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
  * DARPA SSITH research programme.
@@ -30,7 +33,7 @@
  */
 
 // AXI4 imports
-import AXI4_AXI4Lite_Types :: *;
+import AXI4_Common_Types :: *;
 import AXI4_Types :: *;
 import AXI4_AW_Utils :: *;
 import AXI4_W_Utils :: *;
