@@ -106,4 +106,18 @@ function AXI4Stream_Slave #(id_, data_, dest_, user_)
   debugAXI4Stream_Slave ( AXI4Stream_Slave #(id_, data_, dest_, user_) s
                         , Fmt msg) = debugSink (s,$format (msg, " t"));
 
+module toUnguarded_AXI4Stream_Master
+  #(AXI4Stream_Master #(id_, data_, dest_, user_) m)
+   (AXI4Stream_Master #(id_, data_, dest_, user_));
+  let ugm <- toUnguardedSource (m, ?);
+  return ugm;
+endmodule
+
+module toUnguarded_AXI4Stream_Slave
+  #(AXI4Stream_Slave #(id_, data_, dest_, user_) s)
+   (AXI4Stream_Slave #(id_, data_, dest_, user_));
+   let ugs <- toUnguardedSink (s);
+   return ugs;
+endmodule
+
 endpackage
