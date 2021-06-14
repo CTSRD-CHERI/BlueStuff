@@ -28,11 +28,11 @@
 
 package AXI4Stream;
 
-import AXI4_AXI4Lite_AXI4Stream_Types :: *;
+import AXI4_Common_Types :: *;
 import AXI4Stream_Types :: *;
 import AXI4Stream_Utils :: *;
 
-export AXI4_AXI4Lite_AXI4Stream_Types :: *;
+export AXI4_Common_Types :: *;
 export AXI4Stream_Types :: *;
 export AXI4Stream_Utils :: *;
 

@@ -30,7 +30,7 @@
  */
 
 // AXI4 imports
-import AXI4_AXI4Lite_AXI4Stream_Types :: *;
+import AXI4_Common_Types :: *;
 import AXI4_Types :: *;
 import AXI4_AW_Utils :: *;
 import AXI4_W_Utils :: *;

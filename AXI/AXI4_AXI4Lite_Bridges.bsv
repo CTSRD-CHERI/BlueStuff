@@ -29,7 +29,7 @@
 // AXI imports
 import AXI4_Types :: *;
 import AXI4Lite_Types :: *;
-import AXI4_AXI4Lite_AXI4Stream_Types :: *;
+import AXI4_Common_Types :: *;
 
 // BlueBasics import
 import SourceSink :: *;

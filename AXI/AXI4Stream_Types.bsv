@@ -5,7 +5,7 @@ import Connectable :: *;
 // BlueBasics import
 import SourceSink :: *;
 
-import AXI4_AXI4Lite_AXI4Stream_Types :: *;
+import AXI4_Common_Types :: *;
 
 typedef struct {
   Bit #(data_)            tdata;

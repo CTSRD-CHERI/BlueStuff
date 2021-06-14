@@ -28,7 +28,7 @@
 
 package AXI;
 
-import AXI4_AXI4Lite_AXI4Stream_Types :: *;
+import AXI4_Common_Types :: *;
 import AXI4_Types :: *;
 import AXI4_AW_Utils :: *;
 import AXI4_W_Utils :: *;
@@ -47,7 +47,7 @@ import AXI4Lite_Utils :: *;
 import AXI4Lite_Interconnect :: *;
 import AXI4_AXI4Lite_Bridges :: *;
 
-export AXI4_AXI4Lite_AXI4Stream_Types :: *;
+export AXI4_Common_Types :: *;
 export AXI4_Types :: *;
 export AXI4_AW_Utils :: *;
 export AXI4_W_Utils :: *;

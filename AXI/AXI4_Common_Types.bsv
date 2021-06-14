@@ -33,7 +33,7 @@
 // AXI3, AXI4, AXI5, ACE and ACE5
 // ARM IHI 0022F.b (ID122117)
 
-package AXI4_AXI4Lite_AXI4Stream_Types;
+package AXI4_Common_Types;
 
 import Printf :: *;
 

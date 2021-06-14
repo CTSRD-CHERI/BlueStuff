@@ -1,9 +1,9 @@
-Bluestuff's [`AXI4_AXI4Lite_AXI4Stream_Types`](AXI4_AXI4Lite_AXI4Stream_Types.bsv) and [AXI4_Types`](AXI4_Types.bsv) packages provide a set of types and interface capturing the AXI4 protocol described in the specification in
+Bluestuff's [`AXI4_Common_Types`](AXI4_Common_Types.bsv) and [AXI4_Types`](AXI4_Types.bsv) packages provide a set of types and interface capturing the AXI4 protocol described in the specification in
 > AMBA AXI and ACE Protocol Specification
 > AXI3, AXI4, AXI5, ACE and ACE5
 > ARM IHI 0022F.b (ID122117)
 
-# AXI4_AXI4Lite_AXI4Stream_Types
+# AXI4_Common_Types
 - To capture AXI4 burst length (A3-48), the `AXI4_Len` type
 - To capture AXI4 burst size (A3-49), the `AXI4_Size` type
 - To capture AXI4 burst type (A3-49), the `AXI4_Burst` type

@@ -35,7 +35,7 @@ import Routable :: *;
 import SourceSink :: *;
 import MasterSlave :: *;
 
-import AXI4_AXI4Lite_AXI4Stream_Types :: *;
+import AXI4_Common_Types :: *;
 
 ////////////////////////////////////
 // AXI4Lite Address Write Channel //
