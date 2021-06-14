@@ -28,6 +28,12 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
+// Based on AXI4-Stream specification from:
+//
+// AMBA AXI-Stream Protocol Specification
+// ARM IHI 0051B (ID122117)
+// https://developer.arm.com/documentation/ihi0051/b/
+
 package AXI4Stream_Types;
 
 import Connectable :: *;
