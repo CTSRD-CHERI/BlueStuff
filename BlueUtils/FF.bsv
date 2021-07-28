@@ -75,6 +75,21 @@ interface FFNext#(type data, numeric type depth);
   method Bit#(TAdd#(TLog#(depth), 1)) remaining();
 endinterface
 
+instance ToSource#(FF#(t,d), t);
+  function toSource(ff) = interface Source#(t);
+    method canPeek = ff.notEmpty;
+    method peek    = ff.first;
+    method drop    = ff.deq;
+  endinterface;
+endinstance
+
+instance ToSink#(FF#(t,d), t);
+  function toSink (ff) = interface Sink;
+    method canPut = ff.notFull;
+    method put    = ff.enq;
+  endinterface;
+endinstance
+
 // Equal to Bluespec equivelant
 module mkUGFF(FF#(data, depth))
 provisos(Log#(depth,logDepth),Bits#(data, data_width));
