@@ -467,7 +467,7 @@ module mkBurstToNoBurst (AXI4_Shim#(a, b, c, d, e, f, g, h))
                 + $format("\toutR.canPeek:\t ", fshow(outR.canPeek));
     Fmt state_str = $format(" writesSent: %d", writesSent[0],
                             " readsSent: %d", readsSent[0],
-                            " flitReceived: %d", fshow(flitReceived[0]));
+                            " flitReceived: ", fshow(flitReceived[0]));
     $display("%0t: ", $time, dbg_str);
     $display("%0t: ", $time, state_str);
   endrule
