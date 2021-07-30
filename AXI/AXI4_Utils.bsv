@@ -670,20 +670,20 @@ function AXI4_Master#(a,b,c,d,e,f,g,h)
          debugAXI4_Master(AXI4_Master#(a,b,c,d,e,f,g,h) m, Fmt msg) =
   interface AXI4_Master;
     interface aw = debugSource(m.aw, $format(msg, " aw"));
-    interface w  = debugSource( m.w, $format(msg, "  w"));
-    interface b  = debugSink  ( m.b, $format(msg, "  b"));
+    interface w  = debugSource( m.w, $format(msg, " w"));
+    interface b  = debugSink  ( m.b, $format(msg, " b"));
     interface ar = debugSource(m.ar, $format(msg, " ar"));
-    interface r  = debugSink  ( m.r, $format(msg, "  r"));
+    interface r  = debugSink  ( m.r, $format(msg, " r"));
   endinterface;
 
 function AXI4_Slave#(a,b,c,d,e,f,g,h)
          debugAXI4_Slave(AXI4_Slave#(a,b,c,d,e,f,g,h) s, Fmt msg) =
   interface AXI4_Slave;
     interface aw = debugSink  (s.aw, $format(msg, " aw"));
-    interface w  = debugSink  ( s.w, $format(msg, "  w"));
-    interface b  = debugSource( s.b, $format(msg, "  b"));
+    interface w  = debugSink  ( s.w, $format(msg, " w"));
+    interface b  = debugSource( s.b, $format(msg, " b"));
     interface ar = debugSink  (s.ar, $format(msg, " ar"));
-    interface r  = debugSource( s.r, $format(msg, "  r"));
+    interface r  = debugSource( s.r, $format(msg, " r"));
   endinterface;
 
 module mkAXI4DebugShimSynth #(String debugTag) (AXI4_Shim_Synth#(a,b,c,d,e,f,g,h));

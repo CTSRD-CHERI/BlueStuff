@@ -538,6 +538,40 @@ module mkAXI4Lite_Slave_Xactor (AXI4Lite_Slave_Xactor#(a, b, c, d, e, f, g));
 endmodule
 */
 
+// Truncate addr field of outgoing flits
+function AXI4Lite_Master#(a_,b,c,d,e,f,g) truncateAddrFieldsMasterLite (AXI4Lite_Master#(a,b,c,d,e,f,g) mstr)
+  provisos (Add#(a__, a_, a));
+  return interface AXI4Lite_Master;
+    interface aw = interface Source;
+      method canPeek = mstr.aw.canPeek;
+      method peek;
+        AXI4Lite_AWFlit#(a, c) x = mstr.aw.peek;
+        AXI4Lite_AWFlit#(a_, c) ret = ?;
+        ret.awaddr = truncate(x.awaddr);
+        ret.awprot = x.awprot;
+        ret.awuser = x.awuser;
+        return ret;
+      endmethod
+      method drop = mstr.aw.drop;
+    endinterface;
+    interface w = mstr.w;
+    interface b = mstr.b;
+    interface ar = interface Source;
+      method canPeek = mstr.ar.canPeek;
+      method peek;
+        AXI4Lite_ARFlit#(a, f) x = mstr.ar.peek;
+        AXI4Lite_ARFlit#(a_, f) ret = ?;
+        ret.araddr = truncate(x.araddr);
+        ret.arprot = x.arprot;
+        ret.aruser = x.aruser;
+        return ret;
+      endmethod
+      method drop = mstr.ar.drop;
+    endinterface;
+    interface r = mstr.r;
+  endinterface;
+endfunction
+
 ///////////////////////////////
 // AXI4Lite "no route" slave //
 ////////////////////////////////////////////////////////////////////////////////
