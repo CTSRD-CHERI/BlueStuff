@@ -38,8 +38,8 @@ import AXI4_Common_Types :: *;
 import SourceSink :: *;
 
 // Standard
-import FIFOF :: *;
-import SpecialFIFOs :: *;
+import FIFO :: *;
+import Connectable :: *;
 
 // die helper
 function Action die (Fmt m) = action $display (m); $finish (0); endaction;
@@ -66,10 +66,6 @@ AXI4_WFlit #(data_, wuser_) dfltW =
              , wstrb: ?
              , wlast: True
              , wuser: ? };
-AXI4_BFlit #(id_, buser_) dfltB =
-  AXI4_BFlit { bid: 0
-             , bresp: ?
-             , buser: ? };
 AXI4_ARFlit #(id_, addr_, aruser_) dfltAR =
   AXI4_ARFlit { arid: 0
               , araddr: ?
@@ -82,12 +78,6 @@ AXI4_ARFlit #(id_, addr_, aruser_) dfltAR =
               , arqos: 0
               , arregion: 0
               , aruser: ? };
-AXI4_RFlit #(id_, data_, ruser_) dfltR =
-  AXI4_RFlit { rid: 0
-             , rdata: ?
-             , rresp: ?
-             , rlast: True
-             , ruser: ? };
 
 // see previous definitions for field values of AXI4 exclusive fields
 function AXI4_AWFlit #(id_, addr_, awuser_)
@@ -107,12 +97,8 @@ function AXI4_WFlit #(data_, wuser_)
   return res;
 endfunction
 function AXI4_BFlit #(id_, buser_)
-         fromAXI4Lite_B (AXI4Lite_BFlit #(buser_) x);
-  AXI4_BFlit #(id_, buser_) res = dfltB;
-  res.bresp = x.bresp;
-  res.buser = x.buser;
-  return res;
-endfunction
+         fromAXI4Lite_B (Bit #(id_) someId, AXI4Lite_BFlit #(buser_) x) =
+  AXI4_BFlit { bid: someId, bresp: x.bresp, buser: x.buser };
 function AXI4_ARFlit #(id_, addr_, aruser_)
          fromAXI4Lite_AR (AXI4Lite_ARFlit #(addr_, aruser_) x);
   AXI4_ARFlit #(id_, addr_, aruser_) res = dfltAR;
@@ -122,13 +108,12 @@ function AXI4_ARFlit #(id_, addr_, aruser_)
   return res;
 endfunction
 function AXI4_RFlit #(id_, data_, ruser_)
-         fromAXI4Lite_R (AXI4Lite_RFlit #(data_, ruser_) x);
-  AXI4_RFlit #(id_, data_, ruser_) res = dfltR;
-  res.rdata = x.rdata;
-  res.rresp = x.rresp;
-  res.ruser = x.ruser;
-  return res;
-endfunction
+         fromAXI4Lite_R (Bit #(id_) someId, AXI4Lite_RFlit #(data_, ruser_) x) =
+  AXI4_RFlit { rid: someId
+             , rdata: x.rdata
+             , rresp: x.rresp
+             , rlast: True
+             , ruser: x.ruser };
 
 // always strict subset of fields
 function AXI4Lite_AWFlit #(addr_, awuser_)
@@ -158,9 +143,10 @@ function AXI4Lite_RFlit #(data_, ruser_)
 
 // assertions on AXI4 flits
 function Action checkAXI4_AWFlit ( AXI4_Size busSize
+                                 , Bool checkId
                                  , AXI4_AWFlit #(id_, addr_, awuser_) x) =
   action
-    if (x.awid != 0)
+    if (checkId && x.awid != 0)
       die ($format("Unsupported awid (0x%0x)", x.awid));
     if (x.awlen != 0)
       die ($format("Unsupported awlen (0x%0x)", x.awlen));
@@ -181,14 +167,15 @@ function Action checkAXI4_WFlit (AXI4_WFlit #(data_, wuser_) x) = action
   if (x.wlast != True)
     die ($format("Unsupported wlast (", fshow(x.wlast), ")"));
 endaction;
-function Action checkAXI4_BFlit (AXI4_BFlit #(id_, buser_) x) = action
-  if (x.bid != 0)
-    die ($format("Unsupported bid (0x%0x)", x.bid));
-endaction;
+function Action checkAXI4_BFlit (Bool checkId, AXI4_BFlit #(id_, buser_) x) =
+  action
+    if (checkId && x.bid != 0) die ($format("Unsupported bid (0x%0x)", x.bid));
+  endaction;
 function Action checkAXI4_ARFlit ( AXI4_Size busSize
+                                 , Bool checkId
                                  , AXI4_ARFlit #(id_, addr_, aruser_) x) =
   action
-    if (x.arid != 0)
+    if (checkId && x.arid != 0)
       die ($format("Unsupported arid (0x%0x)", x.arid));
     if (x.arlen != 0)
       die ($format("Unsupported arlen (0x%0x)", x.arlen));
@@ -205,12 +192,118 @@ function Action checkAXI4_ARFlit ( AXI4_Size busSize
     if (x.arregion != 0)
       die ($format("Unsupported arregion (0x%0x)", x.arregion));
   endaction;
-function Action checkAXI4_RFlit (AXI4_RFlit #(id_, data_, ruser_) x) = action
-  if (x.rid != 0)
+function Action checkAXI4_RFlit ( Bool checkId
+                                , AXI4_RFlit #(id_, data_, ruser_) x) = action
+  if (checkId && x.rid != 0)
     die ($format("Unsupported rid (0x%0x)", x.rid));
   if (x.rlast != True)
     die ($format("Unsupported rlast (", fshow(x.rlast), ")"));
 endaction;
+
+///////////////////////////
+// Connectable instances //
+////////////////////////////////////////////////////////////////////////////////
+
+// AXI4Lite Master to AXI4 Slave
+////////////////////////////////
+instance Connectable #( AXI4Lite_Master #( addr_, data_
+                                         , awuser_, wuser_, buser_
+                                         , aruser_, ruser_ )
+                      , AXI4_Slave #( id_, addr_, data_
+                                    , awuser_, wuser_, buser_
+                                    , aruser_, ruser_));
+  module mkConnection #( AXI4Lite_Master #( addr_, data_
+                                          , awuser_, wuser_, buser_
+                                          , aruser_, ruser_ ) axlm
+                       , AXI4_Slave #( id_, addr_, data_
+                                     , awuser_, wuser_, buser_
+                                     , aruser_, ruser_) axs) (Empty);
+    //mkConnection (fromAXI4LiteToAXI4_Master (axlm), axs);
+    mkConnection (axlm, fromAXI4ToAXI4Lite_Slave (axs));
+  endmodule
+endinstance
+instance Connectable #( AXI4_Slave #( id_, addr_, data_
+                                    , awuser_, wuser_, buser_
+                                    , aruser_, ruser_)
+                      , AXI4Lite_Master #( addr_, data_
+                                         , awuser_, wuser_, buser_
+                                         , aruser_, ruser_ ));
+  module mkConnection #( AXI4_Slave #( id_, addr_, data_
+                                     , awuser_, wuser_, buser_
+                                     , aruser_, ruser_) axs
+                       , AXI4Lite_Master #( addr_, data_
+                                          , awuser_, wuser_, buser_
+                                          , aruser_, ruser_ ) axlm) (Empty);
+    mkConnection (axlm, axs);
+  endmodule
+endinstance
+
+// AXI4 Master to AXI4Lite Slave
+////////////////////////////////
+instance Connectable #( AXI4_Master #( id_, addr_, data_
+                                     , awuser_, wuser_, buser_
+                                     , aruser_, ruser_ )
+                      , AXI4Lite_Slave #( addr_, data_
+                                        , awuser_, wuser_, buser_
+                                        , aruser_, ruser_));
+  module mkConnection #( AXI4_Master #( id_, addr_, data_
+                                      , awuser_, wuser_, buser_
+                                      , aruser_, ruser_ ) axm
+                       , AXI4Lite_Slave #( addr_, data_
+                                         , awuser_, wuser_, buser_
+                                         , aruser_, ruser_) axls) (Empty);
+    // id field fifos
+    let awIdFF <- mkFIFO;
+    let arIdFF <- mkFIFO;
+
+    // convert and forward each flits
+    let busSize = fromInteger(valueOf(data_)/8);
+    rule aw;
+      let awflit <- get (axm.aw);
+      checkAXI4_AWFlit (busSize, False, awflit);
+      axls.aw.put (toAXI4Lite_AW (awflit));
+      awIdFF.enq (awflit.awid);
+    endrule
+    rule w;
+      let wflit <- get (axm.w);
+      checkAXI4_WFlit (wflit);
+      axls.w.put (toAXI4Lite_W (wflit));
+    endrule
+    rule b;
+      axm.b.put (fromAXI4Lite_B (awIdFF.first, axls.b.peek));
+      axls.b.drop;
+      awIdFF.deq;
+    endrule
+    rule ar;
+      let arflit <- get (axm.ar);
+      checkAXI4_ARFlit (busSize, False, arflit);
+      axls.ar.put (toAXI4Lite_AR (arflit));
+      arIdFF.enq (arflit.arid);
+    endrule
+    rule r;
+      axm.r.put (fromAXI4Lite_R (arIdFF.first, axls.r.peek));
+      axls.r.drop;
+      arIdFF.deq;
+    endrule
+
+  endmodule
+endinstance
+instance Connectable #( AXI4Lite_Slave #( addr_, data_
+                                        , awuser_, wuser_, buser_
+                                        , aruser_, ruser_)
+                      , AXI4_Master #( id_, addr_, data_
+                                     , awuser_, wuser_, buser_
+                                     , aruser_, ruser_ ));
+  module mkConnection #( AXI4Lite_Slave #( addr_, data_
+                                         , awuser_, wuser_, buser_
+                                         , aruser_, ruser_) axls
+                       , AXI4_Master #( id_, addr_, data_
+                                      , awuser_, wuser_, buser_
+                                      , aruser_, ruser_ ) axm) (Empty);
+    mkConnection (axm, axls);
+  endmodule
+endinstance
+
 
 ////////////////////////
 // Master convertions //
@@ -225,15 +318,15 @@ function (AXI4Lite_Master #( addr_, data_
                         , aruser_, ruser_) m) = interface AXI4Lite_Master;
   let busSize = fromInteger(valueOf(data_)/8);
   interface aw = mapSource ( toAXI4Lite_AW
-                           , onDrop (checkAXI4_AWFlit (busSize), m.aw) );
+                           , onDrop (checkAXI4_AWFlit (busSize, True), m.aw) );
   interface  w = mapSource ( toAXI4Lite_W
                            , onDrop (checkAXI4_WFlit, m.w) );
-  interface  b = mapSink   ( fromAXI4Lite_B
-                           , onPut (checkAXI4_BFlit, m.b) );
+  interface  b = mapSink   ( fromAXI4Lite_B (0)
+                           , onPut (checkAXI4_BFlit (True), m.b) );
   interface ar = mapSource ( toAXI4Lite_AR
-                           , onDrop (checkAXI4_ARFlit (busSize), m.ar) );
-  interface  r = mapSink   ( fromAXI4Lite_R
-                           , onPut (checkAXI4_RFlit, m.r) );
+                           , onDrop (checkAXI4_ARFlit (busSize, True), m.ar) );
+  interface  r = mapSink   ( fromAXI4Lite_R (0)
+                           , onPut (checkAXI4_RFlit (True), m.r) );
 endinterface;
 
 function (AXI4_Master #( id_, addr_, data_
@@ -244,15 +337,15 @@ function (AXI4_Master #( id_, addr_, data_
                             , awuser_, wuser_, buser_
                             , aruser_, ruser_) mLite) = interface AXI4_Master;
   let busSize = fromInteger(valueOf(data_)/8);
-  interface aw = onDrop ( checkAXI4_AWFlit (busSize)
+  interface aw = onDrop ( checkAXI4_AWFlit (busSize, True)
                         , mapSource (fromAXI4Lite_AW, mLite.aw) );
   interface  w = onDrop ( checkAXI4_WFlit
                         , mapSource (fromAXI4Lite_W, mLite.w) );
-  interface  b = onPut  ( checkAXI4_BFlit
+  interface  b = onPut  ( checkAXI4_BFlit (True)
                         , mapSink (toAXI4Lite_B, mLite.b) );
-  interface ar = onDrop ( checkAXI4_ARFlit (busSize)
+  interface ar = onDrop ( checkAXI4_ARFlit (busSize, True)
                         , mapSource (fromAXI4Lite_AR, mLite.ar) );
-  interface  r = onPut  ( checkAXI4_RFlit
+  interface  r = onPut  ( checkAXI4_RFlit (True)
                         , mapSink (toAXI4Lite_R, mLite.r) );
 endinterface;
 
@@ -269,15 +362,15 @@ function (AXI4Lite_Slave #( addr_, data_
                        , aruser_, ruser_) s) = interface AXI4Lite_Slave;
   let busSize = fromInteger(valueOf(data_)/8);
   interface aw = mapSink   ( fromAXI4Lite_AW
-                           , onPut (checkAXI4_AWFlit (busSize), s.aw) );
+                           , onPut (checkAXI4_AWFlit (busSize, True), s.aw) );
   interface  w = mapSink   ( fromAXI4Lite_W
                            , onPut (checkAXI4_WFlit, s.w) );
   interface  b = mapSource ( toAXI4Lite_B
-                           , onDrop (checkAXI4_BFlit, s.b) );
+                           , onDrop (checkAXI4_BFlit (True), s.b) );
   interface ar = mapSink   ( fromAXI4Lite_AR
-                           , onPut (checkAXI4_ARFlit (busSize), s.ar) );
+                           , onPut (checkAXI4_ARFlit (busSize, True), s.ar) );
   interface  r = mapSource ( toAXI4Lite_R
-                           , onDrop (checkAXI4_RFlit, s.r) );
+                           , onDrop (checkAXI4_RFlit (True), s.r) );
 endinterface;
 
 function (AXI4_Slave #( id_, addr_, data_
@@ -288,14 +381,14 @@ function (AXI4_Slave #( id_, addr_, data_
                            , awuser_, wuser_, buser_
                            , aruser_, ruser_) sLite) = interface AXI4_Slave;
   let busSize = fromInteger(valueOf(data_)/8);
-  interface aw = onPut  ( checkAXI4_AWFlit (busSize)
+  interface aw = onPut  ( checkAXI4_AWFlit (busSize, True)
                         , mapSink (toAXI4Lite_AW, sLite.aw) );
   interface  w = onPut  ( checkAXI4_WFlit
                         , mapSink (toAXI4Lite_W, sLite.w) );
-  interface  b = onDrop ( checkAXI4_BFlit
-                        , mapSource (fromAXI4Lite_B, sLite.b) );
-  interface ar = onPut  ( checkAXI4_ARFlit (busSize)
+  interface  b = onDrop ( checkAXI4_BFlit (True)
+                        , mapSource (fromAXI4Lite_B (0), sLite.b) );
+  interface ar = onPut  ( checkAXI4_ARFlit (busSize, True)
                         , mapSink (toAXI4Lite_AR, sLite.ar) );
-  interface  r = onDrop ( checkAXI4_RFlit
-                        , mapSource (fromAXI4Lite_R, sLite.r) );
+  interface  r = onDrop ( checkAXI4_RFlit (True)
+                        , mapSource (fromAXI4Lite_R (0), sLite.r) );
 endinterface;
