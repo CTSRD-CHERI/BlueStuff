@@ -27,6 +27,7 @@
 #
 
 BSC = bsc
+#BSC = ~/Downloads/bsc-install-focal/bsc-install/bin/bsc
 
 BLUESTUFFDIR = .
 AXIDIR = $(BLUESTUFFDIR)/AXI

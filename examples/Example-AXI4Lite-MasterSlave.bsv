@@ -77,10 +77,10 @@ module axiLiteMaster (AXI4Lite_Master#(`PARAMS));
 
 endmodule
 
-module axiLiteMasterSynth (AXI4Lite_Master_Synth#(`PARAMS));
-  let noSynth <- axiLiteMaster;
-  let synth <- toAXI4Lite_Master_Synth (noSynth);
-  return synth;
+module axiLiteMasterSig (AXI4Lite_Master_Sig#(`PARAMS));
+  let noSig <- axiLiteMaster;
+  let sig <- toAXI4Lite_Master_Sig (noSig);
+  return sig;
 endmodule
 
 module axiLiteSlave (AXI4Lite_Slave#(`PARAMS));
@@ -122,10 +122,10 @@ module axiLiteSlave (AXI4Lite_Slave#(`PARAMS));
 
 endmodule
 
-module axiLiteSlaveSynth (AXI4Lite_Slave_Synth#(`PARAMS));
-  let noSynth <- axiLiteSlave;
-  let synth <- toAXI4Lite_Slave_Synth (noSynth);
-  return synth;
+module axiLiteSlaveSig (AXI4Lite_Slave_Sig#(`PARAMS));
+  let noSig <- axiLiteSlave;
+  let sig <- toAXI4Lite_Slave_Sig (noSig);
+  return sig;
 endmodule
 
 module top (Empty);

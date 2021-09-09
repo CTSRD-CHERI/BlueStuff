@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2020 Alexandre Joannou
+ * Copyright (c) 2018-2021 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -155,17 +155,17 @@ module top (Empty);
   Vector#(NSLAVES, `SLAVE_T)   ss;
   for (Integer i = 0; i < valueOf(NMASTERS); i = i + 1) begin
     let m <- axiMaster;
-    let mSynth <- toAXI4_Master_Synth(m);
-    let mNoSynth <- fromAXI4_Master_Synth(mSynth);
-    ms[i] = mNoSynth;
+    let mSig <- toAXI4_Master_Sig(m);
+    let mNoSig <- fromAXI4_Master_Sig(mSig);
+    ms[i] = mNoSig;
   end
   MappingTable#(NSLAVES, ADDR_sz) maptab = newVector;
   for (Integer i = 0; i < valueOf(NSLAVES); i = i + 1) begin
     maptab[i] = Range{base: fromInteger(i*valueOf(SlaveWidth)), size: fromInteger(valueOf(SlaveWidth))};
     let s <- axiSlave;
-    let sSynth <- toAXI4_Slave_Synth(s);
-    let sNoSynth <- fromAXI4_Slave_Synth(sSynth);
-    ss[i] = sNoSynth;
+    let sSig <- toAXI4_Slave_Sig(s);
+    let sNoSig <- fromAXI4_Slave_Sig(sSig);
+    ss[i] = sNoSig;
   end
   mkAXI4Bus(routeFromMappingTable(maptab), ms, ss);
 endmodule

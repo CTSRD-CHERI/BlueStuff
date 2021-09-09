@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2020 Alexandre Joannou
+ * Copyright (c) 2018-2021 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -62,11 +62,11 @@ instance FromAXI4_AWFlit#(AXI4_AWFlit#(a, b, c), a, b, c);
   function fromAXI4_AWFlit = id;
 endinstance
 
-// convert to/from Synth Master interface
+// convert to/from Sig Master interface
 ////////////////////////////////////////////////////////////////////////////////
 
-module toAXI4_AW_Master_Synth #(src_t#(t) s)
-                               (AXI4_AW_Master_Synth#(id_, addr_, user_))
+module toAXI4_AW_Master_Sig #(src_t#(t) s)
+                             (AXI4_AW_Master_Sig#(id_, addr_, user_))
   provisos ( ToSource#( src_t#(t), t)
            , ToAXI4_AWFlit#(t, id_, addr_, user_)
            , Bits#(t, t_sz));
@@ -87,8 +87,8 @@ module toAXI4_AW_Master_Synth #(src_t#(t) s)
   method awready(rdy) = action if (src.canPeek && rdy) src.drop; endaction;
 endmodule
 
-module fromAXI4_AW_Master_Synth #(AXI4_AW_Master_Synth#(id_, addr_, user_) m)
-                                 (Source#(AXI4_AWFlit#(id_, addr_, user_)));
+module fromAXI4_AW_Master_Sig #(AXI4_AW_Master_Sig#(id_, addr_, user_) m)
+                               (Source#(AXI4_AWFlit#(id_, addr_, user_)));
   FIFOF#(AXI4_AWFlit#(id_, addr_, user_)) buffer <- mkSizedBypassFIFOF(1);
   let snk <- toUnguardedSink(buffer);
   (* fire_when_enabled, no_implicit_conditions *)
@@ -110,11 +110,11 @@ module fromAXI4_AW_Master_Synth #(AXI4_AW_Master_Synth#(id_, addr_, user_) m)
   return toSource(buffer);
 endmodule
 
-// convert to/from Synth Slave interface
+// convert to/from Sig Slave interface
 ////////////////////////////////////////////////////////////////////////////////
 
-module toAXI4_AW_Slave_Synth #(snk_t s)
-                              (AXI4_AW_Slave_Synth#(id_, addr_, user_))
+module toAXI4_AW_Slave_Sig #(snk_t s)
+                            (AXI4_AW_Slave_Sig#(id_, addr_, user_))
   provisos ( ToSink#(snk_t, t)
            , FromAXI4_AWFlit#(t, id_, addr_, user_)
            , Bits#(t, t_sz));
@@ -146,10 +146,10 @@ module toAXI4_AW_Slave_Synth #(snk_t s)
   method awready = snk.canPut;
 endmodule
 
-module fromAXI4_AW_Slave_Synth #(AXI4_AW_Slave_Synth#(id_, addr_, user_) s)
-                                (Sink#(AXI4_AWFlit#(id_, addr_, user_)));
+module fromAXI4_AW_Slave_Sig #(AXI4_AW_Slave_Sig#(id_, addr_, user_) s)
+                              (Sink#(AXI4_AWFlit#(id_, addr_, user_)));
   // We use a guarded buffer to export as a guarded sink, and use an unguarded
-  // source as an internal interface to it for connection to the Synth interface
+  // source as an internal interface to it for connection to the Sig interface
   FIFOF#(AXI4_AWFlit#(id_, addr_, user_)) buffer <- mkSizedBypassFIFOF(1);
   let src <- toUnguardedSource(buffer, ?);
   (* fire_when_enabled, no_implicit_conditions *)

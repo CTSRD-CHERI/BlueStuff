@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2020 Alexandre Joannou
+ * Copyright (c) 2018-2021 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -217,97 +217,98 @@ module mkAXI4LiteDebugShim #(String debugTag) (AXI4Lite_Shim#(a,b,c,d,e,f,g));
   interface  clear = shim.clear;
 endmodule
 
-module mkAXI4DebugShimSynth #(String debugTag) (AXI4Lite_Shim_Synth#(a,b,c,d,e,f,g));
+module mkAXI4DebugShimSig #(String debugTag)
+                           (AXI4Lite_Shim_Sig#(a,b,c,d,e,f,g));
   let shim <- mkAXI4LiteDebugShim(debugTag);
-  let masterSynth <- toAXI4Lite_Master_Synth(shim.master);
-  let  slaveSynth <- toAXI4Lite_Slave_Synth(shim.slave);
-  interface master = masterSynth;
-  interface  slave = slaveSynth;
+  let masterSig <- toAXI4Lite_Master_Sig(shim.master);
+  let  slaveSig <- toAXI4Lite_Slave_Sig(shim.slave);
+  interface master = masterSig;
+  interface  slave = slaveSig;
   interface  clear = shim.clear;
 endmodule
 
 
-/////////////////////////////////////
-// to/from "Synth" interface utils //
+///////////////////////////////////
+// to/from "Sig" interface utils //
 ////////////////////////////////////////////////////////////////////////////////
 
 // AXI4Lite Master
-module toAXI4Lite_Master_Synth #(AXI4Lite_Master#(a, b, c, d, e, f, g) master)
-                                (AXI4Lite_Master_Synth#(a, b, c, d, e, f, g));
-  let awSynth <- toAXI4Lite_AW_Master_Synth(master.aw);
-  let wSynth  <- toAXI4Lite_W_Master_Synth(master.w);
-  let bSynth  <- toAXI4Lite_B_Master_Synth(master.b);
-  let arSynth <- toAXI4Lite_AR_Master_Synth(master.ar);
-  let rSynth  <- toAXI4Lite_R_Master_Synth(master.r);
-  interface aw = awSynth;
-  interface w  = wSynth;
-  interface b  = bSynth;
-  interface ar = arSynth;
-  interface r  = rSynth;
+module toAXI4Lite_Master_Sig #(AXI4Lite_Master#(a, b, c, d, e, f, g) master)
+                              (AXI4Lite_Master_Sig#(a, b, c, d, e, f, g));
+  let awSig <- toAXI4Lite_AW_Master_Sig(master.aw);
+  let wSig  <- toAXI4Lite_W_Master_Sig(master.w);
+  let bSig  <- toAXI4Lite_B_Master_Sig(master.b);
+  let arSig <- toAXI4Lite_AR_Master_Sig(master.ar);
+  let rSig  <- toAXI4Lite_R_Master_Sig(master.r);
+  interface aw = awSig;
+  interface w  = wSig;
+  interface b  = bSig;
+  interface ar = arSig;
+  interface r  = rSig;
 endmodule
 
-module fromAXI4Lite_Master_Synth
-  #(AXI4Lite_Master_Synth#(a, b, c, d, e, f, g) master)
+module fromAXI4Lite_Master_Sig
+  #(AXI4Lite_Master_Sig#(a, b, c, d, e, f, g) master)
    (AXI4Lite_Master#(a, b, c, d, e, f, g));
-  let awNoSynth <- fromAXI4Lite_AW_Master_Synth(master.aw);
-  let wNoSynth  <- fromAXI4Lite_W_Master_Synth(master.w);
-  let bNoSynth  <- fromAXI4Lite_B_Master_Synth(master.b);
-  let arNoSynth <- fromAXI4Lite_AR_Master_Synth(master.ar);
-  let rNoSynth  <- fromAXI4Lite_R_Master_Synth(master.r);
-  interface aw = awNoSynth;
-  interface w  = wNoSynth;
-  interface b  = bNoSynth;
-  interface ar = arNoSynth;
-  interface r  = rNoSynth;
+  let awNoSig <- fromAXI4Lite_AW_Master_Sig(master.aw);
+  let wNoSig  <- fromAXI4Lite_W_Master_Sig(master.w);
+  let bNoSig  <- fromAXI4Lite_B_Master_Sig(master.b);
+  let arNoSig <- fromAXI4Lite_AR_Master_Sig(master.ar);
+  let rNoSig  <- fromAXI4Lite_R_Master_Sig(master.r);
+  interface aw = awNoSig;
+  interface w  = wNoSig;
+  interface b  = bNoSig;
+  interface ar = arNoSig;
+  interface r  = rNoSig;
 endmodule
 
-module liftAXI4Lite_Master_Synth
+module liftAXI4Lite_Master_Sig
   #( function AXI4Lite_Master#(a, b, c, d, e, f, g)
      f (AXI4Lite_Master#(a1, b1, c1, d1, e1, f1, g1) x)
-   , AXI4Lite_Master_Synth#(a1, b1, c1, d1, e1, f1, g1) m)
-   (AXI4Lite_Master_Synth#(a, b, c, d, e, f, g));
-  let mNoSynth <- fromAXI4Lite_Master_Synth (m);
-  let ret <- toAXI4Lite_Master_Synth (f (mNoSynth));
+   , AXI4Lite_Master_Sig#(a1, b1, c1, d1, e1, f1, g1) m)
+   (AXI4Lite_Master_Sig#(a, b, c, d, e, f, g));
+  let mNoSig <- fromAXI4Lite_Master_Sig (m);
+  let ret <- toAXI4Lite_Master_Sig (f (mNoSig));
   return ret;
 endmodule
 
 // AXI4Lite Slave
-module toAXI4Lite_Slave_Synth #(AXI4Lite_Slave#(a, b, c, d, e, f, g) slave)
-                               (AXI4Lite_Slave_Synth#(a, b, c, d, e, f, g));
-  let awSynth <- toAXI4Lite_AW_Slave_Synth(slave.aw);
-  let wSynth  <- toAXI4Lite_W_Slave_Synth(slave.w);
-  let bSynth  <- toAXI4Lite_B_Slave_Synth(slave.b);
-  let arSynth <- toAXI4Lite_AR_Slave_Synth(slave.ar);
-  let rSynth  <- toAXI4Lite_R_Slave_Synth(slave.r);
-  interface aw = awSynth;
-  interface w  = wSynth;
-  interface b  = bSynth;
-  interface ar = arSynth;
-  interface r  = rSynth;
+module toAXI4Lite_Slave_Sig #(AXI4Lite_Slave#(a, b, c, d, e, f, g) slave)
+                             (AXI4Lite_Slave_Sig#(a, b, c, d, e, f, g));
+  let awSig <- toAXI4Lite_AW_Slave_Sig(slave.aw);
+  let wSig  <- toAXI4Lite_W_Slave_Sig(slave.w);
+  let bSig  <- toAXI4Lite_B_Slave_Sig(slave.b);
+  let arSig <- toAXI4Lite_AR_Slave_Sig(slave.ar);
+  let rSig  <- toAXI4Lite_R_Slave_Sig(slave.r);
+  interface aw = awSig;
+  interface w  = wSig;
+  interface b  = bSig;
+  interface ar = arSig;
+  interface r  = rSig;
 endmodule
 
-module fromAXI4Lite_Slave_Synth
-  #(AXI4Lite_Slave_Synth#(a, b, c, d, e, f, g) slave)
+module fromAXI4Lite_Slave_Sig
+  #(AXI4Lite_Slave_Sig#(a, b, c, d, e, f, g) slave)
    (AXI4Lite_Slave#(a, b, c, d, e, f, g));
-  let awNoSynth <- fromAXI4Lite_AW_Slave_Synth(slave.aw);
-  let wNoSynth  <- fromAXI4Lite_W_Slave_Synth(slave.w);
-  let bNoSynth  <- fromAXI4Lite_B_Slave_Synth(slave.b);
-  let arNoSynth <- fromAXI4Lite_AR_Slave_Synth(slave.ar);
-  let rNoSynth  <- fromAXI4Lite_R_Slave_Synth(slave.r);
-  interface aw = awNoSynth;
-  interface w  = wNoSynth;
-  interface b  = bNoSynth;
-  interface ar = arNoSynth;
-  interface r  = rNoSynth;
+  let awNoSig <- fromAXI4Lite_AW_Slave_Sig(slave.aw);
+  let wNoSig  <- fromAXI4Lite_W_Slave_Sig(slave.w);
+  let bNoSig  <- fromAXI4Lite_B_Slave_Sig(slave.b);
+  let arNoSig <- fromAXI4Lite_AR_Slave_Sig(slave.ar);
+  let rNoSig  <- fromAXI4Lite_R_Slave_Sig(slave.r);
+  interface aw = awNoSig;
+  interface w  = wNoSig;
+  interface b  = bNoSig;
+  interface ar = arNoSig;
+  interface r  = rNoSig;
 endmodule
 
-module liftAXI4Lite_Slave_Synth
+module liftAXI4Lite_Slave_Sig
   #( function AXI4Lite_Slave#(a, b, c, d, e, f, g)
      f (AXI4Lite_Slave#(a1, b1, c1, d1, e1, f1, g1) x)
-   , AXI4Lite_Slave_Synth#(a1, b1, c1, d1, e1, f1, g1) s)
-   (AXI4Lite_Slave_Synth#(a, b, c, d, e, f, g));
-  let sNoSynth <- fromAXI4Lite_Slave_Synth (s);
-  let ret <- toAXI4Lite_Slave_Synth (f (sNoSynth));
+   , AXI4Lite_Slave_Sig#(a1, b1, c1, d1, e1, f1, g1) s)
+   (AXI4Lite_Slave_Sig#(a, b, c, d, e, f, g));
+  let sNoSig <- fromAXI4Lite_Slave_Sig (s);
+  let ret <- toAXI4Lite_Slave_Sig (f (sNoSig));
   return ret;
 endmodule
 
@@ -513,7 +514,7 @@ endfunction
 /*
 module mkAXI4Lite_Master_Xactor (AXI4Lite_Master_Xactor#(a, b, c, d, e, f, g));
   let shim <- mkAXI4LiteShimBypassFIFOF;
-  let master <- toAXI4Lite_Master_Synth(shim.master);
+  let master <- toAXI4Lite_Master_Sig(shim.master);
   let clearing <- mkConfigReg(False);
   rule do_clear (clearing);
     shim.clear;
@@ -521,12 +522,12 @@ module mkAXI4Lite_Master_Xactor (AXI4Lite_Master_Xactor#(a, b, c, d, e, f, g));
   endrule
   method clear if (!clearing) = action clearing <= True; endaction;
   interface slave = guard_AXI4Lite_Slave(shim.slave, clearing);
-  interface masterSynth = master;
+  interface masterSig = master;
 endmodule
 
 module mkAXI4Lite_Slave_Xactor (AXI4Lite_Slave_Xactor#(a, b, c, d, e, f, g));
   let shim <- mkAXI4LiteShimBypassFIFOF;
-  let slvSynth <- toAXI4Lite_Slave_Synth(shim.slave);
+  let slvSig <- toAXI4Lite_Slave_Sig(shim.slave);
   let clearing <- mkConfigReg(False);
   rule do_clear(clearing);
     shim.clear;
@@ -534,7 +535,7 @@ module mkAXI4Lite_Slave_Xactor (AXI4Lite_Slave_Xactor#(a, b, c, d, e, f, g));
   endrule
   method clear if (!clearing) = action clearing <= True; endaction;
   interface master = guard_AXI4Lite_Master(shim.master, clearing);
-  interface slaveSynth = slvSynth;
+  interface slaveSig = slvSig;
 endmodule
 */
 

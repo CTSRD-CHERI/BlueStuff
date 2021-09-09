@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2021 Ivan Ribeiro
+ * Copyright (c) 2021 Alexandre Joannou
  * All rights reserved.
  *
  * This hardware design was developed by the University of Cambridge Computer
@@ -87,8 +88,8 @@ instance FromAXI4Stream_Flit #( AXI4Stream_Flit #(id_, data_, dest_, user_)
 endinstance
 
 
-module toAXI4Stream_Master_Synth #(src_t #(t) s)
-  (AXI4Stream_Master_Synth #(id_, data_, dest_, user_))
+module toAXI4Stream_Master_Sig #(src_t #(t) s)
+  (AXI4Stream_Master_Sig #(id_, data_, dest_, user_))
   provisos ( ToSource #(src_t #(t), t)
            , ToAXI4Stream_Flit #(t, id_, data_, dest_, user_)
            , Bits #(t, t_sz));
@@ -107,8 +108,8 @@ module toAXI4Stream_Master_Synth #(src_t #(t) s)
 endmodule
 
 
-module toAXI4Stream_Slave_Synth #(snk_t s)
-  (AXI4Stream_Slave_Synth #(id_, data_, dest_, user_))
+module toAXI4Stream_Slave_Sig #(snk_t s)
+  (AXI4Stream_Slave_Sig #(id_, data_, dest_, user_))
   provisos ( ToSink #(snk_t, t)
            , FromAXI4Stream_Flit #(t, id_, data_, dest_, user_)
            , Bits #(t, t_sz));

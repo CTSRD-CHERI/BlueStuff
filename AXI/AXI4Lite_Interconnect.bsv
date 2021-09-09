@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2020 Alexandre Joannou
+ * Copyright (c) 2018-2021 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -44,17 +44,17 @@ import Routable :: *;
 
 `define PARAMS addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_
 
-module mkAXI4LiteBus_Synth #(
+module mkAXI4LiteBus_Sig #(
   function Vector #(nSlaves, Bool) route (Bit #(addr_) val)
-, Vector #(nMasters, AXI4Lite_Master_Synth #(`PARAMS)) masters
-, Vector #(nSlaves,  AXI4Lite_Slave_Synth  #(`PARAMS)) slaves
+, Vector #(nMasters, AXI4Lite_Master_Sig #(`PARAMS)) masters
+, Vector #(nSlaves,  AXI4Lite_Slave_Sig  #(`PARAMS)) slaves
 ) (Empty) provisos (
   Add #(1, a__, nSlaves)
 , Add #(1, b__, nMasters)
 );
-  let msNoSynth <- mapM (fromAXI4Lite_Master_Synth, masters);
-  let ssNoSynth <- mapM (fromAXI4Lite_Slave_Synth,  slaves);
-  mkAXI4LiteBus (route, msNoSynth, ssNoSynth);
+  let msNoSig <- mapM (fromAXI4Lite_Master_Sig, masters);
+  let ssNoSig <- mapM (fromAXI4Lite_Slave_Sig,  slaves);
+  mkAXI4LiteBus (route, msNoSig, ssNoSig);
 endmodule
 
 module mkAXI4LiteBus #(

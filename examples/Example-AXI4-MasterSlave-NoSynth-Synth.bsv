@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2020 Alexandre Joannou
+ * Copyright (c) 2018-2021 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -144,15 +144,15 @@ endmodule
 
 module top (Empty);
   let m <- axiMaster;
-  let mSynth <- toAXI4_Master_Synth(m);
-  let mNoSynth <- fromAXI4_Master_Synth(mSynth);
+  let mSig <- toAXI4_Master_Sig(m);
+  let mNoSig <- fromAXI4_Master_Sig(mSig);
   let s <- axiSlave;
-  let sSynth <- toAXI4_Slave_Synth(s);
-  let sNoSynth <- fromAXI4_Slave_Synth(sSynth);
+  let sSig <- toAXI4_Slave_Sig(s);
+  let sNoSig <- fromAXI4_Slave_Sig(sSig);
   //mkConnection(m, s);
-  //mkConnection(mNoSynth, s);
-  //mkConnection(m, sNoSynth);
-  mkConnection(mNoSynth, sNoSynth);
+  //mkConnection(mNoSig, s);
+  //mkConnection(m, sNoSig);
+  mkConnection(mNoSig, sNoSig);
 endmodule
 
 `undef PARAMS

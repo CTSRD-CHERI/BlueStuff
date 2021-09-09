@@ -653,12 +653,12 @@ module mkAXI4Shim (AXI4_Shim#(a, b, c, d, e, f, g, h));
   return shim;
 endmodule
 
-module toAXI4_Shim_Synth #(AXI4_Shim#(a, b, c, d, e, f, g, h) shim)
-                          (AXI4_Shim_Synth#(a, b, c, d, e, f, g, h));
-  let masterSynth <- toAXI4_Master_Synth(shim.master);
-  let  slaveSynth <- toAXI4_Slave_Synth(shim.slave);
-  interface master = masterSynth;
-  interface  slave = slaveSynth;
+module toAXI4_Shim_Sig #(AXI4_Shim#(a, b, c, d, e, f, g, h) shim)
+                        (AXI4_Shim_Sig#(a, b, c, d, e, f, g, h));
+  let masterSig <- toAXI4_Master_Sig(shim.master);
+  let  slaveSig <- toAXI4_Slave_Sig(shim.slave);
+  interface master = masterSig;
+  interface  slave = slaveSig;
   interface  clear = shim.clear;
 endmodule
 
@@ -686,12 +686,12 @@ function AXI4_Slave#(a,b,c,d,e,f,g,h)
     interface r  = debugSource( s.r, $format(msg, " r"));
   endinterface;
 
-module mkAXI4DebugShimSynth #(String debugTag) (AXI4_Shim_Synth#(a,b,c,d,e,f,g,h));
+module mkAXI4DebugShimSig #(String debugTag) (AXI4_Shim_Sig#(a,b,c,d,e,f,g,h));
   let shim <- mkAXI4DebugShim(debugTag);
-  let masterSynth <- toAXI4_Master_Synth(shim.master);
-  let  slaveSynth <- toAXI4_Slave_Synth(shim.slave);
-  interface master = masterSynth;
-  interface  slave = slaveSynth;
+  let masterSig <- toAXI4_Master_Sig(shim.master);
+  let  slaveSig <- toAXI4_Slave_Sig(shim.slave);
+  interface master = masterSig;
+  interface  slave = slaveSig;
   interface  clear = shim.clear;
 endmodule
 
@@ -775,85 +775,85 @@ module monitorAXI4_Slave #(AXI4_Slave#(a, b, c, d, e, f, g, h) slave)
   endinterface;
 endmodule
 
-/////////////////////////////////////
-// to/from "Synth" interface utils //
+///////////////////////////////////
+// to/from "Sig" interface utils //
 ////////////////////////////////////////////////////////////////////////////////
 
 // AXI4 Master
-module toAXI4_Master_Synth #(AXI4_Master#(a, b, c, d, e, f, g, h) master)
-                            (AXI4_Master_Synth#(a, b, c, d, e, f, g, h));
-  let awSynth <- toAXI4_AW_Master_Synth(master.aw);
-  let wSynth  <- toAXI4_W_Master_Synth(master.w);
-  let bSynth  <- toAXI4_B_Master_Synth(master.b);
-  let arSynth <- toAXI4_AR_Master_Synth(master.ar);
-  let rSynth  <- toAXI4_R_Master_Synth(master.r);
-  interface aw = awSynth;
-  interface w  = wSynth;
-  interface b  = bSynth;
-  interface ar = arSynth;
-  interface r  = rSynth;
+module toAXI4_Master_Sig #(AXI4_Master#(a, b, c, d, e, f, g, h) master)
+                          (AXI4_Master_Sig#(a, b, c, d, e, f, g, h));
+  let awSig <- toAXI4_AW_Master_Sig(master.aw);
+  let wSig  <- toAXI4_W_Master_Sig(master.w);
+  let bSig  <- toAXI4_B_Master_Sig(master.b);
+  let arSig <- toAXI4_AR_Master_Sig(master.ar);
+  let rSig  <- toAXI4_R_Master_Sig(master.r);
+  interface aw = awSig;
+  interface w  = wSig;
+  interface b  = bSig;
+  interface ar = arSig;
+  interface r  = rSig;
 endmodule
 
-module fromAXI4_Master_Synth #(AXI4_Master_Synth#(a, b, c, d, e, f, g, h) master)
-                              (AXI4_Master#(a, b, c, d, e, f, g, h));
-  let awNoSynth <- fromAXI4_AW_Master_Synth(master.aw);
-  let wNoSynth  <- fromAXI4_W_Master_Synth(master.w);
-  let bNoSynth  <- fromAXI4_B_Master_Synth(master.b);
-  let arNoSynth <- fromAXI4_AR_Master_Synth(master.ar);
-  let rNoSynth  <- fromAXI4_R_Master_Synth(master.r);
-  interface aw = awNoSynth;
-  interface w  = wNoSynth;
-  interface b  = bNoSynth;
-  interface ar = arNoSynth;
-  interface r  = rNoSynth;
+module fromAXI4_Master_Sig #(AXI4_Master_Sig#(a, b, c, d, e, f, g, h) master)
+                            (AXI4_Master#(a, b, c, d, e, f, g, h));
+  let awNoSig <- fromAXI4_AW_Master_Sig(master.aw);
+  let wNoSig  <- fromAXI4_W_Master_Sig(master.w);
+  let bNoSig  <- fromAXI4_B_Master_Sig(master.b);
+  let arNoSig <- fromAXI4_AR_Master_Sig(master.ar);
+  let rNoSig  <- fromAXI4_R_Master_Sig(master.r);
+  interface aw = awNoSig;
+  interface w  = wNoSig;
+  interface b  = bNoSig;
+  interface ar = arNoSig;
+  interface r  = rNoSig;
 endmodule
 
-module liftAXI4_Master_Synth
+module liftAXI4_Master_Sig
   #( function AXI4_Master#(a, b, c, d, e, f, g, h)
      f (AXI4_Master#(a1, b1, c1, d1, e1, f1, g1, h1) x)
-   , AXI4_Master_Synth#(a1, b1, c1, d1, e1, f1, g1, h1) m)
-   (AXI4_Master_Synth#(a, b, c, d, e, f, g, h));
-  let mNoSynth <- fromAXI4_Master_Synth (m);
-  let ret <- toAXI4_Master_Synth (f (mNoSynth));
+   , AXI4_Master_Sig#(a1, b1, c1, d1, e1, f1, g1, h1) m)
+   (AXI4_Master_Sig#(a, b, c, d, e, f, g, h));
+  let mNoSig <- fromAXI4_Master_Sig (m);
+  let ret <- toAXI4_Master_Sig (f (mNoSig));
   return ret;
 endmodule
 
 // AXI4 Slave
-module toAXI4_Slave_Synth #(AXI4_Slave#(a, b, c, d, e, f, g, h) slave)
-                           (AXI4_Slave_Synth#(a, b, c, d, e, f, g, h));
-  let awSynth <- toAXI4_AW_Slave_Synth(slave.aw);
-  let wSynth  <- toAXI4_W_Slave_Synth(slave.w);
-  let bSynth  <- toAXI4_B_Slave_Synth(slave.b);
-  let arSynth <- toAXI4_AR_Slave_Synth(slave.ar);
-  let rSynth  <- toAXI4_R_Slave_Synth(slave.r);
-  interface aw = awSynth;
-  interface w  = wSynth;
-  interface b  = bSynth;
-  interface ar = arSynth;
-  interface r  = rSynth;
+module toAXI4_Slave_Sig #(AXI4_Slave#(a, b, c, d, e, f, g, h) slave)
+                         (AXI4_Slave_Sig#(a, b, c, d, e, f, g, h));
+  let awSig <- toAXI4_AW_Slave_Sig(slave.aw);
+  let wSig  <- toAXI4_W_Slave_Sig(slave.w);
+  let bSig  <- toAXI4_B_Slave_Sig(slave.b);
+  let arSig <- toAXI4_AR_Slave_Sig(slave.ar);
+  let rSig  <- toAXI4_R_Slave_Sig(slave.r);
+  interface aw = awSig;
+  interface w  = wSig;
+  interface b  = bSig;
+  interface ar = arSig;
+  interface r  = rSig;
 endmodule
 
-module fromAXI4_Slave_Synth #(AXI4_Slave_Synth#(a, b, c, d, e, f, g, h) slave)
-                             (AXI4_Slave#(a, b, c, d, e, f, g, h));
-  let awNoSynth <- fromAXI4_AW_Slave_Synth(slave.aw);
-  let wNoSynth  <- fromAXI4_W_Slave_Synth(slave.w);
-  let bNoSynth  <- fromAXI4_B_Slave_Synth(slave.b);
-  let arNoSynth <- fromAXI4_AR_Slave_Synth(slave.ar);
-  let rNoSynth  <- fromAXI4_R_Slave_Synth(slave.r);
-  interface aw = awNoSynth;
-  interface w  = wNoSynth;
-  interface b  = bNoSynth;
-  interface ar = arNoSynth;
-  interface r  = rNoSynth;
+module fromAXI4_Slave_Sig #(AXI4_Slave_Sig#(a, b, c, d, e, f, g, h) slave)
+                           (AXI4_Slave#(a, b, c, d, e, f, g, h));
+  let awNoSig <- fromAXI4_AW_Slave_Sig(slave.aw);
+  let wNoSig  <- fromAXI4_W_Slave_Sig(slave.w);
+  let bNoSig  <- fromAXI4_B_Slave_Sig(slave.b);
+  let arNoSig <- fromAXI4_AR_Slave_Sig(slave.ar);
+  let rNoSig  <- fromAXI4_R_Slave_Sig(slave.r);
+  interface aw = awNoSig;
+  interface w  = wNoSig;
+  interface b  = bNoSig;
+  interface ar = arNoSig;
+  interface r  = rNoSig;
 endmodule
 
-module liftAXI4_Slave_Synth
+module liftAXI4_Slave_Sig
   #( function AXI4_Slave#(a, b, c, d, e, f, g, h)
      f (AXI4_Slave#(a1, b1, c1, d1, e1, f1, g1, h1) x)
-   , AXI4_Slave_Synth#(a1, b1, c1, d1, e1, f1, g1, h1) s)
-   (AXI4_Slave_Synth#(a, b, c, d, e, f, g, h));
-  let sNoSynth <- fromAXI4_Slave_Synth (s);
-  let ret <- toAXI4_Slave_Synth (f (sNoSynth));
+   , AXI4_Slave_Sig#(a1, b1, c1, d1, e1, f1, g1, h1) s)
+   (AXI4_Slave_Sig#(a, b, c, d, e, f, g, h));
+  let sNoSig <- fromAXI4_Slave_Sig (s);
+  let ret <- toAXI4_Slave_Sig (f (sNoSig));
   return ret;
 endmodule
 
@@ -1601,7 +1601,7 @@ function AXI4_Slave#(a,b,c,d,e,f,g,h) guard_AXI4_Slave
 /*
 module mkAXI4_Master_Xactor (AXI4_Master_Xactor#(a, b, c, d, e, f, g, h));
   let shim <- mkAXI4ShimBypassFIFOF;
-  let master <- toAXI4_Master_Synth(shim.master);
+  let master <- toAXI4_Master_Sig(shim.master);
   let clearing <- mkConfigReg(False);
   rule do_clear (clearing);
     shim.clear;
@@ -1609,12 +1609,12 @@ module mkAXI4_Master_Xactor (AXI4_Master_Xactor#(a, b, c, d, e, f, g, h));
   endrule
   method clear if (!clearing) = action clearing <= True; endaction;
   interface slave = guard_AXI4_Slave(shim.slave, clearing);
-  interface masterSynth = master;
+  interface masterSig = master;
 endmodule
 
 module mkAXI4_Slave_Xactor (AXI4_Slave_Xactor#(a, b, c, d, e, f, g, h));
   let shim <- mkAXI4ShimBypassFIFOF;
-  let slvSynth <- toAXI4_Slave_Synth(shim.slave);
+  let slvSig <- toAXI4_Slave_Sig(shim.slave);
   let clearing <- mkConfigReg(False);
   rule do_clear(clearing);
     shim.clear;
@@ -1622,13 +1622,13 @@ module mkAXI4_Slave_Xactor (AXI4_Slave_Xactor#(a, b, c, d, e, f, g, h));
   endrule
   method clear if (!clearing) = action clearing <= True; endaction;
   interface master = guard_AXI4_Master(shim.master, clearing);
-  interface slaveSynth = slvSynth;
+  interface slaveSig = slvSig;
 endmodule
 
 module mkAXI4_Slave_Widening_Xactor (AXI4_Slave_Width_Xactor#(a, b, c, d, e, f, g, h, i, j, k, l, m, n)) provisos (Add#(c,c,d), Add#(d, _, 128), Add#(a__, SizeOf#(AXI4_Size_Bits), b));
   let shim <- mkAXI4ShimSizedFIFOF4;
   let widened_slave <- toWider_AXI4_Slave(shim.slave);
-  let slvSynth <- toAXI4_Slave_Synth(zeroSlaveUserFields(widened_slave));
+  let slvSig <- toAXI4_Slave_Sig(zeroSlaveUserFields(widened_slave));
   let clearing <- mkConfigReg(False);
   rule do_clear(clearing);
     shim.clear;
@@ -1636,12 +1636,12 @@ module mkAXI4_Slave_Widening_Xactor (AXI4_Slave_Width_Xactor#(a, b, c, d, e, f, 
   endrule
   method clear if (!clearing) = action clearing <= True; endaction;
   interface master = guard_AXI4_Master(shim.master, clearing);
-  interface slaveSynth = slvSynth;
+  interface slaveSig = slvSig;
 endmodule
 
 module mkAXI4_Slave_Zeroing_Xactor (AXI4_Slave_Width_Xactor#(a, b, c, d, e, f, g, h, i, j, k, l, m, n)) provisos (Add#(c,0,d), Add#(d, _, 128), Add#(a__, SizeOf#(AXI4_Size_Bits), b));
   let shim <- mkAXI4ShimSizedFIFOF4;
-  let slvSynth <- toAXI4_Slave_Synth(zeroSlaveUserFields(shim.slave));
+  let slvSig <- toAXI4_Slave_Sig(zeroSlaveUserFields(shim.slave));
   let clearing <- mkConfigReg(False);
   rule do_clear(clearing);
     shim.clear;
@@ -1649,7 +1649,7 @@ module mkAXI4_Slave_Zeroing_Xactor (AXI4_Slave_Width_Xactor#(a, b, c, d, e, f, g
   endrule
   method clear if (!clearing) = action clearing <= True; endaction;
   interface master = guard_AXI4_Master(shim.master, clearing);
-  interface slaveSynth = slvSynth;
+  interface slaveSig = slvSig;
 endmodule
 */
 

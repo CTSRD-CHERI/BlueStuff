@@ -27,6 +27,7 @@
  */
 
 import AXI4 :: *;
+import AXI4_Fake_16550 :: *;
 
 import Routable :: *;
 import SourceSink :: *;
@@ -58,8 +59,8 @@ typedef   0 RUSER_sz;
 `define SPARAMS SID_sz, `PARAMS
 `define MASTER_T AXI4_Master#(`MPARAMS)
 `define SLAVE_T  AXI4_Slave#(`SPARAMS)
-`define MASTER_SYNTH_T AXI4_Master_Synth#(`MPARAMS)
-`define SLAVE_SYNTH_T  AXI4_Slave_Synth#(`SPARAMS)
+`define MASTER_SYNTH_T AXI4_Master_Sig#(`MPARAMS)
+`define SLAVE_SYNTH_T  AXI4_Slave_Sig#(`SPARAMS)
 
 Integer nb_flit = 3;
 Integer nb_rsp = 2;
@@ -112,10 +113,10 @@ module axiMaster (`MASTER_T);
 
 endmodule
 
-module axiMasterSynth (`MASTER_SYNTH_T);
-  let noSynth <- axiMaster;
-  let synth <- toAXI4_Master_Synth (noSynth);
-  return synth;
+module axiMasterSig (`MASTER_SYNTH_T);
+  let noSig <- axiMaster;
+  let sig <- toAXI4_Master_Sig (noSig);
+  return sig;
 endmodule
 
 module axiSlave (`SLAVE_T);
@@ -161,10 +162,10 @@ module axiSlave (`SLAVE_T);
 
 endmodule
 
-module axiSlaveSynth (`SLAVE_SYNTH_T);
-  let noSynth <- axiSlave;
-  let synth <- toAXI4_Slave_Synth (noSynth);
-  return synth;
+module axiSlaveSig (`SLAVE_SYNTH_T);
+  let noSig <- axiSlave;
+  let sig <- toAXI4_Slave_Sig (noSig);
+  return sig;
 endmodule
 
 module top (Empty);

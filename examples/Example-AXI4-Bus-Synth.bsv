@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2020 Alexandre Joannou
+ * Copyright (c) 2018-2021 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -58,8 +58,8 @@ typedef   0 RUSER_sz;
 `define SPARAMS SID_sz, `PARAMS
 `define MASTER_T AXI4_Master#(`MPARAMS)
 `define SLAVE_T  AXI4_Slave#(`SPARAMS)
-`define MASTER_SYNTH_T AXI4_Master_Synth#(`MPARAMS)
-`define SLAVE_SYNTH_T  AXI4_Slave_Synth#(`SPARAMS)
+`define MASTER_SYNTH_T AXI4_Master_Sig#(`MPARAMS)
+`define SLAVE_SYNTH_T  AXI4_Slave_Sig#(`SPARAMS)
 
 Integer nb_flit = 8;
 Integer nb_rsp = 2;
@@ -149,13 +149,13 @@ endmodule
 module top (Empty);
     `MASTER_T m <- axiMaster;
     let mShim <- mkAXI4ShimFF;
-    let mShim_mSynth <- toAXI4_Master_Synth (mShim.master);
+    let mShim_mSig <- toAXI4_Master_Sig (mShim.master);
     mkConnection (m, mShim.slave);
     `SLAVE_T s <- axiSlave;
     let sShim <- mkAXI4ShimFF;
-    let sShim_sSynth <- toAXI4_Slave_Synth (sShim.slave);
+    let sShim_sSig <- toAXI4_Slave_Sig (sShim.slave);
     mkConnection (s, sShim.master);
-    mkConnection(mShim_mSynth, sShim_sSynth);
+    mkConnection(mShim_mSig, sShim_sSig);
 endmodule
 `else
 module top (Empty);
@@ -165,7 +165,7 @@ module top (Empty);
     `MASTER_T m <- axiMaster;
     let mShim <- mkAXI4ShimFF;
     mkConnection (m, mShim.slave);
-    ms[i] <- toAXI4_Master_Synth (mShim.master);
+    ms[i] <- toAXI4_Master_Sig (mShim.master);
   end
   MappingTable#(NSLAVES, ADDR_sz) maptab = newVector;
   for (Integer i = 0; i < valueOf(NSLAVES); i = i + 1) begin
@@ -173,9 +173,9 @@ module top (Empty);
     `SLAVE_T s <- axiSlave;
     let sShim <- mkAXI4ShimFF;
     mkConnection (s, sShim.master);
-    ss[i] <- toAXI4_Slave_Synth (sShim.slave);
+    ss[i] <- toAXI4_Slave_Sig (sShim.slave);
   end
-  mkAXI4Bus_Synth(routeFromMappingTable(maptab), ms, ss);
+  mkAXI4Bus_Sig(routeFromMappingTable(maptab), ms, ss);
 endmodule
 `endif
 

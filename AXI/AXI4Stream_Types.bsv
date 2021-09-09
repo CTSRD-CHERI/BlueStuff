@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2021 Ivan Ribeiro
+ * Copyright (c) 2021 Alexandre Joannou
  * All rights reserved.
  *
  * This hardware design was developed by the University of Cambridge Computer
@@ -58,10 +59,10 @@ typedef struct {
 deriving (Bits, FShow);
 
 (* always_ready, always_enabled *)
-interface AXI4Stream_Master_Synth #( numeric type id_
-                                   , numeric type data_
-                                   , numeric type dest_
-                                   , numeric type user_);
+interface AXI4Stream_Master_Sig #( numeric type id_
+                                 , numeric type data_
+                                 , numeric type dest_
+                                 , numeric type user_);
   method Bit #(data_)            tdata;
   method Bit #(TDiv #(data_, 8)) tstrb;
   method Bit #(TDiv #(data_, 8)) tkeep;
@@ -74,10 +75,10 @@ interface AXI4Stream_Master_Synth #( numeric type id_
 endinterface
 
 (* always_ready, always_enabled *)
-interface AXI4Stream_Slave_Synth #( numeric type id_
-                                  , numeric type data_
-                                  , numeric type dest_
-                                  , numeric type user_);
+interface AXI4Stream_Slave_Sig #( numeric type id_
+                                , numeric type data_
+                                , numeric type dest_
+                                , numeric type user_);
   (* prefix="" *) method Action tflit ( Bool                    tvalid
                                       , Bit #(data_)            tdata
                                       , Bit #(TDiv #(data_, 8)) tstrb
