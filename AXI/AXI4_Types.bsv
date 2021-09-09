@@ -31,6 +31,7 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
+import FIFOF :: *;
 import Connectable :: *;
 import DefaultValue :: *;
 
@@ -953,28 +954,22 @@ instance FallibleRoute#( AXI4_WriteFlit#(sid_, addr_, data_, awuser_, wuser_)
                        , AXI4_BFlit#(sid_, buser_));
   module mkNoRouteSlave (Slave #( AXI4_WriteFlit#(sid_, addr_, data_, awuser_, wuser_)
                                 , AXI4_BFlit#(sid_, buser_)));
-    Reg #(Maybe #(Bit #(sid_))) m_send_rsp <- mkReg (Invalid);
-    Wire #(Bit #(sid_))            putWire <- mkWire;
-    PulseWire                     dropWire <- mkPulseWire;
-    Reg #(Bool)           drain_until_last <- mkReg (False);
-    (* mutually_exclusive = "set_m_send_rsp, clear_m_send_rsp" *)
-    rule set_m_send_rsp; m_send_rsp <= Valid (putWire); endrule
-    rule clear_m_send_rsp (dropWire); m_send_rsp <= Invalid; endrule
+    let awidReg <- mkRegU;
+    let rspFF <- mkFIFOF;
     interface sink = interface Sink;
-      method canPut = drain_until_last || !isValid (m_send_rsp);
-      method put (req) if (drain_until_last || !isValid (m_send_rsp)) = action
+      method canPut = rspFF.notFull;
+      method put (req) if (rspFF.notFull) = action
+        let currentAwid = awidReg;
         case (req) matches
-          tagged FirstFlit {.aw, ._}: putWire <= aw.awid;
+          tagged FirstFlit {.aw, ._}: currentAwid = aw.awid;
         endcase
-        drain_until_last <= !isLast (req);
+        if (isLast (req)) rspFF.enq (AXI4_BFlit{ bid: currentAwid
+                                               , bresp: DECERR
+                                               , buser: ? });
+        awidReg <= currentAwid;
       endaction;
     endinterface;
-    interface source = interface Source;
-      method canPeek = isValid (m_send_rsp);
-      method peek if (isValid (m_send_rsp)) =
-        AXI4_BFlit{ bid: m_send_rsp.Valid, bresp: DECERR, buser: ? };
-      method drop if (isValid (m_send_rsp)) = dropWire.send;
-    endinterface;
+    interface source = toSource (rspFF);
   endmodule
 endinstance
 instance ExpandableReqRsp#(
