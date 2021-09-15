@@ -53,6 +53,9 @@ import SpecialFIFOs :: *;
 import ConfigReg :: *;
 import Connectable :: *;
 
+
+// Performance Monitoring
+import StatCounters :: *;
 ////////////////////////////////
 // AXI4 Write channel helpers //
 ////////////////////////////////////////////////////////////////////////////////
@@ -708,7 +711,7 @@ endmodule
 
 module monitorAXI4_Shim #(AXI4_Shim#(a, b, c, d, e, f, g, h) shim)
                          (Monitored#( AXI4_Shim#(a, b, c, d, e, f, g, h)
-                                    , Tuple2#(AXI4_Events, AXI4_Events)));
+                                    , Tuple2#(AXI4_Master_Events, AXI4_Slave_Events)));
   let masterMonitor <- monitorAXI4_Master(shim.master);
   let  slaveMonitor <- monitorAXI4_Slave(shim.slave);
   interface ifc = interface AXI4_Shim;
@@ -723,7 +726,7 @@ endmodule
 
 module monitorAXI4_Master #(AXI4_Master#(a, b, c, d, e, f, g, h) master)
                            (Monitored#( AXI4_Master#(a, b, c, d, e, f, g, h)
-                                      , AXI4_Events));
+                                      , AXI4_Master_Events));
   function f (x) = tuple2(True, isLast(x));
   let awMonitor <- monitorSource(master.aw);
   let  wMonitor <- monitorSourceWith(master.w, f);
@@ -738,19 +741,19 @@ module monitorAXI4_Master #(AXI4_Master#(a, b, c, d, e, f, g, h) master)
     interface  r = rMonitor.ifc;
   endinterface;
   interface events = interface ReadOnly;
-    method _read = AXI4_Events { evt_AW_FLIT:      awMonitor.events
-                               , evt_W_FLIT:       tpl_1(wMonitor.events)
-                               , evt_W_FLIT_FINAL: tpl_2(wMonitor.events)
-                               , evt_B_FLIT:       bMonitor.events
-                               , evt_AR_FLIT:      arMonitor.events
-                               , evt_R_FLIT:       tpl_1(rMonitor.events)
-                               , evt_R_FLIT_FINAL: tpl_2(rMonitor.events) };
+    method _read = AXI4_Master_Events { evt_AW_FLIT:      zeroExtend(pack(awMonitor.events))
+                               , evt_W_FLIT:       zeroExtend(pack(tpl_1(wMonitor.events)))
+                               , evt_W_FLIT_FINAL: zeroExtend(pack(tpl_2(wMonitor.events)))
+                               , evt_B_FLIT:       zeroExtend(pack(bMonitor.events))
+                               , evt_AR_FLIT:      zeroExtend(pack(arMonitor.events))
+                               , evt_R_FLIT:       zeroExtend(pack(tpl_1(rMonitor.events)))
+                               , evt_R_FLIT_FINAL: zeroExtend(pack(tpl_2(rMonitor.events))) };
   endinterface;
 endmodule
 
 module monitorAXI4_Slave #(AXI4_Slave#(a, b, c, d, e, f, g, h) slave)
                           (Monitored#( AXI4_Slave#(a, b, c, d, e, f, g, h)
-                                     , AXI4_Events));
+                                     , AXI4_Slave_Events));
   function f (x) = tuple2(True, isLast(x));
   let awMonitor <- monitorSink(slave.aw);
   let  wMonitor <- monitorSinkWith(slave.w, f);
@@ -765,13 +768,13 @@ module monitorAXI4_Slave #(AXI4_Slave#(a, b, c, d, e, f, g, h) slave)
     interface  r = rMonitor.ifc;
   endinterface;
   interface events = interface ReadOnly;
-    method _read = AXI4_Events { evt_AW_FLIT:      awMonitor.events
-                               , evt_W_FLIT:       tpl_1(wMonitor.events)
-                               , evt_W_FLIT_FINAL: tpl_2(wMonitor.events)
-                               , evt_B_FLIT:       bMonitor.events
-                               , evt_AR_FLIT:      arMonitor.events
-                               , evt_R_FLIT:       tpl_1(rMonitor.events)
-                               , evt_R_FLIT_FINAL: tpl_2(rMonitor.events) };
+    method _read = AXI4_Slave_Events { evt_AW_FLIT:      zeroExtend(pack(awMonitor.events))
+                               , evt_W_FLIT:       zeroExtend(pack(tpl_1(wMonitor.events)))
+                               , evt_W_FLIT_FINAL: zeroExtend(pack(tpl_2(wMonitor.events)))
+                               , evt_B_FLIT:       zeroExtend(pack(bMonitor.events))
+                               , evt_AR_FLIT:      zeroExtend(pack(arMonitor.events))
+                               , evt_R_FLIT:       zeroExtend(pack(tpl_1(rMonitor.events)))
+                               , evt_R_FLIT_FINAL: zeroExtend(pack(tpl_2(rMonitor.events))) };
   endinterface;
 endmodule
 
