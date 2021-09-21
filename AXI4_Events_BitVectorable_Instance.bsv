@@ -47,8 +47,8 @@ package AXI4_Events_BitVectorable_Instance;
 import AXI4 :: *;
 import PerformanceMonitor :: *;
 
-//instance BitVectorable#(AXI4_Events, 1, n) provisos (Bits#(AXI4_Events, n));
-//  function to_vector = struct_to_vector;
-//endinstance
+instance BitVectorable#(AXI4_Events, 1, n) provisos (Bits#(AXI4_Events, n));
+  function to_vector = struct_to_vector;
+endinstance
 
 endpackage
