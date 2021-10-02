@@ -616,34 +616,6 @@ instance CulDeSac#(AXI4_Master_Sig #( id_
   endinterface;
 endinstance
 
-interface AXI4_Master_Xactor#(
-  numeric type id_,
-  numeric type addr_,
-  numeric type data_,
-  numeric type awuser_,
-  numeric type wuser_,
-  numeric type buser_,
-  numeric type aruser_,
-  numeric type ruser_);
-  method Action clear;
-  interface AXI4_Slave#(id_,
-                        addr_,
-                        data_,
-                        awuser_,
-                        wuser_,
-                        buser_,
-                        aruser_,
-                        ruser_) slave;
-  interface AXI4_Master_Sig #( id_
-                             , addr_
-                             , data_
-                             , awuser_
-                             , wuser_
-                             , buser_
-                             , aruser_
-                             , ruser_) masterSig;
-endinterface
-
 ////////////////
 // AXI4 Slave //
 ////////////////////////////////////////////////////////////////////////////////
@@ -719,69 +691,6 @@ instance CulDeSac#(AXI4_Slave_Sig #( id_
     interface  r = culDeSac;
   endinterface;
 endinstance
-
-interface AXI4_Slave_Xactor#(
-  numeric type id_,
-  numeric type addr_,
-  numeric type data_,
-  numeric type awuser_,
-  numeric type wuser_,
-  numeric type buser_,
-  numeric type aruser_,
-  numeric type ruser_);
-  method Action clear;
-  interface AXI4_Master#(id_,
-                         addr_,
-                         data_,
-                         awuser_,
-                         wuser_,
-                         buser_,
-                         aruser_,
-                         ruser_) master;
-  interface AXI4_Slave_Sig #( id_
-                            , addr_
-                            , data_
-                            , awuser_
-                            , wuser_
-                            , buser_
-                            , aruser_
-                            , ruser_) slaveSig;
-endinterface
-
-interface AXI4_Slave_Width_Xactor#(
-  numeric type id_,
-  numeric type addr_,
-  numeric type mdata_,
-  numeric type sdata_,
-  numeric type mawuser_,
-  numeric type mwuser_,
-  numeric type mbuser_,
-  numeric type maruser_,
-  numeric type mruser_,
-  numeric type sawuser_,
-  numeric type swuser_,
-  numeric type sbuser_,
-  numeric type saruser_,
-  numeric type sruser_);
-  method Action clear;
-  interface AXI4_Master#(id_,
-                         addr_,
-                         mdata_,
-                         mawuser_,
-                         mwuser_,
-                         mbuser_,
-                         maruser_,
-                         mruser_
-) master;
-  interface AXI4_Slave_Sig #( id_
-                            , addr_
-                            , sdata_
-                            , sawuser_
-                            , swuser_
-                            , sbuser_
-                            , saruser_
-                            , sruser_) slaveSig;
-endinterface
 
 ////////////////////////////////
 // AXI4 Shim Master <-> Slave //
