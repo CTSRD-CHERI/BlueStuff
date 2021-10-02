@@ -37,6 +37,57 @@ import SpecialFIFOs :: *;
 // AXI Address Write Channel //
 ////////////////////////////////////////////////////////////////////////////////
 
+// map over flit type
+////////////////////////////////////////////////////////////////////////////////
+
+function AXI4_AWFlit #(id_out, addr, user)
+  mapAXI4_AWFlit_awid (
+    function Bit #(id_out) f (Bit #(id_in) a)
+  , AXI4_AWFlit #(id_in, addr, user) x ) =
+  AXI4_AWFlit { awid: f (x.awid)
+              , awaddr: x.awaddr
+              , awlen: x.awlen
+              , awsize: x.awsize
+              , awburst: x.awburst
+              , awlock: x.awlock
+              , awcache: x.awcache
+              , awprot: x.awprot
+              , awqos: x.awqos
+              , awregion: x.awregion
+              , awuser: x.awuser };
+
+function AXI4_AWFlit #(id, addr_out, user)
+  mapAXI4_AWFlit_awaddr (
+    function Bit #(addr_out) f (Bit #(addr_in) a)
+  , AXI4_AWFlit #(id, addr_in, user) x ) =
+  AXI4_AWFlit { awid: x.awid
+              , awaddr: f (x.awaddr)
+              , awlen: x.awlen
+              , awsize: x.awsize
+              , awburst: x.awburst
+              , awlock: x.awlock
+              , awcache: x.awcache
+              , awprot: x.awprot
+              , awqos: x.awqos
+              , awregion: x.awregion
+              , awuser: x.awuser };
+
+function AXI4_AWFlit #(id, addr, user_out)
+  mapAXI4_AWFlit_awuser (
+    function Bit #(user_out) f (Bit #(user_in) a)
+  , AXI4_AWFlit #(id, addr, user_in) x ) =
+  AXI4_AWFlit { awid: x.awid
+              , awaddr: x.awaddr
+              , awlen: x.awlen
+              , awsize: x.awsize
+              , awburst: x.awburst
+              , awlock: x.awlock
+              , awcache: x.awcache
+              , awprot: x.awprot
+              , awqos: x.awqos
+              , awregion: x.awregion
+              , awuser: f (x.awuser) };
+
 // to convert to/from the flit type
 ////////////////////////////////////////////////////////////////////////////////
 

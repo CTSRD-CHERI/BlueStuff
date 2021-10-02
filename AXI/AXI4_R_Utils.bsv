@@ -37,7 +37,41 @@ import SpecialFIFOs :: *;
 // AXI Read Data Channel //
 ////////////////////////////////////////////////////////////////////////////////
 
+// map over flit type
+////////////////////////////////////////////////////////////////////////////////
+
+function AXI4_RFlit #(id_out, data, user)
+  mapAXI4_RFlit_rid (
+    function Bit #(id_out) f (Bit #(id_in) a)
+  , AXI4_RFlit #(id_in, data, user) x ) =
+  AXI4_RFlit { rid:   f (x.rid)
+             , rdata: x.rdata
+             , rresp: x.rresp
+             , rlast: x.rlast
+             , ruser: x.ruser };
+
+function AXI4_RFlit #(id, data_out, user)
+  mapAXI4_RFlit_rdata (
+    function Bit #(data_out) f (Bit #(data_in) a)
+  , AXI4_RFlit #(id, data_in, user) x ) =
+  AXI4_RFlit { rid:   x.rid
+             , rdata: f (x.rdata)
+             , rresp: x.rresp
+             , rlast: x.rlast
+             , ruser: x.ruser };
+
+function AXI4_RFlit #(id, data, user_out)
+  mapAXI4_RFlit_ruser (
+    function Bit #(user_out) f (Bit #(user_in) a)
+  , AXI4_RFlit #(id, data, user_in) x ) =
+  AXI4_RFlit { rid:   x.rid
+             , rdata: x.rdata
+             , rresp: x.rresp
+             , rlast: x.rlast
+             , ruser: f (x.ruser) };
+
 // typeclasses to convert to/from the flit type
+////////////////////////////////////////////////////////////////////////////////
 
 typeclass ToAXI4_RFlit#( type t
                        , numeric type id_

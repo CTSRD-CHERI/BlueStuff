@@ -37,7 +37,59 @@ import SpecialFIFOs :: *;
 // AXI Read Address Channel //
 ////////////////////////////////////////////////////////////////////////////////
 
+// map over flit type
+////////////////////////////////////////////////////////////////////////////////
+
+function AXI4_ARFlit #(id_out, addr, user)
+  mapAXI4_ARFlit_arid (
+    function Bit #(id_out) f (Bit #(id_in) a)
+  , AXI4_ARFlit #(id_in, addr, user) x ) =
+  AXI4_ARFlit { arid: f (x.arid)
+              , araddr: x.araddr
+              , arlen: x.arlen
+              , arsize: x.arsize
+              , arburst: x.arburst
+              , arlock: x.arlock
+              , arcache: x.arcache
+              , arprot: x.arprot
+              , arqos: x.arqos
+              , arregion: x.arregion
+              , aruser: x.aruser };
+
+function AXI4_ARFlit #(id, addr_out, user)
+  mapAXI4_ARFlit_araddr (
+    function Bit #(addr_out) f (Bit #(addr_in) a)
+  , AXI4_ARFlit #(id, addr_in, user) x ) =
+  AXI4_ARFlit { arid: x.arid
+              , araddr: f (x.araddr)
+              , arlen: x.arlen
+              , arsize: x.arsize
+              , arburst: x.arburst
+              , arlock: x.arlock
+              , arcache: x.arcache
+              , arprot: x.arprot
+              , arqos: x.arqos
+              , arregion: x.arregion
+              , aruser: x.aruser };
+
+function AXI4_ARFlit #(id, addr, user_out)
+  mapAXI4_ARFlit_aruser (
+    function Bit #(user_out) f (Bit #(user_in) a)
+  , AXI4_ARFlit #(id, addr, user_in) x ) =
+  AXI4_ARFlit { arid: x.arid
+              , araddr: x.araddr
+              , arlen: x.arlen
+              , arsize: x.arsize
+              , arburst: x.arburst
+              , arlock: x.arlock
+              , arcache: x.arcache
+              , arprot: x.arprot
+              , arqos: x.arqos
+              , arregion: x.arregion
+              , aruser: f (x.aruser) };
+
 // typeclasses to convert to/from the flit type
+////////////////////////////////////////////////////////////////////////////////
 
 typeclass ToAXI4_ARFlit#( type t
                         , numeric type id_
