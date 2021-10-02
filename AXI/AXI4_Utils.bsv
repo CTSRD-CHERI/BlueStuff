@@ -185,51 +185,117 @@ module splitWrite#(
 
 endmodule
 
-////////////////////////////////
-// AXI4 Slave addr width shim //
+////////////////////////
+// AXI4 map utilities //
 ////////////////////////////////////////////////////////////////////////////////
 
-function AXI4_Slave#(a, addr_out, c, d, e, f, g, h) expandAXI4_Slave_Addr
-  (AXI4_Slave#(a, addr_in, c, d, e, f, g, h) s)
-  provisos (Add#(a__, addr_in, addr_out)); // addr_out >= addr_in
-  return interface AXI4_Slave;
-    interface aw = interface Sink;
-      method canPut = s.aw.canPut;
-      method put(x) = s.aw.put(AXI4_AWFlit{
-        awid: x.awid,
-        awaddr: truncate(x.awaddr),
-        awlen: x.awlen,
-        awsize: x.awsize,
-        awburst: x.awburst,
-        awlock: x.awlock,
-        awcache: x.awcache,
-        awprot: x.awprot,
-        awqos: x.awqos,
-        awregion: x.awregion,
-        awuser: x.awuser
-      });
-    endinterface;
+function AXI4_Master #(id_out, b, c, d, e, f, g, h)
+  mapAXI4_Master_id ( function Bit #(id_out) fReq (Bit #(id_in)  x)
+                    , function Bit #(id_in)  fRsp (Bit #(id_out) x)
+                    , AXI4_Master #(id_in, b, c, d, e, f, g, h) m) =
+  interface AXI4_Master;
+    interface aw = mapSource (mapAXI4_AWFlit_awid (fReq), m.aw);
+    interface  w = m.w;
+    interface  b = mapSink   (mapAXI4_BFlit_bid   (fRsp), m.b);
+    interface ar = mapSource (mapAXI4_ARFlit_arid (fReq), m.ar);
+    interface  r = mapSink   (mapAXI4_RFlit_rid   (fRsp), m.r);
+  endinterface;
+
+function AXI4_Master #(a, addr_out, c, d, e, f, g, h)
+  mapAXI4_Master_addr ( function Bit #(addr_out) fun (Bit #(addr_in) x)
+                          , AXI4_Master #(a, addr_in, c, d, e, f, g, h) m) =
+  interface AXI4_Master;
+    interface aw = mapSource (mapAXI4_AWFlit_awaddr (fun), m.aw);
+    interface  w = m.w;
+    interface  b = m.b;
+    interface ar = mapSource (mapAXI4_ARFlit_araddr (fun), m.ar);
+    interface  r = m.r;
+  endinterface;
+
+function AXI4_Master #(a, b, c, d_, e_, f_, g_, h_)
+  mapAXI4_Master_user ( function Bit #(d_) fAW (Bit #(d)  x)
+                      , function Bit #(e_) fW  (Bit #(e)  x)
+                      , function Bit #(f)  fB  (Bit #(f_) x)
+                      , function Bit #(g_) fAR (Bit #(g)  x)
+                      , function Bit #(h)  fR  (Bit #(h_) x)
+                      , AXI4_Master #(a, b, c, d, e, f, g, h) m) =
+  interface AXI4_Master;
+    interface aw = mapSource (mapAXI4_AWFlit_awuser (fAW), m.aw);
+    interface  w = mapSource (mapAXI4_WFlit_wuser   (fW), m.w);
+    interface  b = mapSink   (mapAXI4_BFlit_buser   (fB), m.b);
+    interface ar = mapSource (mapAXI4_ARFlit_aruser (fAR), m.ar);
+    interface  r = mapSink   (mapAXI4_RFlit_ruser   (fR), m.r);
+  endinterface;
+
+//------------------------------------------------------------------------------
+
+function AXI4_Slave #(a, addr_b, c, d, e, f, g, h)
+  mapAXI4_Slave_req_addr ( function Bit #(addr_a) fun (Bit #(addr_b) x)
+                         , AXI4_Slave #(a, addr_a, c, d, e, f, g, h) s) =
+  interface AXI4_Slave;
+    interface aw = mapSink (mapAXI4_AWFlit_awaddr (fun), s.aw);
     interface  w = s.w;
     interface  b = s.b;
-    interface ar = interface Sink;
-      method canPut = s.ar.canPut;
-      method put(x) = s.ar.put(AXI4_ARFlit{
-        arid: x.arid,
-        araddr: truncate(x.araddr),
-        arlen: x.arlen,
-        arsize: x.arsize,
-        arburst: x.arburst,
-        arlock: x.arlock,
-        arcache: x.arcache,
-        arprot: x.arprot,
-        arqos: x.arqos,
-        arregion: x.arregion,
-        aruser: x.aruser
-      });
-    endinterface;
+    interface ar = mapSink (mapAXI4_ARFlit_araddr (fun), s.ar);
     interface  r = s.r;
   endinterface;
+
+function AXI4_Slave #(a, b, c, d_, e_, f_, g_, h_)
+  mapAXI4_Slave_user ( function Bit #(d)  fAW (Bit #(d_) x)
+                     , function Bit #(e)  fW  (Bit #(e_) x)
+                     , function Bit #(f_) fB  (Bit #(f)  x)
+                     , function Bit #(g)  fAR (Bit #(g_) x)
+                     , function Bit #(h_) fR  (Bit #(h)  x)
+                     , AXI4_Slave #(a, b, c, d, e, f, g, h) s) =
+  interface AXI4_Slave;
+    interface aw = mapSink   (mapAXI4_AWFlit_awuser (fAW), s.aw);
+    interface  w = mapSink   (mapAXI4_WFlit_wuser   (fW), s.w);
+    interface  b = mapSource (mapAXI4_BFlit_buser   (fB), s.b);
+    interface ar = mapSink   (mapAXI4_ARFlit_aruser (fAR), s.ar);
+    interface  r = mapSource (mapAXI4_RFlit_ruser   (fR), s.r);
+  endinterface;
+
+///////////////////////////////////////////
+// AXI4 map-based higher level utilities //
+////////////////////////////////////////////////////////////////////////////////
+
+function AXI4_Master #(id_out, b, c, d, e, f, g, h)
+  prepend_AXI4_Master_id ( Bit #(TSub #(id_out, id_in)) upperBits
+                         , AXI4_Master #(id_in, b, c, d, e, f, g, h) m)
+  provisos (Add#(_a, id_in, id_out)); // id_out >= id_in
+  function fun (x) = {upperBits, x};
+  return mapAXI4_Master_id (fun, truncate, m);
 endfunction
+
+function AXI4_Master #(a, addr_out, c, d, e, f, g, h)
+  truncate_AXI4_Master_addr (AXI4_Master #(a, addr_in, c, d, e, f, g, h) m)
+  provisos (Add#(_a, addr_out, addr_in)) // addr_in >= addr_out
+  = mapAXI4_Master_addr (truncate, m);
+
+function AXI4_Master #(a, addr_out, c, d, e, f, g, h)
+  prepend_AXI4_Master_addr ( Bit #(TSub #(addr_out, addr_in)) upperBits
+                          , AXI4_Master #(a, addr_in, c, d, e, f, g, h) m)
+  provisos (Add#(_a, addr_in, addr_out)); // addr_out >= addr_in
+  function f (x) = {upperBits, x};
+  return mapAXI4_Master_addr (f, m);
+endfunction
+
+function AXI4_Master #(a, b, c, d_, e_, f_, g_, h_)
+  zero_AXI4_Master_user (AXI4_Master #(a, b, c, d, e, f, g, h) m) =
+  mapAXI4_Master_user
+    (constFn (0), constFn (0), constFn (0), constFn (0), constFn (0), m);
+
+//------------------------------------------------------------------------------
+
+function AXI4_Slave #(a, addr_out, c, d, e, f, g, h)
+  truncate_AXI4_Slave_addr (AXI4_Slave #(a, addr_in, c, d, e, f, g, h) s)
+  provisos (Add#(_a, addr_in, addr_out)) // addr_out >= addr_in
+  = mapAXI4_Slave_req_addr (truncate, s);
+
+function AXI4_Slave #(a, b, c, d_, e_, f_, g_, h_)
+  zero_AXI4_Slave_user (AXI4_Slave #(a, b, c, d, e, f, g, h) m) =
+  mapAXI4_Slave_user
+    (constFn (0), constFn (0), constFn (0), constFn (0), constFn (0), m);
 
 /////////////////////////
 // AXI4 "dummy" Slaves //
@@ -857,336 +923,6 @@ module liftAXI4_Slave_Sig
   return ret;
 endmodule
 
-// Truncate addr field of incomming flits
-function AXI4_Slave#(a,b,c,d,e,f,g,h) truncateAddrFields (AXI4_Slave#(a,b_,c,d,e,f,g,h) slv)
-  provisos (Add#(a__, b_, b));
-  return interface AXI4_Slave;
-    interface aw = interface Sink;
-      method canPut = slv.aw.canPut;
-      method put (x) = slv.aw.put(AXI4_AWFlit {
-        awid:     x.awid,
-        awaddr:   truncate(x.awaddr),
-        awlen:    x.awlen,
-        awsize:   x.awsize,
-        awburst:  x.awburst,
-        awlock:   x.awlock,
-        awcache:  x.awcache,
-        awprot:   x.awprot,
-        awqos:    x.awqos,
-        awregion: x.awregion,
-        awuser:   x.awuser
-      });
-    endinterface;
-    interface w = slv.w;
-    interface b = slv.b;
-    interface ar = interface Sink;
-      method canPut = slv.ar.canPut;
-      method put (x) = slv.ar.put(AXI4_ARFlit {
-        arid:     x.arid,
-        araddr:   truncate(x.araddr),
-        arlen:    x.arlen,
-        arsize:   x.arsize,
-        arburst:  x.arburst,
-        arlock:   x.arlock,
-        arcache:  x.arcache,
-        arprot:   x.arprot,
-        arqos:    x.arqos,
-        arregion: x.arregion,
-        aruser:   x.aruser
-      });
-    endinterface;
-    interface r = slv.r;
-  endinterface;
-endfunction
-
-// Truncate addr field of outgoing flits
-function AXI4_Master#(a,b_,c,d,e,f,g,h) truncateAddrFieldsMaster (AXI4_Master#(a,b,c,d,e,f,g,h) mstr)
-  provisos (Add#(a__, b_, b));
-  return interface AXI4_Master;
-    interface aw = interface Source;
-      method canPeek = mstr.aw.canPeek;
-      method peek;
-        AXI4_AWFlit#(a, b,  d) x = mstr.aw.peek;
-        AXI4_AWFlit#(a, b_, d) ret = ?;
-        ret.awid = x.awid;
-        ret.awaddr = truncate(x.awaddr);
-        ret.awlen = x.awlen;
-        ret.awsize = x.awsize;
-        ret.awburst = x.awburst;
-        ret.awlock = x.awlock;
-        ret.awcache = x.awcache;
-        ret.awprot = x.awprot;
-        ret.awqos = x.awqos;
-        ret.awregion = x.awregion;
-        ret.awuser = x.awuser;
-        return ret;
-      endmethod
-      method drop = mstr.aw.drop;
-    endinterface;
-    interface w = mstr.w;
-    interface b = mstr.b;
-    interface ar = interface Source;
-      method canPeek = mstr.ar.canPeek;
-      method peek;
-        AXI4_ARFlit#(a, b,  g) x = mstr.ar.peek;
-        AXI4_ARFlit#(a, b_, g) ret = ?;
-        ret.arid = x.arid;
-        ret.araddr = truncate(x.araddr);
-        ret.arlen = x.arlen;
-        ret.arsize = x.arsize;
-        ret.arburst = x.arburst;
-        ret.arlock = x.arlock;
-        ret.arcache = x.arcache;
-        ret.arprot = x.arprot;
-        ret.arqos = x.arqos;
-        ret.arregion = x.arregion;
-        ret.aruser = x.aruser;
-        return ret;
-      endmethod
-      method drop = mstr.ar.drop;
-    endinterface;
-    interface r = mstr.r;
-  endinterface;
-endfunction
-
-////////////////////
-// ID field utils //
-////////////////////////////////////////////////////////////////////////////////
-
-function AXI4_Master#(id_wide,b,c,d,e,f,g,h) extendIDFields (AXI4_Master#(id_narrow,b,c,d,e,f,g,h) m, Bit#(TSub#(id_wide, id_narrow)) id_top)
-  provisos (Add#(a__, id_narrow, id_wide));
-  return interface AXI4_Master;
-    interface Source aw;
-      method drop = m.aw.drop;
-      method canPeek = m.aw.canPeek;
-      method peek;
-        let x = m.aw.peek;
-        return AXI4_AWFlit {
-          awid:     {id_top, x.awid},
-          awaddr:   x.awaddr,
-          awlen:    x.awlen,
-          awsize:   x.awsize,
-          awburst:  x.awburst,
-          awlock:   x.awlock,
-          awcache:  x.awcache,
-          awprot:   x.awprot,
-          awqos:    x.awqos,
-          awregion: x.awregion,
-          awuser:   x.awuser
-          };
-      endmethod
-    endinterface
-    interface Source w;
-      method drop = m.w.drop;
-      method canPeek = m.w.canPeek;
-      method peek;
-        let x = m.w.peek;
-        return AXI4_WFlit {
-          wdata: x.wdata,
-          wstrb: x.wstrb,
-          wlast: x.wlast,
-          wuser: x.wuser
-        };
-      endmethod
-    endinterface
-    interface Sink b;
-      method canPut = m.b.canPut;
-      method put(x) = m.b.put(AXI4_BFlit {
-        bid:   truncate(x.bid),
-        bresp: x.bresp,
-        buser: x.buser
-      });
-    endinterface
-    interface Source ar;
-      method drop = m.ar.drop;
-      method canPeek = m.ar.canPeek;
-      method peek;
-        let x = m.ar.peek;
-        return AXI4_ARFlit {
-          arid:     {id_top, x.arid},
-          araddr:   x.araddr,
-          arlen:    x.arlen,
-          arsize:   x.arsize,
-          arburst:  x.arburst,
-          arlock:   x.arlock,
-          arcache:  x.arcache,
-          arprot:   x.arprot,
-          arqos:    x.arqos,
-          arregion: x.arregion,
-          aruser:   x.aruser
-          };
-      endmethod
-    endinterface
-    interface Sink r;
-      method canPut = m.r.canPut;
-      method put(x) = m.r.put(AXI4_RFlit {
-        rid:   truncate(x.rid),
-        rdata: x.rdata,
-        rresp: x.rresp,
-        rlast: x.rlast,
-        ruser: x.ruser
-      });
-    endinterface
-  endinterface;
-endfunction
-
-///////////////////////
-// User field utils //
-////////////////////////////////////////////////////////////////////////////////
-
-function AXI4_Master#(a,b,c,d,e,f,g,h) zeroMasterUserFields (AXI4_Master#(a,b,c,d_,e_,f_,g_,h_) m);
-  return interface AXI4_Master;
-    interface Source aw;
-      method drop = m.aw.drop;
-      method canPeek = m.aw.canPeek;
-      method peek;
-        let x = m.aw.peek;
-        return AXI4_AWFlit {
-          awid:     x.awid,
-          awaddr:   x.awaddr,
-          awlen:    x.awlen,
-          awsize:   x.awsize,
-          awburst:  x.awburst,
-          awlock:   x.awlock,
-          awcache:  x.awcache,
-          awprot:   x.awprot,
-          awqos:    x.awqos,
-          awregion: x.awregion,
-          awuser:   0
-          };
-      endmethod
-    endinterface
-    interface Source w;
-      method drop = m.w.drop;
-      method canPeek = m.w.canPeek;
-      method peek;
-        let x = m.w.peek;
-        return AXI4_WFlit {
-          wdata: x.wdata,
-          wstrb: x.wstrb,
-          wlast: x.wlast,
-          wuser: 0
-        };
-      endmethod
-    endinterface
-    interface Sink b;
-      method canPut = m.b.canPut;
-      method put(x) = m.b.put(AXI4_BFlit {
-        bid:   x.bid,
-        bresp: x.bresp,
-        buser: 0
-      });
-    endinterface
-    interface Source ar;
-      method drop = m.ar.drop;
-      method canPeek = m.ar.canPeek;
-      method peek;
-        let x = m.ar.peek;
-        return AXI4_ARFlit {
-          arid:     x.arid,
-          araddr:   x.araddr,
-          arlen:    x.arlen,
-          arsize:   x.arsize,
-          arburst:  x.arburst,
-          arlock:   x.arlock,
-          arcache:  x.arcache,
-          arprot:   x.arprot,
-          arqos:    x.arqos,
-          arregion: x.arregion,
-          aruser:   0
-          };
-      endmethod
-    endinterface
-    interface Sink r;
-      method canPut = m.r.canPut;
-      method put(x) = m.r.put(AXI4_RFlit {
-        rid:   x.rid,
-        rdata: x.rdata,
-        rresp: x.rresp,
-        rlast: x.rlast,
-        ruser: 0
-      });
-    endinterface
-  endinterface;
-endfunction
-
-// Transform a slave that expects zeroed user fields to a slave that ignores user fields
-function AXI4_Slave#(a,b,c,d,e,f,g,h) zeroSlaveUserFields (AXI4_Slave#(a,b,c,d_,e_,f_,g_,h_) slv);
-  return interface AXI4_Slave;
-    interface Sink aw;
-      method canPut = slv.aw.canPut;
-      method Action put (x);
-        slv.aw.put(AXI4_AWFlit {
-          awid: x.awid,
-          awaddr: x.awaddr,
-          awlen: x.awlen,
-          awsize: x.awsize,
-          awburst: x.awburst,
-          awlock: x.awlock,
-          awcache: x.awcache,
-          awprot: x.awprot,
-          awqos: x.awqos,
-          awregion: x.awregion,
-          awuser: 0
-          });
-      endmethod
-    endinterface
-    interface Sink w;
-      method canPut = slv.w.canPut;
-      method Action put (x);
-        slv.w.put(AXI4_WFlit {
-          wdata: x.wdata,
-          wstrb: x.wstrb,
-          wlast: x.wlast,
-          wuser: 0
-        });
-      endmethod
-    endinterface
-    interface Source b;
-      method canPeek = slv.b.canPeek;
-      method peek;
-        return AXI4_BFlit {
-          bid: slv.b.peek.bid,
-          bresp: slv.b.peek.bresp,
-          buser: 0
-          };
-      endmethod
-      method drop = slv.b.drop;
-    endinterface
-    interface Sink ar;
-      method canPut = slv.ar.canPut;
-      method Action put (x);
-        slv.ar.put(AXI4_ARFlit {
-          arid: x.arid,
-          araddr: x.araddr,
-          arlen: x.arlen,
-          arsize: x.arsize,
-          arburst: x.arburst,
-          arlock: x.arlock,
-          arcache: x.arcache,
-          arprot: x.arprot,
-          arqos: x.arqos,
-          arregion: x.arregion,
-          aruser: 0
-          });
-      endmethod
-    endinterface
-    interface Source r;
-      method canPeek = slv.r.canPeek;
-      method peek;
-        return AXI4_RFlit {
-          rid: slv.r.peek.rid,
-          rdata: slv.r.peek.rdata,
-          rresp: slv.r.peek.rresp,
-          rlast: slv.r.peek.rlast,
-          ruser: 0
-          };
-      endmethod
-      method drop = slv.r.drop;
-    endinterface
-  endinterface;
-endfunction
-
 ///////////////////////
 // Width conversions //
 ////////////////////////////////////////////////////////////////////////////////
@@ -1598,73 +1334,3 @@ function AXI4_Slave#(a,b,c,d,e,f,g,h) guard_AXI4_Slave
     interface ar = guardSink(raw.ar, block);
     interface r  = guardSource(raw.r, block);
   endinterface;
-/*
-module mkAXI4_Master_Xactor (AXI4_Master_Xactor#(a, b, c, d, e, f, g, h));
-  let shim <- mkAXI4ShimBypassFIFOF;
-  let master <- toAXI4_Master_Sig(shim.master);
-  let clearing <- mkConfigReg(False);
-  rule do_clear (clearing);
-    shim.clear;
-    clearing <= False;
-  endrule
-  method clear if (!clearing) = action clearing <= True; endaction;
-  interface slave = guard_AXI4_Slave(shim.slave, clearing);
-  interface masterSig = master;
-endmodule
-
-module mkAXI4_Slave_Xactor (AXI4_Slave_Xactor#(a, b, c, d, e, f, g, h));
-  let shim <- mkAXI4ShimBypassFIFOF;
-  let slvSig <- toAXI4_Slave_Sig(shim.slave);
-  let clearing <- mkConfigReg(False);
-  rule do_clear(clearing);
-    shim.clear;
-    clearing <= False;
-  endrule
-  method clear if (!clearing) = action clearing <= True; endaction;
-  interface master = guard_AXI4_Master(shim.master, clearing);
-  interface slaveSig = slvSig;
-endmodule
-
-module mkAXI4_Slave_Widening_Xactor (AXI4_Slave_Width_Xactor#(a, b, c, d, e, f, g, h, i, j, k, l, m, n)) provisos (Add#(c,c,d), Add#(d, _, 128), Add#(a__, SizeOf#(AXI4_Size_Bits), b));
-  let shim <- mkAXI4ShimSizedFIFOF4;
-  let widened_slave <- toWider_AXI4_Slave(shim.slave);
-  let slvSig <- toAXI4_Slave_Sig(zeroSlaveUserFields(widened_slave));
-  let clearing <- mkConfigReg(False);
-  rule do_clear(clearing);
-    shim.clear;
-    clearing <= False;
-  endrule
-  method clear if (!clearing) = action clearing <= True; endaction;
-  interface master = guard_AXI4_Master(shim.master, clearing);
-  interface slaveSig = slvSig;
-endmodule
-
-module mkAXI4_Slave_Zeroing_Xactor (AXI4_Slave_Width_Xactor#(a, b, c, d, e, f, g, h, i, j, k, l, m, n)) provisos (Add#(c,0,d), Add#(d, _, 128), Add#(a__, SizeOf#(AXI4_Size_Bits), b));
-  let shim <- mkAXI4ShimSizedFIFOF4;
-  let slvSig <- toAXI4_Slave_Sig(zeroSlaveUserFields(shim.slave));
-  let clearing <- mkConfigReg(False);
-  rule do_clear(clearing);
-    shim.clear;
-    clearing <= False;
-  endrule
-  method clear if (!clearing) = action clearing <= True; endaction;
-  interface master = guard_AXI4_Master(shim.master, clearing);
-  interface slaveSig = slvSig;
-endmodule
-*/
-
-///////////////////////////
-// AXI4 "no route" slave //
-////////////////////////////////////////////////////////////////////////////////
-
-/*
-module mkNoRouteAXI4_Slave (AXI4_Slave #(a,b,c,d,e,f,g,h));
-  let noRouteWrite <- mkNoRouteSlave;
-  let noRouteRead  <- mkNoRouteSlave;
-  interface aw = noRouteWrite.sink;
-  interface  w = nullSink;
-  interface  b = noRouteWrite.source;
-  interface ar = noRouteRead.sink;
-  interface  r = noRouteRead.source;
-endmodule
-*/
