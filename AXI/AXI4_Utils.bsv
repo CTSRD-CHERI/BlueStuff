@@ -230,7 +230,7 @@ function AXI4_Master #(a, b, c, d_, e_, f_, g_, h_)
 //------------------------------------------------------------------------------
 
 function AXI4_Slave #(a, addr_b, c, d, e, f, g, h)
-  mapAXI4_Slave_req_addr ( function Bit #(addr_a) fun (Bit #(addr_b) x)
+  mapAXI4_Slave_addr ( function Bit #(addr_a) fun (Bit #(addr_b) x)
                          , AXI4_Slave #(a, addr_a, c, d, e, f, g, h) s) =
   interface AXI4_Slave;
     interface aw = mapSink (mapAXI4_AWFlit_awaddr (fun), s.aw);
@@ -272,10 +272,10 @@ function AXI4_Master #(a, addr_out, c, d, e, f, g, h)
   provisos (Add#(_a, addr_out, addr_in)) // addr_in >= addr_out
   = mapAXI4_Master_addr (truncate, m);
 
-function AXI4_Master #(a, addr_out, c, d, e, f, g, h)
-  prepend_AXI4_Master_addr ( Bit #(TSub #(addr_out, addr_in)) upperBits
-                          , AXI4_Master #(a, addr_in, c, d, e, f, g, h) m)
-  provisos (Add#(_a, addr_in, addr_out)); // addr_out >= addr_in
+function AXI4_Master #(a, addr_b, c, d, e, f, g, h)
+  prepend_AXI4_Master_addr ( Bit #(TSub #(addr_b, addr_a)) upperBits
+                          , AXI4_Master #(a, addr_a, c, d, e, f, g, h) m)
+  provisos (Add#(_a, addr_a, addr_b)); // addr_b >= addr_a
   function f (x) = {upperBits, x};
   return mapAXI4_Master_addr (f, m);
 endfunction
@@ -290,7 +290,15 @@ function AXI4_Master #(a, b, c, d_, e_, f_, g_, h_)
 function AXI4_Slave #(a, addr_out, c, d, e, f, g, h)
   truncate_AXI4_Slave_addr (AXI4_Slave #(a, addr_in, c, d, e, f, g, h) s)
   provisos (Add#(_a, addr_in, addr_out)) // addr_out >= addr_in
-  = mapAXI4_Slave_req_addr (truncate, s);
+  = mapAXI4_Slave_addr (truncate, s);
+
+function AXI4_Slave #(a, addr_a, c, d, e, f, g, h)
+  prepend_AXI4_Slave_addr ( Bit #(TSub #(addr_b, addr_a)) upperBits
+                          , AXI4_Slave #(a, addr_b, c, d, e, f, g, h) s)
+  provisos (Add#(_a, addr_a, addr_b)); // addr_b >= addr_b
+  function f (x) = {upperBits, x};
+  return mapAXI4_Slave_addr (f, s);
+endfunction
 
 function AXI4_Slave #(a, b, c, d_, e_, f_, g_, h_)
   zero_AXI4_Slave_user (AXI4_Slave #(a, b, c, d, e, f, g, h) m) =
