@@ -203,7 +203,7 @@ function AXI4_Master #(id_out, b, c, d, e, f, g, h)
 
 function AXI4_Master #(a, addr_out, c, d, e, f, g, h)
   mapAXI4_Master_addr ( function Bit #(addr_out) fun (Bit #(addr_in) x)
-                          , AXI4_Master #(a, addr_in, c, d, e, f, g, h) m) =
+                      , AXI4_Master #(a, addr_in, c, d, e, f, g, h)  m) =
   interface AXI4_Master;
     interface aw = mapSource (mapAXI4_AWFlit_awaddr (fun), m.aw);
     interface  w = m.w;
@@ -231,7 +231,7 @@ function AXI4_Master #(a, b, c, d_, e_, f_, g_, h_)
 
 function AXI4_Slave #(a, addr_b, c, d, e, f, g, h)
   mapAXI4_Slave_addr ( function Bit #(addr_a) fun (Bit #(addr_b) x)
-                         , AXI4_Slave #(a, addr_a, c, d, e, f, g, h) s) =
+                     , AXI4_Slave #(a, addr_a, c, d, e, f, g, h) s) =
   interface AXI4_Slave;
     interface aw = mapSink (mapAXI4_AWFlit_awaddr (fun), s.aw);
     interface  w = s.w;
@@ -1285,6 +1285,84 @@ module toWider_AXI4_Slave #(AXI4_Slave#(id_, addr_,  narrow_, awuser_, wuser_, b
   endrule
 
   return shim.slave;
+endmodule
+
+module sizedSerializeWithId_AXI4_Slave
+  #( Integer writeDepth, Bit #(a) writeId
+   , Integer readDepth, Bit #(a) readId
+   , AXI4_Slave #(a, b, c, d, e, f, g, h) s)
+  (AXI4_Slave #(a_, b, c, d, e, f, g, h));
+  // axi shim
+  let axiShim <- mkAXI4ShimFF;
+  // fifofs of ids
+  let wFF <- mkSizedFIFOF (writeDepth);
+  let rFF <- mkSizedFIFOF (readDepth);
+  // forwarding rules
+  rule forward_aw;
+    let awFlit <- get (axiShim.master.aw);
+    wFF.enq (awFlit.awid);
+    s.aw.put (mapAXI4_AWFlit_awid (constFn (writeId), awFlit));
+  endrule
+  rule forward_w;
+    let wFlit <- get (axiShim.master.w);
+    s.w.put (wFlit);
+  endrule
+  rule forward_b;
+    let bFlit <- get (s.b);
+    axiShim.master.b.put (mapAXI4_BFlit_bid (constFn (wFF.first), bFlit));
+    wFF.deq;
+  endrule
+  rule forward_ar;
+    let arFlit <- get (axiShim.master.ar);
+    rFF.enq (arFlit.arid);
+    s.ar.put (mapAXI4_ARFlit_arid (constFn (readId), arFlit));
+  endrule
+  rule forward_r;
+    let rFlit <- get (s.r);
+    axiShim.master.r.put (mapAXI4_RFlit_rid (constFn (rFF.first), rFlit));
+    rFF.deq;
+  endrule
+  // interface
+  return axiShim.slave;
+endmodule
+
+module sizedSerializeWithId_AXI4_Master
+  #( Integer writeDepth, Bit #(a_) writeId
+   , Integer readDepth, Bit #(a_) readId
+   , AXI4_Master #(a, b, c, d, e, f, g, h) m)
+  (AXI4_Master #(a_, b, c, d, e, f, g, h));
+  // axi shim
+  let axiShim <- mkAXI4ShimFF;
+  // fifofs of ids
+  let wFF <- mkSizedFIFOF (writeDepth);
+  let rFF <- mkSizedFIFOF (readDepth);
+  // forwarding rules
+  rule forward_aw;
+    let awFlit <- get (m.aw);
+    wFF.enq (awFlit.awid);
+    axiShim.slave.aw.put (mapAXI4_AWFlit_awid (constFn (writeId), awFlit));
+  endrule
+  rule forward_w;
+    let wFlit <- get (m.w);
+    axiShim.slave.w.put (wFlit);
+  endrule
+  rule forward_b;
+    let bFlit <- get (axiShim.slave.b);
+    m.b.put (mapAXI4_BFlit_bid (constFn (wFF.first), bFlit));
+    wFF.deq;
+  endrule
+  rule forward_ar;
+    let arFlit <- get (m.ar);
+    rFF.enq (arFlit.arid);
+    axiShim.slave.ar.put (mapAXI4_ARFlit_arid (constFn (readId), arFlit));
+  endrule
+  rule forward_r;
+    let rFlit <- get (axiShim.slave.r);
+    m.r.put (mapAXI4_RFlit_rid (constFn (rFF.first), rFlit));
+    rFF.deq;
+  endrule
+  // interface
+  return axiShim.master;
 endmodule
 
 /////////////////////////////
