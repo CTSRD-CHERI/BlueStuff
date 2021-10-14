@@ -102,16 +102,16 @@ provisos(
   // FShow instances
   /*,FShow#(addr_t), FShow#(data_t)*/
 );
-  if (genC) begin
-    Mem#(addr_t, data_t) mem[1] <- mkMemSim(1, size, file);
-    return mem[0];
-  end else begin
+  `ifdef ALTERA
     let fname = "UNUSED";
     if (isValid(file)) fname = file.Valid;
     BRAM#(idx_sz, data_sz) m <- mkAlteraBRAM(size, fname);
     Mem#(addr_t, data_t) mem <- wrapUnaligned("port 0", m);
     return mem;
-  end
+  `else
+    Mem#(addr_t, data_t) mem[1] <- mkMemSim(1, size, file);
+    return mem[0];
+  `endif
 endmodule
 
 module mkAXI4LiteMem#(Integer size, Maybe#(String) file) (AXI4Lite_Slave#(`PARAMS))

@@ -34,12 +34,12 @@
 #include <math.h>
 
 // general helper functions
-inline unsigned long long div_up(unsigned long long a, unsigned long long b)
+inline unsigned long long div_up (unsigned long long a, unsigned long long b)
 {
   return (a/b)+((a%b)?1:0);
 }
 
-int hexToInt(char c)
+int hexToInt (char c)
 {
   if(c >= '0' && c <= '9') return c - '0';
   if(c >= 'a' && c <= 'f') return c - 'a' + 10;
@@ -47,7 +47,10 @@ int hexToInt(char c)
   return 0;
 }
 
-void print_mem(const unsigned char * const mem, unsigned long long from, unsigned long long to, unsigned long long word_sz)
+void print_mem ( const unsigned char * const mem
+               , unsigned long long from
+               , unsigned long long to
+               , unsigned long long word_sz )
 {
   int i, j;
   int shft = (int) log2(word_sz);
@@ -66,7 +69,7 @@ void print_mem(const unsigned char * const mem, unsigned long long from, unsigne
 
 // HEX file loader functions
 #define MAX_WIDTH 256
-char * parse_hex_line(char * line)
+char * parse_hex_line (char * line)
 {
   char cmt[3] = "//";
   // check for comments
@@ -82,7 +85,7 @@ char * parse_hex_line(char * line)
   return tok;
 }
 
-unsigned long long write_hex_to_buff(char * hexline, unsigned char * buff)
+unsigned long long write_hex_to_buff (char * hexline, unsigned char * buff)
 {
   int i;
   unsigned long long pos = 0;
@@ -125,58 +128,89 @@ void load_hex (const char * filename, unsigned char * buff, unsigned long long b
   fclose(fp);
 }
 
-
 // functions to be used in Bluespec
+////////////////////////////////////////////////////////////////////////////////
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct {
   unsigned char * const data;
   unsigned long long size;
 } mem_t;
 
-unsigned long long mem_create(unsigned int * memSize)
+void * mem_create(unsigned long long memSize)
+//void * mem_create (void * memSize)
 {
+  printf("---- mem_create ----\n");
   mem_t * m = (mem_t *) malloc (sizeof(mem_t));
-  m->size = *((unsigned long long*) memSize);
-  *(unsigned char **)&m->data = (unsigned char *) malloc (m->size * sizeof(unsigned char));
+  m->size = memSize;
+  //m->size = *((unsigned long long*) memSize);
+  *(unsigned char **)&m->data =
+    (unsigned char *) malloc (m->size * sizeof(unsigned char));
+  printf("---- asked memory size of 0x%0llx\n", memSize);
   printf("---- allocated memory size of 0x%0llx\n", m->size);
-  return (unsigned long long) m;
+  printf("---- allocated memory at 0x%0x\n", m->data);
+  return (void *) m;
 }
 
-void mem_init(unsigned long long mem_ptr, char * hexfile, unsigned long long offset)
+void mem_init ( void * mem_ptr
+              , char * hexfile
+              , unsigned long long offset )
 {
+  printf("---- mem_init ----\n");
   mem_t * m = (mem_t *) mem_ptr;
   load_hex(hexfile, &(m->data[offset]), m->size - offset);
   //printf("loaded hex file...\n");
   //print_mem(m->data, 0, 2048, 4);
 }
 
-void mem_zero(unsigned long long mem_ptr)
+void mem_zero (void * mem_ptr)
 {
+  printf("---- mem_zero 0 ----\n");
   mem_t * m = (mem_t *) mem_ptr;
+  printf("---- mem_zero 1 ----\n");
+  printf("---- mem_zero memory size of 0x%0llx\n", m->size);
+  printf("---- mem_zero memory ptr 0x%0x\n", m->data);
   explicit_bzero((void *) m->data, m->size);
+  printf("---- mem_zero 2 ----\n");
 }
 
-void mem_read(unsigned int * ret_data, unsigned long long mem_ptr, unsigned int * addr_ptr, unsigned int * size_ptr)
+void mem_read ( void * ret_data
+              , void * mem_ptr
+              , void * addr_ptr
+              , void * size_ptr )
 {
+  printf("---- mem_read ----\n");
   mem_t * m = (mem_t *) mem_ptr;
-  unsigned long long a = (unsigned long long) *addr_ptr;
-  unsigned long long s = (unsigned long long) *size_ptr;
+  unsigned long long a = * (unsigned long long *) addr_ptr;
+  unsigned long long s = * (unsigned long long *) size_ptr;
   unsigned long long i;
   for (i = 0; i < s; i++)
   {
     ((unsigned char*)(ret_data))[i] = m->data[(a+i)%(m->size)];
-    if (a+i >= m->size) printf("---- @ 0x%0llx >= memory size 0x%0llx, reading from @ 0x%0llx instead\n", a+i, m->size, (a+i)%(m->size));
+    if (a+i >= m->size)
+      printf ( "---- @ 0x%0llx >= memory size 0x%0llx"
+               ", reading from @ 0x%0llx instead\n"
+             , a+i, m->size, (a+i)%(m->size) );
   }
-  //printf("---- reading @ 0x%04x, %d bytes, ret_data = 0x%08x\n", a, s, *ret_data);
+  //printf ("---- reading @ 0x%04x, %d bytes, ret_data = 0x%08x\n"
+  //       , a, s, *ret_data);
   //print_mem(m->data, a - 8, a + 8, 4);
 }
 
-void mem_write(unsigned long long mem_ptr, unsigned int * addr_ptr, unsigned int * size_ptr, unsigned int * be_ptr, unsigned int * data_ptr)
+void mem_write ( void * mem_ptr
+               , void * addr_ptr
+               , void * size_ptr
+               , void * be_ptr
+               , void * data_ptr )
 {
+  printf("---- mem_write ----\n");
   mem_t * m = (mem_t *) mem_ptr;
-  unsigned long long a  = (unsigned long long) *addr_ptr;
-  unsigned long long s  = (unsigned long long) *size_ptr;
-  unsigned long long be = (unsigned long long) *be_ptr;
+  unsigned long long a  = * (unsigned long long *) addr_ptr;
+  unsigned long long s  = * (unsigned long long *) size_ptr;
+  unsigned long long be = * (unsigned long long *) be_ptr;
   unsigned char * d     = (unsigned char *) data_ptr;
 
   unsigned long long i;
@@ -184,15 +218,24 @@ void mem_write(unsigned long long mem_ptr, unsigned int * addr_ptr, unsigned int
   {
     if (be & 0x1) m->data[(a+i)%(m->size)] = d[i];
     be >>= 1;
-    if (a+i >= m->size) printf("---- @ 0x%0llx >= memory size 0x%0llx, writing to @ 0x%0llx instead\n", a+i, m->size, (a+i)%(m->size));
+    if (a+i >= m->size)
+      printf ( "---- @ 0x%0llx >= memory size 0x%0llx"
+               ", writing to @ 0x%0llx instead\n"
+             , a+i, m->size, (a+i)%(m->size) );
   }
 
-  //printf("---- writing @ 0x%04x, %d bytes, be = %08x, data = 0x%08x\n", a, s, be, *d);
+  //printf ("---- writing @ 0x%04x, %d bytes, be = %08x, data = 0x%08x\n"
+  //       , a, s, be, *d);
   //print_mem(m->data, a - 8, a + 8, 4);
 }
 
-void mem_clean(unsigned long long mem_ptr)
+void mem_clean (void * mem_ptr)
 {
-    mem_t * m = (mem_t*) mem_ptr;
-    free(m);
+  printf("---- mem_clean ----\n");
+  mem_t * m = (mem_t*) mem_ptr;
+  free(m);
 }
+
+#ifdef __cplusplus
+}
+#endif

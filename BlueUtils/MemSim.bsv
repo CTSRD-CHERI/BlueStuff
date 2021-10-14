@@ -41,8 +41,7 @@ import SourceSink :: *;
 
 // size expressed in bytes
 
-import "BDPI" mem_create = function ActionValue#(Bit#(64)) mem_create(st s)
-                             provisos (Bits#(st, sw));
+import "BDPI" mem_create = function ActionValue#(Bit#(64)) mem_create(Bit#(64) s);
 import "BDPI" mem_init   = function Action mem_init(
                              Bit#(64) m,
                              String f,
