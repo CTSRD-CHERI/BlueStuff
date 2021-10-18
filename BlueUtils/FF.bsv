@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 2014 Jonathan Woodruff
- * Copyright (c) 2017-2019 Alexandre Joannou
+ * Copyright (c) 2017-2021 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -11,6 +11,13 @@
  * Cambridge Computer Laboratory (Department of Computer Science and
  * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
  * DARPA SSITH research programme.
+ *
+ * This material is based upon work supported by the DoD Information Analysis
+ * Center Program Management Office (DoD IAC PMO), sponsored by the Defense
+ * Technical Information Center (DTIC) under Contract No. FA807518D0004.  Any
+ * opinions, findings and conclusions or recommendations expressed in this
+ * material are those of the author(s) and do not necessarily reflect the views
+ * of the Air Force Installation Contracting Agency (AFICA).
  *
  * @BERI_LICENSE_HEADER_START@
  *
@@ -489,7 +496,8 @@ module mkFFCirc(FF#(data, depth))
 provisos(
     Log#(depth,logDepth),Bits#(data, data_width),
     Add#(a__, TLog#(TDiv#(data_width, 8)), logDepth),
-    Log#(TAdd#(1, TDiv#(data_width, 8)), TAdd#(TLog#(TDiv#(data_width, 8)),1))
+    Log#(TAdd#(1, TDiv#(data_width, 8)), TAdd#(TLog#(TDiv#(data_width, 8)),1)),
+    Add #(_a, logDepth, MemSimMaxAddrSize)
   );
   Mem#(Bit#(logDepth),data) mem <- mkMem(valueOf(depth)*(valueOf(data_width)/8), Invalid); // BRAM
   Reg#(data) latchMemOut[2] <- mkCRegU(2);

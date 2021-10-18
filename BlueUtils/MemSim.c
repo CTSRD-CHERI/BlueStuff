@@ -1,11 +1,18 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2021 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
  * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
  * DARPA SSITH research programme.
+ *
+ * This material is based upon work supported by the DoD Information Analysis
+ * Center Program Management Office (DoD IAC PMO), sponsored by the Defense
+ * Technical Information Center (DTIC) under Contract No. FA807518D0004.  Any
+ * opinions, findings and conclusions or recommendations expressed in this
+ * material are those of the author(s) and do not necessarily reflect the views
+ * of the Air Force Installation Contracting Agency (AFICA).
  *
  * @BERI_LICENSE_HEADER_START@
  *
@@ -135,105 +142,125 @@ void load_hex (const char * filename, unsigned char * buff, unsigned long long b
 extern "C" {
 #endif
 
+#define DEBUG_LVL 2
+
+typedef unsigned char t_byte;
+typedef unsigned long long t_addr;
+typedef unsigned long long t_size;
+typedef unsigned int * t_data_ptr;
+typedef unsigned int * t_be_ptr;
+
 typedef struct {
-  unsigned char * const data;
-  unsigned long long size;
-} mem_t;
+  t_byte * const data;
+  t_size size;
+} t_mem;
 
-void * mem_create(unsigned long long memSize)
-//void * mem_create (void * memSize)
+t_mem * mem_create (t_size memSize)
 {
-  printf("---- mem_create ----\n");
-  mem_t * m = (mem_t *) malloc (sizeof(mem_t));
+  #if (DEBUG_LVL > 0)
+  printf ("---- mem_create ----\n");
+  #endif
+  t_mem * m = (t_mem *) malloc(sizeof(t_mem));
   m->size = memSize;
-  //m->size = *((unsigned long long*) memSize);
-  *(unsigned char **)&m->data =
-    (unsigned char *) malloc (m->size * sizeof(unsigned char));
-  printf("---- asked memory size of 0x%0llx\n", memSize);
-  printf("---- allocated memory size of 0x%0llx\n", m->size);
-  printf("---- allocated memory at 0x%0x\n", m->data);
-  return (void *) m;
+  *(t_byte **)&m->data =
+    (t_byte *) malloc(m->size * sizeof(t_byte));
+  #if (DEBUG_LVL > 1)
+  printf("---- asked for 0x%0llx bytes\n", memSize);
+  printf("---- allocated memory size = 0x%0llx\n", m->size);
+  printf("---- allocated memory      @ 0x%p\n", m->data);
+  #endif
+  return m;
 }
 
-void mem_init ( void * mem_ptr
+void mem_init ( t_mem * mem_ptr
               , char * hexfile
-              , unsigned long long offset )
+              , t_addr offset )
 {
+  #if (DEBUG_LVL > 0)
   printf("---- mem_init ----\n");
-  mem_t * m = (mem_t *) mem_ptr;
-  load_hex(hexfile, &(m->data[offset]), m->size - offset);
-  //printf("loaded hex file...\n");
-  //print_mem(m->data, 0, 2048, 4);
+  #endif
+  load_hex(hexfile, &(mem_ptr->data[offset]), mem_ptr->size - offset);
+  #if (DEBUG_LVL > 2)
+  printf("loaded hex file...\n");
+  print_mem(mem_ptr->data, 0, 2048, 4);
+  #endif
 }
 
-void mem_zero (void * mem_ptr)
+void mem_zero (t_mem * mem_ptr)
 {
-  printf("---- mem_zero 0 ----\n");
-  mem_t * m = (mem_t *) mem_ptr;
-  printf("---- mem_zero 1 ----\n");
-  printf("---- mem_zero memory size of 0x%0llx\n", m->size);
-  printf("---- mem_zero memory ptr 0x%0x\n", m->data);
-  explicit_bzero((void *) m->data, m->size);
-  printf("---- mem_zero 2 ----\n");
+  #if (DEBUG_LVL > 0)
+  printf("---- mem_zero ----\n");
+  #endif
+  explicit_bzero((void *) mem_ptr->data, mem_ptr->size);
 }
 
-void mem_read ( void * ret_data
-              , void * mem_ptr
-              , void * addr_ptr
-              , void * size_ptr )
+void mem_read ( t_data_ptr ret_data_ptr
+              , t_mem * mem_ptr
+              , t_addr addr
+              , t_size size )
 {
+  #if (DEBUG_LVL > 0)
   printf("---- mem_read ----\n");
-  mem_t * m = (mem_t *) mem_ptr;
-  unsigned long long a = * (unsigned long long *) addr_ptr;
-  unsigned long long s = * (unsigned long long *) size_ptr;
-  unsigned long long i;
-  for (i = 0; i < s; i++)
+  #endif
+  #if (DEBUG_LVL > 1)
+  printf("---- mem_read - args       ----\n");
+  printf("---- ret_data_ptr @ 0x%p ----\n", ret_data_ptr);
+  printf("---- mem_ptr      @ 0x%p ----\n", mem_ptr);
+  printf("---- addr         = 0x%llx ----\n", addr);
+  printf("---- size         = 0x%llx ----\n", size);
+  #endif
+  for (t_size i = 0; i < size; i++)
   {
-    ((unsigned char*)(ret_data))[i] = m->data[(a+i)%(m->size)];
-    if (a+i >= m->size)
-      printf ( "---- @ 0x%0llx >= memory size 0x%0llx"
-               ", reading from @ 0x%0llx instead\n"
-             , a+i, m->size, (a+i)%(m->size) );
+    t_addr actual_addr = (addr+i) % (mem_ptr->size);
+    ((t_byte*)ret_data_ptr)[i] = mem_ptr->data[actual_addr];
+    #if (DEBUG_LVL > 1)
+    if (addr+i >= mem_ptr->size)
+      printf( "---- @ 0x%0llx >= memory size 0x%0llx"
+              ", reading 0x%02x from @ 0x%0llx instead\n"
+            , addr+i, mem_ptr->size, mem_ptr->data[actual_addr], actual_addr );
+    #endif
   }
-  //printf ("---- reading @ 0x%04x, %d bytes, ret_data = 0x%08x\n"
-  //       , a, s, *ret_data);
-  //print_mem(m->data, a - 8, a + 8, 4);
 }
 
-void mem_write ( void * mem_ptr
-               , void * addr_ptr
-               , void * size_ptr
-               , void * be_ptr
-               , void * data_ptr )
+void mem_write ( t_mem * mem_ptr
+               , t_addr addr
+               , t_size size
+               , t_be_ptr be_ptr
+               , t_data_ptr data_ptr )
 {
+  #if (DEBUG_LVL > 0)
   printf("---- mem_write ----\n");
-  mem_t * m = (mem_t *) mem_ptr;
-  unsigned long long a  = * (unsigned long long *) addr_ptr;
-  unsigned long long s  = * (unsigned long long *) size_ptr;
-  unsigned long long be = * (unsigned long long *) be_ptr;
-  unsigned char * d     = (unsigned char *) data_ptr;
-
-  unsigned long long i;
-  for (i = 0; i < s; i++)
+  #endif
+  #if (DEBUG_LVL > 1)
+  printf("---- mem_write - args  ----\n");
+  printf("---- mem_ptr  @ 0x%p ----\n", mem_ptr);
+  printf("---- addr     = 0x%llx ----\n", addr);
+  printf("---- size     = 0x%llx ----\n", size);
+  printf("---- be_ptr   @ 0x%p ----\n", be_ptr);
+  printf("---- data_ptr @ 0x%p ----\n", data_ptr);
+  #endif
+  t_byte be = * (t_byte *) be_ptr;
+  t_byte * d = (t_byte *) data_ptr;
+  for (t_size i = 0; i < size; i++)
   {
-    if (be & 0x1) m->data[(a+i)%(m->size)] = d[i];
+    t_addr actual_addr = (addr+i) % (mem_ptr->size);
+    if (be & 0x1) mem_ptr->data[actual_addr] = d[i];
     be >>= 1;
-    if (a+i >= m->size)
-      printf ( "---- @ 0x%0llx >= memory size 0x%0llx"
-               ", writing to @ 0x%0llx instead\n"
-             , a+i, m->size, (a+i)%(m->size) );
+    #if (DEBUG_LVL > 1)
+    if (addr+i >= mem_ptr->size)
+      printf( "---- @ 0x%0llx >= memory size 0x%0llx"
+              ", writing 0x%02x to @ 0x%0llx instead\n"
+            , addr+i, mem_ptr->size, d[i], actual_addr );
+    #endif
   }
-
-  //printf ("---- writing @ 0x%04x, %d bytes, be = %08x, data = 0x%08x\n"
-  //       , a, s, be, *d);
-  //print_mem(m->data, a - 8, a + 8, 4);
 }
 
-void mem_clean (void * mem_ptr)
+void mem_clean (t_mem * mem_ptr)
 {
+  #if (DEBUG_LVL > 0)
   printf("---- mem_clean ----\n");
-  mem_t * m = (mem_t*) mem_ptr;
-  free(m);
+  #endif
+  free(mem_ptr);
 }
 
 #ifdef __cplusplus

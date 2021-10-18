@@ -1,11 +1,18 @@
 /*-
- * Copyright (c) 2018-2019 Alexandre Joannou
+ * Copyright (c) 2018-2021 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
  * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
  * DARPA SSITH research programme.
+ *
+ * This material is based upon work supported by the DoD Information Analysis
+ * Center Program Management Office (DoD IAC PMO), sponsored by the Defense
+ * Technical Information Center (DTIC) under Contract No. FA807518D0004.  Any
+ * opinions, findings and conclusions or recommendations expressed in this
+ * material are those of the author(s) and do not necessarily reflect the views
+ * of the Air Force Installation Contracting Agency (AFICA).
  *
  * @BERI_LICENSE_HEADER_START@
  *
@@ -124,8 +131,8 @@ module wrapUnaligned#(
   BRAM#(idx_sz, chunk_sz) mem
 ) (Mem#(addr_t, content_t)) provisos(
   Bits#(addr_t, addr_sz), Bits#(content_t, content_sz),
-  Div#(chunk_sz, BitsPerByte, chunk_byte_sz),
-  Div#(content_sz, BitsPerByte, content_byte_sz),
+  Div#(chunk_sz, 8, chunk_byte_sz),
+  Div#(content_sz, 8, content_byte_sz),
   Div#(chunk_sz, content_sz, content_per_chunk),
   Log#(content_byte_sz, ofst_sz), Log#(chunk_byte_sz, chunk_ofst_sz),
   Add#(a__, content_sz, chunk_sz), // content must be smaller than or same size as chunk
@@ -136,8 +143,8 @@ module wrapUnaligned#(
   Add#(f__, TAdd#(TLog#(content_byte_sz), 1), TAdd#(chunk_ofst_sz, 1)), // must zeroExtend the countZeroMSB of req writeen
   Add#(g__, ofst_sz, TAdd#(chunk_ofst_sz, 1)), // offset must be smaller than offset of chunk + 1
   // for some reason required at the readBitPo call and when asigning numBytes on writes
-  Log#(TDiv#(content_sz, BitsPerByte), TLog#(content_byte_sz)),
-  Log#(TAdd#(1, TDiv#(content_sz, BitsPerByte)), TAdd#(TLog#(content_byte_sz), 1))
+  Log#(TDiv#(content_sz, 8), TLog#(content_byte_sz)),
+  Log#(TAdd#(1, TDiv#(content_sz, 8)), TAdd#(TLog#(content_byte_sz), 1))
   // FShow instances
   /*,FShow#(addr_t), FShow#(content_t)*/
 );
@@ -164,7 +171,7 @@ module wrapUnaligned#(
     Bit#(chunk_sz) data = ?;
     case (req) matches
       tagged ReadReq .r: begin // read request
-        numBytes = zeroExtend(readBitPO(r.numBytes));
+        numBytes = 1 << r.numBytes; // XX double check r.numBytes < sizeOf numBytes
         idx = truncateLSB(pack(r.addr));
         byteOffset = truncate(pack(r.addr));
       end
@@ -190,13 +197,13 @@ module wrapUnaligned#(
     fromInteger(valueOf(chunk_byte_sz)) - zeroExtend(o);
   function Bit#(chunk_byte_sz) byteMaskAbove (Bit#(chunk_ofst_sz) o) = ~byteMaskBelow(o);
   function Bit#(TAdd#(chunk_ofst_sz, 4)) bitsBelow (Bit#(chunk_ofst_sz) o) =
-    zeroExtend(bytesBelow(o)) << valueOf(TLog#(BitsPerByte));
+    zeroExtend(bytesBelow(o)) << valueOf(TLog#(8));
   function Bit#(chunk_sz) bitMaskBelow (Bit#(chunk_ofst_sz) o) = ~((~0) << bitsBelow(o));
   function Bit#(TAdd#(chunk_ofst_sz, 4)) bitsAbove (Bit#(chunk_ofst_sz) o) =
-    zeroExtend(bytesAbove(o)) << valueOf(TLog#(BitsPerByte));
+    zeroExtend(bytesAbove(o)) << valueOf(TLog#(8));
   function Bit#(chunk_sz) bitMaskAbove (Bit#(chunk_ofst_sz) o) = ~bitMaskBelow(o);
   function Bit#(TAdd#(chunk_ofst_sz, 4)) largeBitsBelow (Bit#(TAdd#(chunk_ofst_sz, 1)) o) =
-    zeroExtend(o) << valueOf(TLog#(BitsPerByte));
+    zeroExtend(o) << valueOf(TLog#(8));
 
   // local state
   //////////////////////////////////////////////////////////////////////////////
