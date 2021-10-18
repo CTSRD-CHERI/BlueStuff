@@ -42,7 +42,10 @@ import FIFO :: *;
 import Connectable :: *;
 
 // die helper
-function Action die (Fmt m) = action $display (m); $finish (0); endaction;
+function Action die (Fmt m) = action
+  $display ("AXI4_AXI4Lite_Bridges.bsv ===> ", m);
+  $finish (0);
+endaction;
 
 ///////////////////////////////////////////
 // simple flit conversion and assertions //
@@ -147,57 +150,100 @@ function Action checkAXI4_AWFlit ( AXI4_Size busSize
                                  , AXI4_AWFlit #(id_, addr_, awuser_) x) =
   action
     if (checkId && x.awid != 0)
-      die ($format("Unsupported awid (0x%0x)", x.awid));
+      die ($format( "checkAXI4_AWFlit - Unsupported non-0 awid (%0d)"
+                  , x.awid
+                  , "\n", fshow (x) ));
     if (x.awlen != 0)
-      die ($format("Unsupported awlen (0x%0x)", x.awlen));
+      die ($format( "checkAXI4_AWFlit - Unsupported non-0 awlen (%0d)"
+                  , x.awlen
+                  , "\n", fshow (x) ));
     if (x.awsize != busSize)
-      die ($format("Unsupported awsize (0x%0x)", x.awsize));
+      die ($format("checkAXI4_AWFlit - Unsupported awsize"
+                  , " (expected: ", showAXI4_Size (busSize)
+                  , ", given: ", showAXI4_Size (x.awsize), ")"
+                  , "\n", fshow (x) ));
     if (x.awburst != FIXED)
-      die ($format("Unsupported awburst (", fshow(x.awburst), ")"));
+      die ($format( "checkAXI4_AWFlit - Unsupported non-FIXED awburst"
+                  , "(", fshow (x.awburst), ")"
+                  , "\n", fshow (x) ));
     if (x.awlock != NORMAL)
-      die ($format("Unsupported awlock (", fshow(x.awlock), ")"));
+      die ($format( "checkAXI4_AWFlit - Unsupported non-NORMAL awlock"
+                  , "(", fshow (x.awlock), ")"
+                  , "\n", fshow (x) ));
     if (x.awcache != 0)
-      die ($format("Unsupported awcache (0x%0x)", x.awcache));
+      die ($format( "checkAXI4_AWFlit - Unsupported non-0 awcache (0x%0x)"
+                  , x.awcache
+                  , "\n", fshow (x) ));
     if (x.awqos != 0)
-      die ($format("Unsupported awqos (0x%0x)", x.awqos));
+      die ($format( "checkAXI4_AWFlit - Unsupported non-0 awqos (%0d)"
+                  , x.awqos
+                  , "\n", fshow (x) ));
     if (x.awregion != 0)
-      die ($format("Unsupported awregion (0x%0x)", x.awregion));
+      die ($format( "checkAXI4_AWFlit - Unsupported non-0 awregion (%0d)"
+                  , x.awregion
+                  , "\n", fshow (x) ));
   endaction;
 function Action checkAXI4_WFlit (AXI4_WFlit #(data_, wuser_) x) = action
   if (x.wlast != True)
-    die ($format("Unsupported wlast (", fshow(x.wlast), ")"));
+    die ($format( "checkAXI4_WFlit - Unsupported non-True wlast"
+                , "(", fshow (x.wlast), ")"
+                , "\n", fshow (x) ));
 endaction;
 function Action checkAXI4_BFlit (Bool checkId, AXI4_BFlit #(id_, buser_) x) =
   action
-    if (checkId && x.bid != 0) die ($format("Unsupported bid (0x%0x)", x.bid));
+    if (checkId && x.bid != 0)
+      die ($format( "checkAXI4_BFlit - Unsupported non-0 bid (%0d)"
+                  , x.bid
+                  , "\n", fshow (x) ));
   endaction;
 function Action checkAXI4_ARFlit ( AXI4_Size busSize
                                  , Bool checkId
                                  , AXI4_ARFlit #(id_, addr_, aruser_) x) =
   action
     if (checkId && x.arid != 0)
-      die ($format("Unsupported arid (0x%0x)", x.arid));
+      die ($format( "checkAXI4_ARFlit - Unsupported non-0 arid (%0d)"
+                  , x.arid
+                  , "\n", fshow (x) ));
     if (x.arlen != 0)
-      die ($format("Unsupported arlen (0x%0x)", x.arlen));
+      die ($format( "checkAXI4_ARFlit - Unsupported non-0 arlen (%0d)"
+                  , x.arlen
+                  , "\n", fshow (x) ));
     if (x.arsize != busSize)
-      die ($format("Unsupported arsize (0x%0x)", x.arsize));
+      die ($format("checkAXI4_ARFlit - Unsupported arsize"
+                  , " (expected: ", showAXI4_Size (busSize)
+                  , ", given: ", showAXI4_Size (x.arsize), ")"
+                  , "\n", fshow (x) ));
     if (x.arburst != FIXED)
-      die ($format("Unsupported arburst (", fshow(x.arburst), ")"));
+      die ($format( "checkAXI4_ARFlit - Unsupported non-FIXED arburst"
+                  , "(", fshow (x.arburst), ")"
+                  , "\n", fshow (x) ));
     if (x.arlock != NORMAL)
-      die ($format("Unsupported arlock (", fshow(x.arlock), ")"));
+      die ($format( "checkAXI4_ARFlit - Unsupported non-NORMAL arlock"
+                  , "(", fshow (x.arlock), ")"
+                  , "\n", fshow (x) ));
     if (x.arcache != 0)
-      die ($format("Unsupported arcache (0x%0x)", x.arcache));
+      die ($format( "checkAXI4_ARFlit - Unsupported non-0 arcache (0x%0x)"
+                  , x.arcache
+                  , "\n", fshow (x) ));
     if (x.arqos != 0)
-      die ($format("Unsupported arqos (0x%0x)", x.arqos));
+      die ($format( "checkAXI4_ARFlit - Unsupported non-0 arqos (%0d)"
+                  , x.arqos
+                  , "\n", fshow (x) ));
     if (x.arregion != 0)
-      die ($format("Unsupported arregion (0x%0x)", x.arregion));
+      die ($format( "checkAXI4_ARFlit - Unsupported non-0 arregion (%0d)"
+                  , x.arregion
+                  , "\n", fshow (x) ));
   endaction;
 function Action checkAXI4_RFlit ( Bool checkId
                                 , AXI4_RFlit #(id_, data_, ruser_) x) = action
   if (checkId && x.rid != 0)
-    die ($format("Unsupported rid (0x%0x)", x.rid));
+    die ($format( "checkAXI4_ARFlit - Unsupported non-0 rid (%0d)"
+                , x.rid
+                , "\n", fshow (x) ));
   if (x.rlast != True)
-    die ($format("Unsupported rlast (", fshow(x.rlast), ")"));
+    die ($format( "checkAXI4_ARFlit - Unsupported non-True rlast"
+                , "(", fshow(x.rlast), ")"
+                , "\n", fshow (x) ));
 endaction;
 
 ///////////////////////////
