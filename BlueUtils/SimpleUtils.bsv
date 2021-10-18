@@ -1,11 +1,18 @@
 /*-
- * Copyright (c) 2018 Alexandre Joannou
+ * Copyright (c) 2018-2021 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
  * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
  * DARPA SSITH research programme.
+ *
+ * This material is based upon work supported by the DoD Information Analysis
+ * Center Program Management Office (DoD IAC PMO), sponsored by the Defense
+ * Technical Information Center (DTIC) under Contract No. FA807518D0004.  Any
+ * opinions, findings and conclusions or recommendations expressed in this
+ * material are those of the author(s) and do not necessarily reflect the views
+ * of the Air Force Installation Contracting Agency (AFICA).
  *
  * @BERI_LICENSE_HEADER_START@
  *
@@ -183,4 +190,13 @@ endfunction
 function Bit#(n) arithRightShift (Bit#(n) a, Bit#(m) b);
   Int#(n) sa = unpack(a);
   return pack(sa >> b);
+endfunction
+
+// "unsafe" resize
+////////////////////////////////////////////////////////////////////////////////
+function Bit #(m) resize (Bit #(n) x);
+  Vector #(m, Bit #(1)) newVec = replicate (0);
+  for (Integer i = 0; i < valueOf (n); i = i + 1)
+    newVec[i] = x[i];
+  return pack (newVec);
 endfunction
