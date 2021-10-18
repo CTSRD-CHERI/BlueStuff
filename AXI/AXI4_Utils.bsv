@@ -1035,8 +1035,15 @@ endmodule
 typedef enum { COMBINE, PAD_FIRST, PAD_LAST } ReadSplitOption deriving (Bits, Eq, FShow);
 
 //Module to double the data width of a slave. Assumes no bursts, data address aligned to data size.
-module toWider_AXI4_Slave #(AXI4_Slave#(id_, addr_,  narrow_, awuser_, wuser_, buser_, aruser_, ruser_) narrow)
-  (AXI4_Slave#(id_, addr_, wide_, awuser_, wuser_, buser_, aruser_, ruser_)) provisos (Add#(narrow_, narrow_, wide_), Add#(wide_, a__, 128), Add#(b__, SizeOf#(AXI4_Size_Bits), addr_));
+module toWider_AXI4_Slave #(AXI4_Slave #( id_, addr_,  narrow_
+                                        , awuser_, wuser_, buser_
+                                        , aruser_, ruser_) narrow)
+                           (AXI4_Slave #( id_, addr_, wide_
+                                        , awuser_, wuser_, buser_
+                                        , aruser_, ruser_))
+  provisos ( Add #(narrow_, narrow_, wide_)
+           , Add#(_a, wide_, 128)
+           , Add#(_b, TExp#(SizeOf#(AXI4_Size)), addr_) );
 
   let debug = False;
 
@@ -1084,8 +1091,10 @@ module toWider_AXI4_Slave #(AXI4_Slave#(id_, addr_,  narrow_, awuser_, wuser_, b
     return addr[halfBitIdx] == 1'b0 && (addr + zeroExtend(fromAXI4_Size(size)) > (addr[valueOf(addr_)-1:halfBitIdx] << halfBitIdx) + (fromInteger(valueOf(narrow_)) >> 3));
   endfunction
 
-  function getFirstSize (addr, size) = crossesBoundary(addr, size) ? toAXI4_Size((fromInteger(valueOf(narrow_)) >> 3) - addr[halfBitIdx-1:0]) : Valid(size);
-  function getSecondSize (addr, size) = toAXI4_Size(fromAXI4_Size(size) - (fromInteger(valueOf(narrow_)) >> 3) + addr[halfBitIdx:0]);
+  function Maybe #(AXI4_Size) getFirstSize (Bit #(addr_) addr, AXI4_Size size) =
+    crossesBoundary(addr, size) ? toAXI4_Size((fromInteger(valueOf(narrow_)) >> 3) - addr[halfBitIdx-1:0]) : Valid(size);
+  function Maybe #(AXI4_Size) getSecondSize (Bit #(addr_) addr, AXI4_Size size) =
+    toAXI4_Size(zeroExtend(fromAXI4_Size(size)) - (fromInteger(valueOf(narrow_)) >> 3) + addr[halfBitIdx:0]);
 
   rule send_first_aw_w (allowWrite);
     lastWasRead <= False;

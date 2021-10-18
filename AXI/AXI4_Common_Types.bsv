@@ -42,17 +42,33 @@ import Printf :: *;
 
 //////////////////////
 // Common AXI types //
-////////////////////////////////////////////////////////////////////////////////
+//////////////////////
 
 // AXI4 burst length (A3-48)
+////////////////////////////////////////////////////////////////////////////////
 typedef Bit#(8) AXI4_Len;
 
 // AXI4 burst size (A3-49)
+////////////////////////////////////////////////////////////////////////////////
+// 2^axisize = number of bytes in a transfer
+// ==> 3-bit AXI4_Size means from 1 (b000, 2^0) to 128 (b111, 2^7) bytes
 typedef struct {
-  Bit#(3) val;
+  Bit #(3) val;
 } AXI4_Size deriving (Bits, Bitwise, Arith, Ord, Eq, FShow);
-instance Literal#(AXI4_Size);
-  function fromInteger(x) = case (x)
+function Integer bytesFromAXI4_Size (AXI4_Size x) = case (x.val)
+  3'b000: 1;
+  3'b001: 2;
+  3'b010: 4;
+  3'b011: 8;
+  3'b100: 16;
+  3'b101: 32;
+  3'b110: 64;
+  3'b111: 128;
+endcase;
+function Fmt showAXI4_Size (AXI4_Size x) =
+  $format (" %0d (0b%03b)", bytesFromAXI4_Size (x), x.val);
+instance Literal #(AXI4_Size);
+  function fromInteger (x) = case (x)
     1:       return AXI4_Size { val: 3'b000 };
     2:       return AXI4_Size { val: 3'b001 };
     4:       return AXI4_Size { val: 3'b010 };
@@ -61,19 +77,21 @@ instance Literal#(AXI4_Size);
     32:      return AXI4_Size { val: 3'b101 };
     64:      return AXI4_Size { val: 3'b110 };
     128:     return AXI4_Size { val: 3'b111 };
-    default: return error(sprintf(
+    default: return error (sprintf (
         "Unsupported AXI4_Size %0d. "
-      + "Supported AXI4_Size values are {1, 2, 4, 8, 16, 32, 64, 128}.",
-      x));
+      + "Supported AXI4_Size values are {1, 2, 4, 8, 16, 32, 64, 128}."
+      , x ));
   endcase;
-  function inLiteralRange(_, x) = case (x)
+  function inLiteralRange (_, x) = case (x)
     1, 2, 4, 8, 16, 32, 64, 128: return True;
     default: return False;
   endcase;
 endinstance
-typedef Bit#(TExp#(SizeOf#(AXI4_Size))) AXI4_Size_Bits;
-function AXI4_Size_Bits fromAXI4_Size (AXI4_Size sz) = (1 << pack(sz));
-function Maybe#(AXI4_Size) toAXI4_Size(AXI4_Size_Bits sz);
+
+function Bit #(TExp#(SizeOf#(AXI4_Size))) fromAXI4_Size (AXI4_Size sz) =
+  1 << pack(sz);
+
+function Maybe #(AXI4_Size) toAXI4_Size (Bit #(TExp#(SizeOf#(AXI4_Size))) sz);
   case (sz)
     1: return Valid(1);
     2: return Valid(2);
@@ -86,6 +104,7 @@ function Maybe#(AXI4_Size) toAXI4_Size(AXI4_Size_Bits sz);
     default: return Invalid;
   endcase
 endfunction
+
 /*
 instance Arith#(AXI4_Size);
   function   \+ (x, y) = unpack(\+ (pack(x), pack(y)));
@@ -118,16 +137,19 @@ endinstance
 */
 
 // AXI4 burst type (A3-49)
+////////////////////////////////////////////////////////////////////////////////
 typedef enum {
   FIXED = 2'b00, INCR = 2'b01, WRAP = 2'b10, Res = 2'b11
 } AXI4_Burst deriving (Bits, Eq, FShow);
 
 // AXI4 locked accesses (A7-101)
+////////////////////////////////////////////////////////////////////////////////
 typedef enum {
   NORMAL = 1'b0, EXCLUSIVE = 1'b1
 } AXI4_Lock deriving (Bits, Eq, FShow);
 
 // AXI4 memory types (A4-69)
+////////////////////////////////////////////////////////////////////////////////
 typedef Bit #(4)  AXI4_Cache;
 
 AXI4_Cache  arcache_dev_nonbuf           = 4'b0000;
@@ -157,6 +179,7 @@ AXI4_Cache  awcache_wback_w_alloc        = 4'b1111;
 AXI4_Cache  awcache_wback_r_w_alloc      = 4'b1111;
 
 // AXI4 access permissions (A4-75)
+////////////////////////////////////////////////////////////////////////////////
 typedef enum {
   DATA = 1'b0, INST = 1'b1
 } AXI4_Prot_2 deriving (Bits, Eq, FShow);
@@ -171,17 +194,21 @@ function AXI4_Prot axi4Prot(AXI4_Prot_2 x, AXI4_Prot_1 y, AXI4_Prot_0 z) =
   unpack({pack(x), pack(y), pack(z)});
 
 // AXI4 QoS signaling (A8-104)
+////////////////////////////////////////////////////////////////////////////////
 typedef Bit#(4) AXI4_QoS;
 
 // AXI4 multiple region signaling (A8-105)
+////////////////////////////////////////////////////////////////////////////////
 typedef Bit#(4) AXI4_Region;
 
 // AXI4 read and write response structure (A3-59)
+////////////////////////////////////////////////////////////////////////////////
 typedef enum {
   OKAY = 2'b00, EXOKAY = 2'b01, SLVERR = 2'b10, DECERR = 2'b11
 } AXI4_Resp deriving (Bits, Eq, FShow);
 
-// return an interface acting as a dead end
+// CulDeSac interface, acting as a dead end
+////////////////////////////////////////////////////////////////////////////////
 typeclass CulDeSac#(type t);
   function t culDeSac;
 endtypeclass
