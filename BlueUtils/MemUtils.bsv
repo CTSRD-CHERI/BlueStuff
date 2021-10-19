@@ -41,8 +41,8 @@ import SourceSink :: *;
 import MasterSlave :: *;
 import FIFO :: *;
 
-////////////////
-// 1 port Mem //
+///////////////////
+// 1 port memory //
 ////////////////////////////////////////////////////////////////////////////////
 
 module mkMem #(Integer size, Maybe #(String) file) (Mem #(addr_t, data_t))
@@ -63,10 +63,39 @@ module mkMem #(Integer size, Maybe #(String) file) (Mem #(addr_t, data_t))
   `endif
 endmodule
 
-module mkAXI4LiteMem #(Integer size, Maybe #(String) file)
-                      (AXI4Lite_Slave #( addr_sz, data_sz
-                                       , awuser_sz, wuser_sz, buser_sz
-                                       , aruser_sz, ruser_sz ))
+////////////////////
+// 2 ports memory //
+////////////////////////////////////////////////////////////////////////////////
+
+module mkMem2 #(Integer size, Maybe #(String) file)
+               (Array #(Mem #(addr_t, data_t)))
+  provisos ( Bits #(addr_t, addr_sz)
+           , Bits #(data_t, data_sz)
+           , Add #(idx_sz, TLog #(TDiv #(data_sz, 8)), addr_sz)
+           , Log #( TAdd #(1, TDiv #(data_sz, 8))
+                  , TAdd #(TLog #(TDiv #(data_sz, 8)), 1) )
+           , Add #(_a, addr_sz, MemSimMaxAddrSize) );
+  `ifdef ALTERA
+    BRAM2 #(idx_sz, data_sz, idx_sz, data_sz)
+      m <- mkAlteraBRAM2 (size, fromMaybe ("UNUSED", file));
+    Mem #(addr_t, data_t) mem[2];
+    mem[0] <- wrapUnaligned ("port0", m.p0);
+    mem[1] <- wrapUnaligned ("port1", m.p1);
+    return mem;
+  `else
+    Mem #(addr_t, data_t) mem[2] <- mkMemSim (2, size, file);
+    return mem;
+  `endif
+endmodule
+
+///////////////////////
+// AXI4Lite memories //
+////////////////////////////////////////////////////////////////////////////////
+
+module mkAXI4LiteSimpleMem #(Integer size, Maybe #(String) file)
+                            (AXI4Lite_Slave #( addr_sz, data_sz
+                                             , awuser_sz, wuser_sz, buser_sz
+                                             , aruser_sz, ruser_sz ))
   provisos ( Log #( TAdd #(1, TDiv #(data_sz, 8))
                   , TAdd #(TLog #(TDiv #(data_sz, 8)), 1) )
            , Add #(_a, TLog #(TDiv #(data_sz, 8)), addr_sz)
@@ -80,10 +109,55 @@ module mkAXI4LiteMem #(Integer size, Maybe #(String) file)
   return ifc;
 endmodule
 
-module mkAXI4Mem #(Integer size, Maybe #(String) file)
-                  (AXI4_Slave #( id_sz, addr_sz, data_sz
-                               , awuser_sz, wuser_sz, buser_sz
-                               , aruser_sz, ruser_sz ))
+module mkAXI4LiteMem #(Integer size, Maybe #(String) file)
+                      (AXI4Lite_Slave #( addr_sz, data_sz
+                                       , awuser_sz, wuser_sz, buser_sz
+                                       , aruser_sz, ruser_sz ))
+  provisos ( Log #( TAdd #(1, TDiv #(data_sz, 8))
+                  , TAdd #(TLog #(TDiv #(data_sz, 8)), 1) )
+           , Add #(_a, TLog #(TDiv #(data_sz, 8)), addr_sz)
+           , Add #(_b, TLog #(TDiv #(data_sz, 8)), data_sz)
+           , Add #(_d, addr_sz, MemSimMaxAddrSize) );
+  Mem #(Bit #(addr_sz), Bit #(data_sz)) mem[2] <- mkMem2 (size, file);
+  AXI4Lite_Slave #( addr_sz, data_sz
+                  , awuser_sz, wuser_sz, buser_sz
+                  , aruser_sz, ruser_sz) ifc;
+  ifc <- mkMem2ToAXI4Lite_Slave (mem);
+  return ifc;
+endmodule
+
+module mkAXI4LiteMem2 #(Integer size, Maybe #(String) file)
+                       (Array #(AXI4Lite_Slave #( addr_sz, data_sz
+                                                , awuser_sz, wuser_sz, buser_sz
+                                                , aruser_sz, ruser_sz )))
+  provisos ( Log #( TAdd #(1, TDiv #(data_sz, 8))
+                  , TAdd #(TLog #(TDiv #(data_sz, 8)), 1) )
+           , Add #(_a, TLog #(TDiv #(data_sz, 8)), addr_sz)
+           , Add #(_b, TLog #(TDiv #(data_sz, 8)), data_sz)
+           , Add #(_d, addr_sz, MemSimMaxAddrSize) );
+  Mem #(Bit #(addr_sz), Bit #(data_sz)) mem[2] <- mkMem2 (size, file);
+  Mem #(Bit #(addr_sz), Bit #(data_sz)) portA[2];
+  portA[0] = mem[0];
+  portA[1] = mem[0];
+  Mem #(Bit #(addr_sz), Bit #(data_sz)) portB[2];
+  portB[0] = mem[1];
+  portB[1] = mem[1];
+  AXI4Lite_Slave #( addr_sz, data_sz
+                  , awuser_sz, wuser_sz, buser_sz
+                  , aruser_sz, ruser_sz) ifcs[2];
+  ifcs[0] <- mkMem2ToAXI4Lite_Slave (portA);
+  ifcs[1] <- mkMem2ToAXI4Lite_Slave (portB);
+  return ifcs;
+endmodule
+
+///////////////////
+// AXI4 memories //
+////////////////////////////////////////////////////////////////////////////////
+
+module mkAXI4SimpleMem #(Integer size, Maybe #(String) file)
+                        (AXI4_Slave #( id_sz, addr_sz, data_sz
+                                     , awuser_sz, wuser_sz, buser_sz
+                                     , aruser_sz, ruser_sz ))
   provisos ( NumAlias #(axiNumBytes_fat_sz, TExp #(SizeOf #(AXI4_Size)))
            , NumAlias #( numBytes_sz
                        , TMax #( 1
@@ -106,52 +180,10 @@ module mkAXI4Mem #(Integer size, Maybe #(String) file)
   return ifc;
 endmodule
 
-///////////////////////////
-// 2 ports shared memory //
-////////////////////////////////////////////////////////////////////////////////
-
-module mkSharedMem2 #(Integer size, Maybe #(String) file)
-                     (Array #(Mem #(addr_t, data_t)))
-  provisos ( Bits #(addr_t, addr_sz)
-           , Bits #(data_t, data_sz)
-           , Add #(idx_sz, TLog #(TDiv #(data_sz, 8)), addr_sz)
-           , Log #( TAdd #(1, TDiv #(data_sz, 8))
-                  , TAdd #(TLog #(TDiv #(data_sz, 8)), 1) )
-           , Add #(_a, addr_sz, MemSimMaxAddrSize) );
-  `ifdef ALTERA
-    BRAM2 #(idx_sz, data_sz, idx_sz, data_sz)
-      m <- mkAlteraBRAM2 (size, fromMaybe ("UNUSED", file));
-    Mem #(addr_t, data_t) mem[2];
-    mem[0] <- wrapUnaligned ("port0", m.p0);
-    mem[1] <- wrapUnaligned ("port1", m.p1);
-    return mem;
-  `else
-    Mem #(addr_t, data_t) mem[2] <- mkMemSim (2, size, file);
-    return mem;
-  `endif
-endmodule
-
-module mkAXI4LiteSharedMem2 #(Integer size, Maybe #(String) file)
-                             (AXI4Lite_Slave #( addr_sz, data_sz
-                                              , awuser_sz, wuser_sz, buser_sz
-                                              , aruser_sz, ruser_sz ))
-  provisos ( Log #( TAdd #(1, TDiv #(data_sz, 8))
-                  , TAdd #(TLog #(TDiv #(data_sz, 8)), 1) )
-           , Add #(_a, TLog #(TDiv #(data_sz, 8)), addr_sz)
-           , Add #(_b, TLog #(TDiv #(data_sz, 8)), data_sz)
-           , Add #(_d, addr_sz, MemSimMaxAddrSize) );
-  Mem #(Bit #(addr_sz), Bit #(data_sz)) mem[2] <- mkSharedMem2 (size, file);
-  AXI4Lite_Slave #( addr_sz, data_sz
-                  , awuser_sz, wuser_sz, buser_sz
-                  , aruser_sz, ruser_sz) ifc;
-  ifc <- mkMem2ToAXI4Lite_Slave (mem);
-  return ifc;
-endmodule
-
-module mkAXI4SharedMem2 #(Integer size, Maybe #(String) file)
-                         (AXI4_Slave #( id_sz, addr_sz, data_sz
-                                      , awuser_sz, wuser_sz, buser_sz
-                                      , aruser_sz, ruser_sz ))
+module mkAXI4Mem #(Integer size, Maybe #(String) file)
+                  (AXI4_Slave #( id_sz, addr_sz, data_sz
+                               , awuser_sz, wuser_sz, buser_sz
+                               , aruser_sz, ruser_sz ))
   provisos ( NumAlias #(axiNumBytes_fat_sz, TExp #(SizeOf #(AXI4_Size)))
            , NumAlias #( numBytes_sz
                        , TMax #( 1
@@ -166,12 +198,45 @@ module mkAXI4SharedMem2 #(Integer size, Maybe #(String) file)
            , Add #(_b, byteIdx_sz, addr_sz)
            , Add #(_c, numBytes_sz, SizeOf #(AXI4_Size))
            , Add #(_d, addr_sz, MemSimMaxAddrSize) );
-  Mem #(Bit #(addr_sz), Bit #(data_sz)) mem[2] <- mkSharedMem2 (size, file);
+  Mem #(Bit #(addr_sz), Bit #(data_sz)) mem[2] <- mkMem2 (size, file);
   AXI4_Slave #( id_sz, addr_sz, data_sz
               , awuser_sz, wuser_sz, buser_sz
               , aruser_sz, ruser_sz) ifc;
   ifc <- mkMem2ToAXI4_Slave (mem);
   return ifc;
+endmodule
+
+module mkAXI4Mem2 #(Integer size, Maybe #(String) file)
+                   (Array #(AXI4_Slave #( id_sz, addr_sz, data_sz
+                                        , awuser_sz, wuser_sz, buser_sz
+                                        , aruser_sz, ruser_sz )))
+  provisos ( NumAlias #(axiNumBytes_fat_sz, TExp #(SizeOf #(AXI4_Size)))
+           , NumAlias #( numBytes_sz
+                       , TMax #( 1
+                               , TLog #(TAdd #( 1
+                                              , TLog #(TDiv #(data_sz, 8))))))
+           , NumAlias #(data_byte_sz, TDiv #(data_sz, 8))
+           , NumAlias #(byteIdx_sz, TLog #(data_byte_sz))
+           , Log #( TAdd #(1, TDiv #(data_sz, 8))
+                  , TAdd #(TLog #(TDiv #(data_sz, 8)), 1))
+           , Log #(data_byte_sz, byteIdx_sz)
+           , Add #(_a, axiNumBytes_fat_sz, addr_sz)
+           , Add #(_b, byteIdx_sz, addr_sz)
+           , Add #(_c, numBytes_sz, SizeOf #(AXI4_Size))
+           , Add #(_d, addr_sz, MemSimMaxAddrSize) );
+  Mem #(Bit #(addr_sz), Bit #(data_sz)) mem[2] <- mkMem2 (size, file);
+  Mem #(Bit #(addr_sz), Bit #(data_sz)) portA[2];
+  portA[0] = mem[0];
+  portA[1] = mem[0];
+  Mem #(Bit #(addr_sz), Bit #(data_sz)) portB[2];
+  portB[0] = mem[1];
+  portB[1] = mem[1];
+  AXI4_Slave #( id_sz, addr_sz, data_sz
+              , awuser_sz, wuser_sz, buser_sz
+              , aruser_sz, ruser_sz) ifcs[2];
+  ifcs[0] <- mkMem2ToAXI4_Slave (portA);
+  ifcs[1] <- mkMem2ToAXI4_Slave (portB);
+  return ifcs;
 endmodule
 
 //////////////////////////
