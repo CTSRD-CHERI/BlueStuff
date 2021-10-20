@@ -44,19 +44,21 @@ import SourceSink :: *;
 // 16550 register map on 2 AXI4Lite slave interfaces. Each can be memory
 // mapped in AXI4Lite masters' address spaces to allow for simple communication.
 
-// The mkAXI4_Fake_16550_Half module presents a (not complete) 16550 interface
+// The mkAXI4_Fake_16550 module presents a (not complete) 16550 interface
 // through an AXI4 lite slave, and exposes two AXI4 stream interfaces for the
-// rx and tx channels as well as an interrupt line
-module mkAXI4_Fake_16550_Half (
+// rx and tx channels as well as an interrupt line.
+// Note that the registers are byte wide registers, and have been remapped to
+// be 4 bytes appart to be accessible easily on a 32-bit wide AXI4Lite bus.
+module mkAXI4_Fake_16550 (
   Tuple4 #( AXI4Lite_Slave #( addr_, data_
                             , awuser_, wuser_, buser_, aruser_, ruser_)
           , AXI4Stream_Master #(txId, txData, txDest, txUser)
           , AXI4Stream_Slave #(rxId, rxData, rxDest, rxUser)
           , ReadOnly #(Bool) ))
-  provisos ( Add#(a__, txData, data_)
-           , Add#(b__, rxData, data_)
-           , Add#(c__, 8, data_)
-           , Add#(d__, 4, addr_) );
+  provisos ( Add#(_a, txData, data_)
+           , Add#(_b, rxData, data_)
+           , Add#(_c, 8, data_)
+           , Add#(_d, 4, addr_) );
 
   // transaction buffers
   AXI4Stream_Shim #(txId, txData, txDest, txUser) txShim <- mkAXI4StreamShimFF;
@@ -66,6 +68,9 @@ module mkAXI4_Fake_16550_Half (
   // internal state / wires
   Reg #(Bit #(8))   regIER <- mkReg (8'b00000000);
   Reg #(Bit #(8))   regSCR <- mkRegU;
+  Reg #(Bit #(8))   regLCR <- mkReg (8'b00000000);
+  Reg #(Bit #(8))   regDLR_LSB <- mkRegU;
+  Reg #(Bit #(8))   regDLR_MSB <- mkRegU;
   Wire #(Bit #(8)) wireIIR <- mkDWire (8'b00000000);
   PulseWire       pulseIrq <- mkPulseWire;
 
@@ -100,27 +105,37 @@ module mkAXI4_Fake_16550_Half (
   // read requests handling
   rule read_req;
     let r <- get (axiShim.master.ar);
-    let rsp = AXI4Lite_RFlit { rdata: ?
+    let rsp = AXI4Lite_RFlit { rdata: 0
                              , rresp: OKAY
                              , ruser: ? };
-    case (truncate (r.araddr))
-      4'h0: begin // RBR: Receiver Buffer Register
-        rsp.rdata = zeroExtend (rxData);
-        if (rxShim.master.canPeek) rxDropData.send;
+    case (r.araddr[4:2])
+      3'h0: begin
+        if (regLCR[0] == 0) begin // RBR: Receiver Buffer Register
+          rsp.rdata = zeroExtend (rxData);
+          if (rxShim.master.canPeek) rxDropData.send;
+        end else // DLR (LSB): Divisor Latch Register (LSB)
+          rsp.rdata = zeroExtend (regDLR_LSB);
       end
-      4'h1: // IER: Interrupt Enable Register
-        rsp.rdata = zeroExtend (regIER);
-      4'h2: // IIR: Interrupt Identification Register
+      3'h1: begin
+        if (regLCR[0] == 0) // IER: Interrupt Enable Register
+          rsp.rdata = zeroExtend (regIER);
+        else // DLR (MSB): Divisor Latch Register (MSB)
+          rsp.rdata = zeroExtend (regDLR_MSB);
+      end
+      3'h2: // IIR: Interrupt Identification Register
         rsp.rdata = zeroExtend (wireIIR);
-      4'h5: // LSR: Line Statur Register
+      3'h3: // LCR: LINE CONTROL REGISTER
+        rsp.rdata = zeroExtend (regLCR);
+      3'h5: // LSR: Line Statur Register
         rsp.rdata = zeroExtend ({ 2'b00
                                 , pack (txShim.slave.canPut)
                                 , 4'b0000
                                 , pack (rxShim.master.canPeek) });
-      4'h7: // SCR: Scratch Register
+      3'h7: // SCR: Scratch Register
         rsp.rdata = zeroExtend (regSCR);
       default:
-        rsp.rresp = SLVERR;
+        //rsp.rresp = SLVERR;
+        noAction;
     endcase
     axiShim.master.r.put (rsp);
   endrule
@@ -131,15 +146,26 @@ module mkAXI4_Fake_16550_Half (
     let w <- get (axiShim.master.w);
     let rsp = AXI4Lite_BFlit { bresp: OKAY
                              , buser: ? };
-    case (truncate (aw.awaddr))
-      4'h0: // THR: Transmitter Holding Register
-        wireTxData <= truncate (w.wdata);
-      4'h1: // IER: Interrupt Enable Register
-        regIER <= truncate (w.wdata);
-      4'h7: // SCR: Scratch Register
+    if (w.wstrb[0] == 1'b1) case (aw.awaddr[4:2])
+      3'h0: begin
+        if (regLCR[0] == 0) // THR: Transmitter Holding Register
+          wireTxData <= truncate (w.wdata);
+        else // DLR (LSB): Divisor Latch Register (LSB)
+          regDLR_LSB <= truncate (w.wdata);
+      end
+      3'h1: begin
+        if (regLCR[0] == 0) // IER: Interrupt Enable Register
+          regIER <= truncate (w.wdata);
+        else // DLR (MSB): Divisor Latch Register (MSB)
+          regDLR_MSB <= truncate (w.wdata);
+      end
+      3'h3: // LCR: LINE CONTROL REGISTER
+        regLCR <= truncate (w.wdata);
+      3'h7: // SCR: Scratch Register
         regSCR <= truncate (w.wdata);
       default:
-        rsp.bresp = SLVERR;
+        //rsp.bresp = SLVERR;
+        noAction;
     endcase
     axiShim.master.b.put (rsp);
   endrule
@@ -151,7 +177,7 @@ module mkAXI4_Fake_16550_Half (
                 , pulseWireToReadOnly (pulseIrq) );
 endmodule
 
-// The mkAXI4_Fake_16550_Pair module instantiates two mkAXI4_Fake_16550_Half
+// The mkAXI4_Fake_16550_Pair module instantiates two mkAXI4_Fake_16550
 // modules and connects their rx and tx streams, and returns the two remaining
 // AXI4 lite slave interfaces together with their irq line
 module mkAXI4_Fake_16550_Pair (
@@ -163,9 +189,9 @@ module mkAXI4_Fake_16550_Pair (
                                       , awuser1_, wuser1_, buser1_
                                       , aruser1_, ruser1_)
                     , ReadOnly #(Bool) )))
-  provisos ( Add #(a__, 4, addr0_)
-           , Add #(b__, 4, addr1_)
-           , Add #(c__, 8, data_)
+  provisos ( Add #(_a, 4, addr0_)
+           , Add #(_b, 4, addr1_)
+           , Add #(_c, 8, data_)
            , Add #(0, data0_, data1_)
            , NumAlias #(data0_, data_) );
   Tuple4 #( AXI4Lite_Slave #( addr0_, data0_
@@ -173,14 +199,14 @@ module mkAXI4_Fake_16550_Pair (
           , AXI4Stream_Master #(0, data_, 0, 0)
           , AXI4Stream_Slave #(0, data_, 0, 0)
           , ReadOnly #(Bool) )
-    half0 <- mkAXI4_Fake_16550_Half;
+    half0 <- mkAXI4_Fake_16550;
   match {.slv0, .tx0, .rx0, .irq0} = half0;
   Tuple4 #( AXI4Lite_Slave #( addr1_, data1_
                             , awuser1_, wuser1_, buser1_, aruser1_, ruser1_)
           , AXI4Stream_Master #(0, data_, 0, 0)
           , AXI4Stream_Slave #(0, data_, 0, 0)
           , ReadOnly #(Bool) )
-    half1 <- mkAXI4_Fake_16550_Half;
+    half1 <- mkAXI4_Fake_16550;
   match {.slv1, .tx1, .rx1, .irq1} = half1;
   mkConnection (tx0, rx1);
   mkConnection (tx1, rx0);
