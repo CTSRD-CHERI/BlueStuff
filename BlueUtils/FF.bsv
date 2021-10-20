@@ -494,10 +494,13 @@ endmodule
 // An unguarded circular FIFO with predictable "overfill" behaviour.
 module mkFFCirc(FF#(data, depth))
 provisos(
+    NumAlias #(nbChunks, TDiv #(data_width, SizeOf #(MemSimDataT))),
     Log#(depth,logDepth),Bits#(data, data_width),
     Add#(a__, TLog#(TDiv#(data_width, 8)), logDepth),
     Log#(TAdd#(1, TDiv#(data_width, 8)), TAdd#(TLog#(TDiv#(data_width, 8)),1)),
-    Add #(_a, logDepth, MemSimMaxAddrSize)
+    Add #(_a, logDepth, MemSimMaxAddrSize),
+    Add #(_b, TDiv #(data_width, 8), TMul #(nbChunks, 8)),
+    Add #(_c, data_width, TMul #(nbChunks, SizeOf #(MemSimDataT)))
   );
   Mem#(Bit#(logDepth),data) mem <- mkMem(valueOf(depth)*(valueOf(data_width)/8), Invalid); // BRAM
   Reg#(data) latchMemOut[2] <- mkCRegU(2);

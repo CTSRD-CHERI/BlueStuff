@@ -142,13 +142,13 @@ void load_hex (const char * filename, unsigned char * buff, unsigned long long b
 extern "C" {
 #endif
 
-#define DEBUG_LVL 2
+#define DEBUG_LVL 0
 
 typedef unsigned char t_byte;
 typedef unsigned long long t_addr;
 typedef unsigned long long t_size;
-typedef unsigned int * t_data_ptr;
-typedef unsigned int * t_be_ptr;
+typedef unsigned long long t_data;
+typedef unsigned char t_be;
 
 typedef struct {
   t_byte * const data;
@@ -194,25 +194,24 @@ void mem_zero (t_mem * mem_ptr)
   explicit_bzero((void *) mem_ptr->data, mem_ptr->size);
 }
 
-void mem_read ( t_data_ptr ret_data_ptr
-              , t_mem * mem_ptr
-              , t_addr addr
-              , t_size size )
+t_data mem_read ( t_mem * mem_ptr
+                , t_addr addr
+                , t_size size )
 {
   #if (DEBUG_LVL > 0)
   printf("---- mem_read ----\n");
   #endif
   #if (DEBUG_LVL > 1)
   printf("---- mem_read - args       ----\n");
-  printf("---- ret_data_ptr @ 0x%p ----\n", ret_data_ptr);
   printf("---- mem_ptr      @ 0x%p ----\n", mem_ptr);
   printf("---- addr         = 0x%llx ----\n", addr);
   printf("---- size         = 0x%llx ----\n", size);
   #endif
+  t_data data = 0;
   for (t_size i = 0; i < size; i++)
   {
     t_addr actual_addr = (addr+i) % (mem_ptr->size);
-    ((t_byte*)ret_data_ptr)[i] = mem_ptr->data[actual_addr];
+    ((t_byte*)&data)[i] = mem_ptr->data[actual_addr];
     #if (DEBUG_LVL > 1)
     if (addr+i >= mem_ptr->size)
       printf( "---- @ 0x%0llx >= memory size 0x%0llx"
@@ -220,13 +219,13 @@ void mem_read ( t_data_ptr ret_data_ptr
             , addr+i, mem_ptr->size, mem_ptr->data[actual_addr], actual_addr );
     #endif
   }
+  return data;
 }
 
 void mem_write ( t_mem * mem_ptr
                , t_addr addr
-               , t_size size
-               , t_be_ptr be_ptr
-               , t_data_ptr data_ptr )
+               , t_be be
+               , t_data data )
 {
   #if (DEBUG_LVL > 0)
   printf("---- mem_write ----\n");
@@ -235,22 +234,19 @@ void mem_write ( t_mem * mem_ptr
   printf("---- mem_write - args  ----\n");
   printf("---- mem_ptr  @ 0x%p ----\n", mem_ptr);
   printf("---- addr     = 0x%llx ----\n", addr);
-  printf("---- size     = 0x%llx ----\n", size);
-  printf("---- be_ptr   @ 0x%p ----\n", be_ptr);
-  printf("---- data_ptr @ 0x%p ----\n", data_ptr);
+  printf("---- be       = 0x%x ----\n", be);
+  printf("---- data     = 0x%llx ----\n", data);
   #endif
-  t_byte be = * (t_byte *) be_ptr;
-  t_byte * d = (t_byte *) data_ptr;
-  for (t_size i = 0; i < size; i++)
+  for (t_size i = 0; i < 8; i++)
   {
     t_addr actual_addr = (addr+i) % (mem_ptr->size);
-    if (be & 0x1) mem_ptr->data[actual_addr] = d[i];
+    if (be & 0x1) mem_ptr->data[actual_addr] = ((t_byte*)&data)[i];
     be >>= 1;
     #if (DEBUG_LVL > 1)
     if (addr+i >= mem_ptr->size)
       printf( "---- @ 0x%0llx >= memory size 0x%0llx"
               ", writing 0x%02x to @ 0x%0llx instead\n"
-            , addr+i, mem_ptr->size, d[i], actual_addr );
+            , addr+i, mem_ptr->size, ((t_byte*)&data)[i], actual_addr );
     #endif
   }
 }

@@ -59,6 +59,7 @@ SIMEXAMPLES = $(addprefix sim, $notdir($(basename $(SIMEXAMPLESSRC))))
 VERILOGEXAMPLESSRC = $(EXAMPLESDIR)/Example-AXI4-MasterSlave.bsv
 VERILOGEXAMPLESSRC += $(EXAMPLESDIR)/Example-AXI4Lite-MasterSlave.bsv
 VERILOGEXAMPLES = $(addprefix verilog, $(notdir $(basename $(VERILOGEXAMPLESSRC))))
+CFILES = $(BLUEUTILSDIR)/MemSim.c
 
 all: simExamples verilogExamples
 
@@ -69,7 +70,7 @@ simExample-%: $(EXAMPLESDIR)/Example-%.bsv
 	mkdir -p $(OUTPUTDIR)/$@-info $(BDIR) $(SIMDIR)
 	#$(BSC) -cpp -Xcpp -I. -info-dir $(OUTPUTDIR)/$@-info -simdir $(SIMDIR) $(BSCFLAGS) -sim -g top -u $<
 	$(BSC) -info-dir $(OUTPUTDIR)/$@-info -simdir $(SIMDIR) $(BSCFLAGS) -sim -g top -u $<
-	CC=$(CC) CXX=$(CXX) $(BSC) -simdir $(SIMDIR) $(BSCFLAGS) -sim -e top -o $(OUTPUTDIR)/$@
+	$(BSC) -simdir $(SIMDIR) $(BSCFLAGS) -sim -e top -o $(OUTPUTDIR)/$@ $(CFILES)
 	dot -Tsvg $(OUTPUTDIR)/$@-info/top_combined.dot > $(OUTPUTDIR)/$@-info/top_combined.svg
 	dot -Tsvg $(OUTPUTDIR)/$@-info/top_combined_full.dot > $(OUTPUTDIR)/$@-info/top_combined_full.svg
 	dot -Tsvg $(OUTPUTDIR)/$@-info/top_conflict.dot > $(OUTPUTDIR)/$@-info/top_conflict.svg

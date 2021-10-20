@@ -37,6 +37,7 @@ import MemTypes :: *;
 
 import Printf :: *;
 import FIFO :: *;
+import Vector :: *;
 import SpecialFIFOs :: *;
 import Clocks :: *;
 
@@ -49,43 +50,51 @@ import SourceSink :: *;
 
 typedef 64 MemSimMaxAddrSize;
 
-typedef Bit #(64) MemCHandle;
-typedef Bit #(MemSimMaxAddrSize) AddrT;
-typedef Bit #(64) SizeT;
+typedef Bit #(64) MemSimCHandle;
+typedef Bit #(64) MemSimSizeT;
+typedef Bit #(MemSimMaxAddrSize) MemSimAddrT;
+typedef Bit #(8) MemSimAccessSizeT;
+typedef Bit #(64) MemSimDataT;
+// this is broken in bsc version untagged-gb37e90ec (build b37e90ec)
+// typedef Bit #(TDiv #(SizeOf #(MemSimDataT), 8)) MemSimByteEnT;
+// using this instead
+typedef Bit #(8) MemSimByteEnT;
 
 import "BDPI" mem_create =
-  function ActionValue #(MemCHandle) mem_create (SizeT byteSize);
+  function ActionValue #(MemSimCHandle) mem_create (MemSimSizeT byteSize);
+
 import "BDPI" mem_init =
-  function Action mem_init (MemCHandle men, String hexFile, AddrT offset);
-import "BDPI" mem_zero = function Action mem_zero (MemCHandle mem);
+  function Action mem_init ( MemSimCHandle mem
+                           , String hexFile
+                           , MemSimAddrT offset );
+
+import "BDPI" mem_zero = function Action mem_zero (MemSimCHandle mem);
 import "BDPI" mem_read =
-  //function ActionValue #(data_t) mem_read ( MemCHandle mem
-  function data_t mem_read ( MemCHandle mem
-                           , AddrT addr
-                           , SizeT byteSize )
-  provisos (Bits #(data_t, data_sz));
+  function ActionValue #(MemSimDataT) mem_read ( MemSimCHandle mem
+                                               , MemSimAddrT addr
+                                               , MemSimAccessSizeT byteSize );
 import "BDPI" mem_write =
-  function Action mem_write ( MemCHandle mem
-                            , AddrT addr
-                            , SizeT byteSize
-                            , byteEn_t byteEn
-                            , data_t data )
-  provisos ( Bits #(byteEn_t, byteEn_sz)
-           , Bits #(data_t, data_sz) );
+  function Action mem_write ( MemSimCHandle mem
+                            , MemSimAddrT addr
+                            , MemSimByteEnT byteEn
+                            , MemSimDataT data );
 
 module mkMemSimWithOffset #( Integer nIfcs
                            , Integer offset
                            , Integer size
                            , Maybe #(String) file)
   (Array #(Mem #(addr_t, data_t)))
-  provisos ( Bits #(addr_t, addr_sz)
+  provisos ( NumAlias #(nbChunks, TDiv #(data_sz, SizeOf #(MemSimDataT)))
+           , Bits #(addr_t, addr_sz)
            , Bits #(data_t, data_sz)
-           , Add #(_a, addr_sz, MemSimMaxAddrSize) );
+           , Add #(_a, addr_sz, MemSimMaxAddrSize)
+           , Add #(_b, TDiv #(data_sz, 8), TMul #(nbChunks, 8))
+           , Add #(_c, data_sz, TMul #(nbChunks, SizeOf #(MemSimDataT))) );
 
   // sanitize size input
-  SizeT actualSize = fromInteger (size);
+  MemSimSizeT actualSize = fromInteger (size);
   if (2**(log2 (size)) != size) begin
-    SizeT powerOf2Size = fromInteger (2**(log2 (size) + 1));
+    MemSimSizeT powerOf2Size = fromInteger (2**log2 (size));
     errorM (sprintf ( "Error: mkMemSimWithOffset called with non-power-of 2"
                     + " size %0d (nearest power-of-2 is %0d)"
                     , actualSize, powerOf2Size ));
@@ -94,9 +103,9 @@ module mkMemSimWithOffset #( Integer nIfcs
   let clk <- exposeCurrentClock;
   let rst <- mkReset (0, False, clk);
 
-  Reg #(MemCHandle) memCHandle <- mkRegU;
-  Reg #(Bool)     isAllocated <- mkSyncReg (False, clk, rst.new_rst, clk);
-  Reg #(Bool)   isInitialized <- mkReg (False);
+  Reg #(MemSimCHandle) memCHandle <- mkRegU;
+  Reg #(Bool)         isAllocated <- mkSyncReg (False, clk, rst.new_rst, clk);
+  Reg #(Bool)       isInitialized <- mkReg (False);
 
   rule do_alloc (!isAllocated);
     let tmp <- mem_create (actualSize);
@@ -111,6 +120,20 @@ module mkMemSimWithOffset #( Integer nIfcs
     isInitialized <= True;
   endrule
 
+  // helper functions for simulated memory accesses
+  // addresses
+  function memAddrs (base, i) = zeroExtend (pack (base) + fromInteger (8*i));
+  // elements read
+  function memReadElem (nBytes, addr, i);
+    if (i == 0) return mem_read (memCHandle, addr, 8'h01 << nBytes[1:0]);
+    else if (fromInteger ((i+1)*8) <= (1 << nBytes))
+      return mem_read (memCHandle, addr, 8'h08);
+      else return actionvalue return 0; endactionvalue;
+  endfunction
+  // element write
+  function memWriteElem (addr, be, d) =
+    (be == 0) ? noAction : mem_write (memCHandle, addr, be, d);
+
   Mem #(addr_t, data_t) ifcs[nIfcs];
   for (Integer i = 0; i < nIfcs; i = i + 1) begin
     FIFO #(MemRsp #(data_t)) rsp <- mkPipelineFIFO;
@@ -120,20 +143,19 @@ module mkMemSimWithOffset #( Integer nIfcs
         method put (req) if (isInitialized) = action
           case (offsetMemReq (req, fromInteger (-offset))) matches
             tagged ReadReq .r: begin
-              //let res <- mem_read ( memCHandle
-              //                    , zeroExtend (pack (r.addr))
-              //                    , 64'b1 << r.numBytes );
-              let res = mem_read ( memCHandle
-                                 , zeroExtend (pack (r.addr))
-                                 , 64'b1 << r.numBytes );
-              rsp.enq (ReadRsp (res));
+              Vector #(nbChunks, MemSimDataT)
+                res <- zipWithM ( memReadElem (r.numBytes)
+                                , genWith (memAddrs (r.addr))
+                                , genVector );
+              rsp.enq (ReadRsp (unpack (truncate (pack (res)))));
             end
             tagged WriteReq .w: begin
-              mem_write ( memCHandle
-                        , zeroExtend (pack (w.addr))
-                        , fromInteger (valueOf (TDiv #(data_sz, 8)))
-                        , w.byteEnable
-                        , w.data );
+              Vector #(nbChunks, MemSimAddrT) as = genWith (memAddrs (w.addr));
+              Vector #(nbChunks, MemSimByteEnT)
+                bes = unpack (zeroExtend (pack (w.byteEnable)));
+              Vector #(nbChunks, MemSimDataT)
+                ds = unpack (zeroExtend (pack (w.data)));
+              let _ <- zipWith3M (memWriteElem, as, bes, ds);
               rsp.enq (WriteRsp);
             end
           endcase
@@ -153,9 +175,12 @@ endmodule
 
 module mkMemSim #(Integer nIfcs, Integer size, Maybe #(String) file)
   (Array #(Mem #(addr_t, data_t)))
-  provisos ( Bits #(addr_t, addr_sz)
+  provisos ( NumAlias #(nbChunks, TDiv #(data_sz, SizeOf #(MemSimDataT)))
+           , Bits #(addr_t, addr_sz)
            , Bits #(data_t, data_sz)
-           , Add #(_a, addr_sz, MemSimMaxAddrSize) );
+           , Add #(_a, addr_sz, MemSimMaxAddrSize)
+           , Add #(_b, TDiv #(data_sz, 8), TMul #(nbChunks, 8))
+           , Add #(_c, data_sz, TMul #(nbChunks, SizeOf #(MemSimDataT))) );
   let mem <- mkMemSimWithOffset (nIfcs, 0, size, file);
   return mem;
 endmodule

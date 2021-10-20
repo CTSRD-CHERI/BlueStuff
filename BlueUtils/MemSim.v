@@ -36,15 +36,13 @@ import "DPI-C" function void mem_init ( chandle mem_ptr
 
 import "DPI-C" function void mem_zero (chandle mem_ptr);
 
-import "DPI-C" function void mem_read ( chandle ret_data
-                                      , chandle mem_ptr
-                                      , longint unsigned addr
-                                      , longint unsigned size );
+import "DPI-C" function longint unsigned mem_read ( chandle mem_ptr
+                                                  , longint unsigned addr
+                                                  , longint unsigned size );
 
 import "DPI-C" function void mem_write ( chandle mem_ptr
                                        , longint unsigned addr
-                                       , longint unsigned size
-                                       , chandle be_ptr
-                                       , chandle data_ptr );
+                                       , byte be
+                                       , longint unsigned data );
 
 import "DPI-C" function void mem_clean (chandle mem_ptr);
