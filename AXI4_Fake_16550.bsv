@@ -80,7 +80,7 @@ module mkAXI4_Fake_16550 (
   rule rx_read_data; rxData <= rxShim.master.peek.tdata; endrule
   PulseWire rxDropData <- mkPulseWire;
   (* fire_when_enabled *)
-  rule rx_drop_data; rxShim.master.drop; endrule
+  rule rx_drop_data (rxDropData); rxShim.master.drop; endrule
 
   // tx handling
   Wire #(Bit #(txData)) wireTxData <- mkWire;
