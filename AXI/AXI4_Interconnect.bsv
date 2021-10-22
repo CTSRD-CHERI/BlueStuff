@@ -26,17 +26,22 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
-import List :: *;
+package AXI4_Interconnect;
+
+export mkAXI4Bus;
+export mkAXI4Bus_Sig;
+
+import List   :: *;
 import Vector :: *;
 import Printf :: *;
 
-import AXI4_Types :: *;
-import AXI4_Utils :: *;
-import SourceSink :: *;
-import MasterSlave :: *;
-import ListExtra :: *;
+import AXI4_Types   :: *;
+import AXI4_Utils   :: *;
+import SourceSink   :: *;
+import MasterSlave  :: *;
+import ListExtra    :: *;
 import Interconnect :: *;
-import Routable :: *;
+import Routable     :: *;
 
 //////////////
 // AXI4 bus //
@@ -83,12 +88,12 @@ module mkAXI4Bus #(
     // merge from write masters
     let merged <- mergeWrite (masters[i].aw, masters[i].w);
     write_masters[i] = interface Master;
-      interface source = merged;
-      interface sink   = masters[i].b;
+      interface req = merged;
+      interface rsp = masters[i].b;
     endinterface;
-    read_masters[i]    = interface Master;
-      interface source = masters[i].ar;
-      interface sink   = masters[i].r;
+    read_masters[i] = interface Master;
+      interface req = masters[i].ar;
+      interface rsp = masters[i].r;
     endinterface;
   end
 
@@ -104,12 +109,12 @@ module mkAXI4Bus #(
     // split to write slaves
     let split <- splitWrite (slaves[i].aw, slaves[i].w);
     write_slaves[i] = interface Slave;
-      interface sink   = split;
-      interface source = slaves[i].b;
+      interface req = split;
+      interface rsp = slaves[i].b;
     endinterface;
     read_slaves[i] = interface Slave;
-      interface sink   = slaves[i].ar;
-      interface source = slaves[i].r;
+      interface req = slaves[i].ar;
+      interface rsp = slaves[i].r;
     endinterface;
   end
 
@@ -118,6 +123,8 @@ module mkAXI4Bus #(
   mkRelaxedTwoWayBus (route, read_masters,  read_slaves);
 
 endmodule
+
+endpackage
 
 `undef PARAMS
 `undef MPARAMS

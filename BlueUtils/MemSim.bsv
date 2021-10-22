@@ -33,19 +33,24 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
-import MemTypes :: *;
+package MemSim;
 
-import Printf :: *;
-import FIFO :: *;
-import Vector :: *;
+export mkMemSim;
+export mkMemSimWithOffset;
+export MemSimMaxAddrSize;
+export MemSimDataT;
+
+import FIFO         :: *;
+import Vector       :: *;
+import Printf       :: *;
+import Clocks       :: *;
 import SpecialFIFOs :: *;
-import Clocks :: *;
 
+import MemTypes    :: *;
+import SourceSink  :: *;
 import MasterSlave :: *;
-import SourceSink :: *;
 
-///////////////////////
-// Simulation memory //
+// Types and BDPI interface functions
 ////////////////////////////////////////////////////////////////////////////////
 
 typedef 64 MemSimMaxAddrSize;
@@ -55,9 +60,11 @@ typedef Bit #(64) MemSimSizeT;
 typedef Bit #(MemSimMaxAddrSize) MemSimAddrT;
 typedef Bit #(8) MemSimAccessSizeT;
 typedef Bit #(64) MemSimDataT;
+// XXX
 // this is broken in bsc version untagged-gb37e90ec (build b37e90ec)
 // typedef Bit #(TDiv #(SizeOf #(MemSimDataT), 8)) MemSimByteEnT;
 // using this instead
+// XXX
 typedef Bit #(8) MemSimByteEnT;
 
 import "BDPI" mem_create =
@@ -78,6 +85,9 @@ import "BDPI" mem_write =
                             , MemSimAddrT addr
                             , MemSimByteEnT byteEn
                             , MemSimDataT data );
+
+// Simulation memory with explicit offset
+////////////////////////////////////////////////////////////////////////////////
 
 module mkMemSimWithOffset #( Integer nIfcs
                            , Integer offset
@@ -138,7 +148,7 @@ module mkMemSimWithOffset #( Integer nIfcs
   for (Integer i = 0; i < nIfcs; i = i + 1) begin
     FIFO #(MemRsp #(data_t)) rsp <- mkPipelineFIFO;
     ifcs[i] = interface Slave;
-      interface sink = interface Sink;
+      interface req = interface Sink;
         method canPut = isInitialized;
         method put (req) if (isInitialized) = action
           case (offsetMemReq (req, fromInteger (-offset))) matches
@@ -161,7 +171,7 @@ module mkMemSimWithOffset #( Integer nIfcs
           endcase
         endaction;
       endinterface;
-      interface source = interface Source;
+      interface rsp = interface Source;
         method canPeek = isInitialized;
         method peek if (isInitialized) = rsp.first;
         method drop if (isInitialized) = rsp.deq;
@@ -172,6 +182,9 @@ module mkMemSimWithOffset #( Integer nIfcs
   return ifcs;
 
 endmodule
+
+// Simulation memory
+////////////////////////////////////////////////////////////////////////////////
 
 module mkMemSim #(Integer nIfcs, Integer size, Maybe #(String) file)
   (Array #(Mem #(addr_t, data_t)))
@@ -184,3 +197,5 @@ module mkMemSim #(Integer nIfcs, Integer size, Maybe #(String) file)
   let mem <- mkMemSimWithOffset (nIfcs, 0, size, file);
   return mem;
 endmodule
+
+endpackage

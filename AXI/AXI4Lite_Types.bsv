@@ -732,13 +732,13 @@ instance FallibleRoute #( AXI4Lite_WriteFlit #(addr_, data_, awuser_, wuser_)
       AXI4Lite_WriteFlit #(addr_, data_, awuser_, wuser_)
     , AXI4Lite_BFlit #(buser_)));
     Reg #(Bool) send_rsp[2] <- mkCReg (2, False);
-    interface sink = interface Sink;
+    interface req = interface Sink;
       method canPut = !send_rsp[0];
-      method put (req) if (!send_rsp[0]) = action
+      method put (x) if (!send_rsp[0]) = action
         send_rsp[0] <= True;
       endaction;
     endinterface;
-    interface source = interface Source;
+    interface rsp = interface Source;
       method canPeek = send_rsp[1];
       method peek if (send_rsp[1]) = AXI4Lite_BFlit { bresp: DECERR, buser: ? };
       method drop if (send_rsp[1]) = writeReg (send_rsp[1], False);
@@ -754,13 +754,13 @@ provisos ( Bits #(down_t, down_t_sz) );
     WithMetaInfo #(AXI4Lite_WriteFlit #(addr_, data_, awuser_, wuser_), down_t)
   , WithRouteInfo #(AXI4Lite_BFlit #(buser_), down_t)));
     Reg #(Maybe #(down_t)) m_send_rsp[2] <- mkCReg (2, Invalid);
-    interface sink = interface Sink;
+    interface req = interface Sink;
       method canPut = !isValid (m_send_rsp[0]);
-      method put (req) if (!isValid (m_send_rsp[0])) = action
-        m_send_rsp[0] <= Valid (req.metaInfo);
+      method put (x) if (!isValid (m_send_rsp[0])) = action
+        m_send_rsp[0] <= Valid (x.metaInfo);
       endaction;
     endinterface;
-    interface source = interface Source;
+    interface rsp = interface Source;
       method canPeek = isValid (m_send_rsp[1]);
       method peek if (isValid (m_send_rsp[1])) =
         WithRouteInfo { routeInfo: m_send_rsp[1].Valid
@@ -777,13 +777,13 @@ instance FallibleRoute #( AXI4Lite_ARFlit #(addr_, aruser_)
       AXI4Lite_ARFlit #(addr_, aruser_)
     , AXI4Lite_RFlit #(data_, ruser_)));
     Reg #(Bool) send_rsp[2] <- mkCReg (2, False);
-    interface sink = interface Sink;
+    interface req = interface Sink;
       method canPut = !send_rsp[0];
-      method put (req) if (!send_rsp[0]) = action
+      method put (x) if (!send_rsp[0]) = action
         send_rsp[0] <= True;
       endaction;
     endinterface;
-    interface source = interface Source;
+    interface rsp = interface Source;
       method canPeek = send_rsp[1];
       method peek if (send_rsp[1]) = AXI4Lite_RFlit { rdata: ?
                                                     , rresp: DECERR
@@ -801,13 +801,13 @@ provisos ( Bits #(down_t, down_t_sz) );
     WithMetaInfo #(AXI4Lite_ARFlit #(addr_, aruser_), down_t)
   , WithRouteInfo #(AXI4Lite_RFlit #(data_, ruser_), down_t)));
     Reg #(Maybe #(down_t)) m_send_rsp[2] <- mkCReg (2, Invalid);
-    interface sink = interface Sink;
+    interface req = interface Sink;
       method canPut = !isValid (m_send_rsp[0]);
-      method put (req) if (!isValid (m_send_rsp[0])) = action
-        m_send_rsp[0] <= Valid (req.metaInfo);
+      method put (x) if (!isValid (m_send_rsp[0])) = action
+        m_send_rsp[0] <= Valid (x.metaInfo);
       endaction;
     endinterface;
-    interface source = interface Source;
+    interface rsp = interface Source;
       method canPeek = isValid (m_send_rsp[1]);
       method peek if (isValid (m_send_rsp[1])) =
         WithRouteInfo { routeInfo: m_send_rsp[1].Valid

@@ -33,13 +33,28 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
-import MemTypes :: *;
-import MemBRAM :: *;
-import MemSim :: *;
-import AXI :: *;
-import SourceSink :: *;
+package MemUtils;
+
+export mkMem;
+export mkMem2;
+
+export mkMem2ToAXI4_Slave;
+export mkAXI4SimpleMem;
+export mkAXI4Mem;
+export mkAXI4Mem2;
+
+export mkMem2ToAXI4Lite_Slave;
+export mkAXI4LiteSimpleMem;
+export mkAXI4LiteMem;
+export mkAXI4LiteMem2;
+
+import AXI         :: *;
+import FIFO        :: *;
+import MemSim      :: *;
+import MemBRAM     :: *;
+import MemTypes    :: *;
+import SourceSink  :: *;
 import MasterSlave :: *;
-import FIFO :: *;
 
 ///////////////////
 // 1 port memory //
@@ -298,13 +313,13 @@ module mkMem2ToAXI4Lite_Slave #(Array #(Mem #(addr_t, data_t)) mem)
     AXI4Lite_WFlit #(data_sz, wuser_sz) wflit <- get (shim.master.w);
     Bit #(byteIdx_sz) byteShift = truncate (awflit.awaddr);
     let bitShift = {byteShift, 3'b000};
-    mem[0].sink.put (
+    mem[0].req.put (
       tagged WriteReq { addr: unpack (awflit.awaddr)
                       , byteEnable: unpack (wflit.wstrb) >> byteShift
                       , data: unpack (wflit.wdata >> bitShift) });
   endrule
-  rule writeRsp (mem[0].source.peek matches tagged WriteRsp);
-    mem[0].source.drop;
+  rule writeRsp (mem[0].rsp.peek matches tagged WriteRsp);
+    mem[0].rsp.drop;
     shim.master.b.put (AXI4Lite_BFlit { bresp: OKAY, buser: ? });
   endrule
 
@@ -313,13 +328,13 @@ module mkMem2ToAXI4Lite_Slave #(Array #(Mem #(addr_t, data_t)) mem)
 
   rule readReq;
     let arflit <- get (shim.master.ar);
-    mem[1].sink.put (
+    mem[1].req.put (
       tagged ReadReq { addr: unpack (arflit.araddr)
                      , numBytes: fromInteger (log2 (valueOf (data_byte_sz))) });
     readFF.enq ({truncate (arflit.araddr), 3'b000});
   endrule
-  rule readRsp (mem[1].source.peek matches tagged ReadRsp .rsp);
-    mem[1].source.drop;
+  rule readRsp (mem[1].rsp.peek matches tagged ReadRsp .rsp);
+    mem[1].rsp.drop;
     readFF.deq;
     shim.master.r.put (
       AXI4Lite_RFlit { rdata: pack (rsp) << readFF.first
@@ -400,7 +415,7 @@ module mkMem2ToAXI4_Slave #(Array #(Mem #(addr_t, data_t)) mem)
     // perform the memory write
     Bit #(byteIdx_sz) byteShift = truncate (awflit.awaddr);
     let bitShift = {byteShift, 3'b000};
-    mem[0].sink.put (
+    mem[0].req.put (
       tagged WriteReq { addr: unpack (addr)
                       , byteEnable: unpack (wflit.wstrb) >> byteShift
                       , data: unpack (wflit.wdata >> bitShift) });
@@ -413,8 +428,8 @@ module mkMem2ToAXI4_Slave #(Array #(Mem #(addr_t, data_t)) mem)
                                   , buser: ? });
   endrule
   // inner memory should be drained of its write responses not to block
-  rule drainInternalWriteRsp (mem[0].source.peek matches tagged WriteRsp);
-    mem[0].source.drop;
+  rule drainInternalWriteRsp (mem[0].rsp.peek matches tagged WriteRsp);
+    mem[0].rsp.drop;
   endrule
 
   // handle AXI4 read requests
@@ -442,14 +457,14 @@ module mkMem2ToAXI4_Slave #(Array #(Mem #(addr_t, data_t)) mem)
     // update the address register
     arAddrReg <= nextAddr (arflit.arburst, arflit.arsize, addr);
     // perform the memory read and notify the response rule
-    mem[1].sink.put (
+    mem[1].req.put (
       tagged ReadReq { addr: unpack (addr)
                      , numBytes: truncate (pack (arflit.arsize)) });
     readFF.enq (tuple3 (arflit.arid, {truncate (addr), 3'b000}, isLast));
   endrule
   // send individual AXI4 RFlit responses
-  rule readRsp (mem[1].source.peek matches tagged ReadRsp .rsp);
-    mem[1].source.drop;
+  rule readRsp (mem[1].rsp.peek matches tagged ReadRsp .rsp);
+    mem[1].rsp.drop;
     match {.arid, .bitShift, .isLast} = readFF.first;
     readFF.deq;
     shim.master.r.put (AXI4_RFlit { rid: arid
@@ -462,3 +477,5 @@ module mkMem2ToAXI4_Slave #(Array #(Mem #(addr_t, data_t)) mem)
   // return the slave interface
   return shim.slave;
 endmodule
+
+endpackage

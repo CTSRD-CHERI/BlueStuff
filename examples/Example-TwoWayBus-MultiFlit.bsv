@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2020 Alexandre Joannou
+ * Copyright (c) 2018-2021 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -80,11 +80,11 @@ endinstance
 instance FallibleRoute #(ReqFat, RspFat);
   module mkNoRouteSlave (Slave #( ReqFat, RspFat));
     let ff <- mkFIFOF1;
-    interface sink = interface Sink;
+    interface req = interface Sink;
       method  canPut = ff.notFull;
       method put (x) = ff.enq (x.routeInfo);
     endinterface;
-    interface source = interface Source;
+    interface rsp = interface Source;
       method canPeek = ff.notEmpty;
       method peek if (ff.notEmpty) = RspFat { routeInfo: ff.first
                                             , payload:  Rsp { status: KO } };
@@ -111,8 +111,8 @@ module mkMaster (Master#(Req, Rsp));
     end else cnt <= cnt + 1;
     $display("%0t -- Master sending ", $time, fshow(req));
   endrule
-  interface source = toSource(ff);
-  interface sink = interface Sink;
+  interface req = toSource(ff);
+  interface rsp = interface Sink;
     method put(x) if (reqSent) = action
       $display("%0t -- Master received ", $time, fshow(x));
       reqSent <= False;
@@ -125,7 +125,7 @@ endmodule
 
 module mkSlave (Slave#(ReqFat, RspFat));
   let ff <- mkFIFOF;
-  interface sink = interface Sink;
+  interface req = interface Sink;
     method put(x) = action
       $display("%0t -- -- -- Slave received ", $time, fshow(x));
       if (isLast (x)) begin
@@ -136,7 +136,7 @@ module mkSlave (Slave#(ReqFat, RspFat));
     endaction;
     method canPut = ff.notFull;
   endinterface;
-  interface source = toSource(ff);
+  interface rsp = toSource(ff);
 endmodule
 
 module top (Empty);

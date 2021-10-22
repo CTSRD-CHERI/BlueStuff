@@ -26,17 +26,21 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
-import List :: *;
+package AXI4Lite_Interconnect;
+
+export mkAXI4LiteBus;
+export mkAXI4LiteBus_Sig;
+
+import List   :: *;
 import Vector :: *;
 import Printf :: *;
 
+import Routable       :: *;
+import SourceSink     :: *;
+import MasterSlave    :: *;
+import Interconnect   :: *;
 import AXI4Lite_Types :: *;
 import AXI4Lite_Utils :: *;
-import SourceSink :: *;
-import MasterSlave :: *;
-//import ListExtra :: *;
-import Interconnect :: *;
-import Routable :: *;
 
 //////////////////
 // AXI Lite bus //
@@ -78,12 +82,12 @@ module mkAXI4LiteBus #(
     Bit #(TLog #(nMasters)) mid = fromInteger (i);
     // merge from write masters
     write_masters[i] = interface Master;
-      interface source = mergeLiteWrite (masters[i].aw, masters[i].w);
-      interface sink   = masters[i].b;
+      interface req = mergeLiteWrite (masters[i].aw, masters[i].w);
+      interface rsp = masters[i].b;
     endinterface;
-    read_masters[i]    = interface Master;
-      interface source = masters[i].ar;
-      interface sink   = masters[i].r;
+    read_masters[i] = interface Master;
+      interface req = masters[i].ar;
+      interface rsp = masters[i].r;
     endinterface;
   end
 
@@ -98,12 +102,12 @@ module mkAXI4LiteBus #(
   for (Integer i = 0; i < valueOf (nSlaves); i = i + 1) begin
     // split to write slaves
     write_slaves[i] = interface Slave;
-      interface sink   = splitLiteWrite (slaves[i].aw, slaves[i].w);
-      interface source = slaves[i].b;
+      interface req = splitLiteWrite (slaves[i].aw, slaves[i].w);
+      interface rsp = slaves[i].b;
     endinterface;
     read_slaves[i] = interface Slave;
-      interface sink   = slaves[i].ar;
-      interface source = slaves[i].r;
+      interface req = slaves[i].ar;
+      interface rsp = slaves[i].r;
     endinterface;
   end
 
@@ -112,5 +116,7 @@ module mkAXI4LiteBus #(
   mkInOrderTwoWayBus (route, read_masters,  read_slaves);
 
 endmodule
+
+endpackage
 
 `undef PARAMS

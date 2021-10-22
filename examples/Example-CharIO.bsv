@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2019 Alexandre Joannou
+ * Copyright (c) 2018-2021 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -34,24 +34,24 @@ import SourceSink :: *;
 
 module top (Empty);
 
-  let charIO <- mkCharIO;
+  match {.snk, .src} <- mkCharIO;
   let ff <- mkBypassFIFO;
 
   rule read;
-    let c <- get(charIO.source);
-    if (c == 113) $finish(0); // terminate with letter q
+    let c <- get (src);
+    if (c == 113) $finish (0); // terminate with letter q
     let echoChar = !((c == 10) || (c == 113));
-    if (echoChar) ff.enq(c);
+    if (echoChar) ff.enq (c);
   endrule
 
-  let doneWriting <- mkReg(True);
+  let doneWriting <- mkReg (True);
   rule write (doneWriting);
-    charIO.sink.put(ff.first);
+    snk.put (ff.first);
     doneWriting <= False;
     ff.deq;
   endrule
   rule lineFeed (!doneWriting);
-    charIO.sink.put(10);
+    snk.put (10);
     doneWriting <= True;
   endrule
 

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2020 Alexandre Joannou
+ * Copyright (c) 2018-2021 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -74,11 +74,11 @@ endinstance
 instance FallibleRoute #(ReqFat, RspFat);
   module mkNoRouteSlave (Slave #(ReqFat, RspFat));
     let ff <- mkFIFOF1;
-    interface sink = interface Sink;
+    interface req = interface Sink;
       method  canPut = ff.notFull;
       method put (x) = ff.enq (x.routeInfo);
     endinterface;
-    interface source = interface Source;
+    interface rsp = interface Source;
       method canPeek = ff.notEmpty;
       method peek if (ff.notEmpty) = RspFat { routeInfo: ff.first
                                             , payload:  Rsp { status: KO } };
@@ -88,44 +88,46 @@ instance FallibleRoute #(ReqFat, RspFat);
 endinstance
 
 module mkMaster (Master #(Req, Rsp));
-  Reg#(Bit #(TLog #(NSlaves))) dest <- mkConfigReg(0);
+  Reg #(Bit #(TLog #(NSlaves))) dest <- mkConfigReg (0);
   let ff <- mkFIFOF;
   rule enq;
     dest <= dest + 1;
     let req = Req { to: dest };
-    ff.enq(req);
-    $display("%0t -- Master sending ", $time, fshow(req));
+    ff.enq (req);
+    $display ("%0t -- Master sending ", $time, fshow (req));
   endrule
-  interface source = toSource(ff);
-  interface sink = interface Sink;
-    method put(x) = action $display("%0t -- Master received ", $time, fshow(x)); endaction;
+  interface req = toSource (ff);
+  interface rsp = interface Sink;
+    method put (x) = action
+      $display ("%0t -- Master received ", $time, fshow (x));
+    endaction;
     method canPut = True;
   endinterface;
 endmodule
 
 module mkSlave (Slave #(ReqFat, RspFat));
   let ff <- mkFIFOF;
-  interface sink = interface Sink;
-    method put(x) = action
-      $display("%0t -- Slave received ", $time, fshow(x));
-      ff.enq(RspFat { routeInfo: x.routeInfo
-                    , payload: Rsp { status: OK } });
+  interface req = interface Sink;
+    method put (x) = action
+      $display ("%0t -- Slave received ", $time, fshow (x));
+      ff.enq (RspFat { routeInfo: x.routeInfo
+                     , payload: Rsp { status: OK } });
     endaction;
     method canPut = ff.notFull;
   endinterface;
-  interface source = toSource(ff);
+  interface rsp = toSource (ff);
 endmodule
 
 module top (Empty);
 
-  Vector#(NMasters, Master #(Req,    Rsp))    masters <- replicateM(mkMaster);
-  Vector#(NSlaves,  Slave  #(ReqFat, RspFat)) slaves  <- replicateM(mkSlave);
+  Vector #(NMasters, Master #(Req,    Rsp))    masters <- replicateM (mkMaster);
+  Vector #(NSlaves,  Slave  #(ReqFat, RspFat)) slaves  <- replicateM (mkSlave);
 
-  let cnt <- mkReg(0);
+  let cnt <- mkReg (0);
   rule count; cnt <= cnt + 1; endrule
 
-  mkRelaxedTwoWayBus(indexToOneHot, masters, slaves);
+  mkRelaxedTwoWayBus (indexToOneHot, masters, slaves);
 
-  rule terminate(cnt > 3000); $finish(0); endrule
+  rule terminate (cnt > 3000); $finish (0); endrule
 
 endmodule

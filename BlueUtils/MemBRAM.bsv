@@ -284,7 +284,7 @@ module wrapUnaligned#(
   //////////////////////////////////////////////////////////////////////////////
   Bool canPutReq = !cross_boundary[1] && !cross_boundary_access_fire && pendingReq.notFull;
   Bool canGetRsp = req_done && pendingReq.notEmpty;
-  interface sink = interface Sink;
+  interface req = interface Sink;
     method Bool canPut = canPutReq;
     method Action put (MemReq#(addr_t, content_t) req) if (canPutReq);
       //printTLogPlusArgs("BlueUtils", $format("wrapUnaligned (", fshow(name), ") -- ", fshow(req)));
@@ -315,7 +315,7 @@ module wrapUnaligned#(
       memLookup <= tuple3(req_writeen, req_idx, req_data);
     endmethod
   endinterface;
-  interface source = interface Source;
+  interface rsp = interface Source;
     method Bool canPeek = canGetRsp;
     method MemRsp#(content_t) peek if (canGetRsp) = buildResponse;
     method Action drop if (canGetRsp);
