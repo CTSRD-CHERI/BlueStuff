@@ -516,7 +516,7 @@ provisos(
   Bit#(logDepth) tail = truncate(ltail);
 
   rule drainMemRsp;
-    let rsp <- get(mem.source);
+    let rsp <- get(mem.rsp);
     case (rsp) matches
       tagged  ReadRsp .r: latchMemOut[0] <= r;
     endcase
@@ -524,14 +524,14 @@ provisos(
 
   rule deqRule(doDeqA || doDeqB);
     ltail <= ltail+1;
-    mem.sink.put(tagged ReadReq{
+    mem.req.put(tagged ReadReq{
       addr: truncate(ltail+1),
       numBytes: fromInteger(valueOf(data_width)/8)
     });
   endrule
 
   method Action enq(data in);
-    mem.sink.put(tagged WriteReq{
+    mem.req.put(tagged WriteReq{
       addr: head,
       byteEnable: ~0,
       data: in
