@@ -110,14 +110,14 @@ module mkAXI4_Fake_16550 (
                              , ruser: ? };
     case (r.araddr[4:2])
       3'h0: begin
-        if (regLCR[0] == 0) begin // RBR: Receiver Buffer Register
+        if (regLCR[7] == 0) begin // RBR: Receiver Buffer Register
           rsp.rdata = zeroExtend (rxData);
           if (rxShim.master.canPeek) rxDropData.send;
         end else // DLR (LSB): Divisor Latch Register (LSB)
           rsp.rdata = zeroExtend (regDLR_LSB);
       end
       3'h1: begin
-        if (regLCR[0] == 0) // IER: Interrupt Enable Register
+        if (regLCR[7] == 0) // IER: Interrupt Enable Register
           rsp.rdata = zeroExtend (regIER);
         else // DLR (MSB): Divisor Latch Register (MSB)
           rsp.rdata = zeroExtend (regDLR_MSB);
@@ -126,7 +126,7 @@ module mkAXI4_Fake_16550 (
         rsp.rdata = zeroExtend (wireIIR);
       3'h3: // LCR: LINE CONTROL REGISTER
         rsp.rdata = zeroExtend (regLCR);
-      3'h5: // LSR: Line Statur Register
+      3'h5: // LSR: Line Status Register
         rsp.rdata = zeroExtend ({ 2'b00
                                 , pack (txShim.slave.canPut)
                                 , 4'b0000
@@ -148,13 +148,13 @@ module mkAXI4_Fake_16550 (
                              , buser: ? };
     if (w.wstrb[0] == 1'b1) case (aw.awaddr[4:2])
       3'h0: begin
-        if (regLCR[0] == 0) // THR: Transmitter Holding Register
+        if (regLCR[7] == 0) // THR: Transmitter Holding Register
           wireTxData <= truncate (w.wdata);
         else // DLR (LSB): Divisor Latch Register (LSB)
           regDLR_LSB <= truncate (w.wdata);
       end
       3'h1: begin
-        if (regLCR[0] == 0) // IER: Interrupt Enable Register
+        if (regLCR[7] == 0) // IER: Interrupt Enable Register
           regIER <= truncate (w.wdata);
         else // DLR (MSB): Divisor Latch Register (MSB)
           regDLR_MSB <= truncate (w.wdata);
