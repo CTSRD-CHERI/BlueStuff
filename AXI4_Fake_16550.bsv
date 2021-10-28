@@ -71,7 +71,7 @@ module mkAXI4_Fake_16550 (
   Reg #(Bit #(8))   regLCR <- mkReg (8'b00000000);
   Reg #(Bit #(8))   regDLR_LSB <- mkRegU;
   Reg #(Bit #(8))   regDLR_MSB <- mkRegU;
-  Wire #(Bit #(8)) wireIIR <- mkDWire (8'b00000000);
+  Wire #(Bit #(8)) wireIIR <- mkDWire (8'b00000001);
   PulseWire       pulseIrq <- mkPulseWire;
 
   // rx handling
@@ -99,7 +99,7 @@ module mkAXI4_Fake_16550 (
   (* fire_when_enabled, no_implicit_conditions *)
   rule updt_irq (unpack (regIER[0]) && rxShim.master.canPeek);
     pulseIrq.send;
-    wireIIR <= 8'b00000101;
+    wireIIR <= 8'b00000100;
   endrule
 
   // read requests handling
