@@ -66,13 +66,15 @@ module mkAXI4_Fake_16550 (
   let axiShim <- mkAXI4LiteShimFF;
 
   // internal state / wires
-  Reg #(Bit #(8))   regIER <- mkReg (8'b00000000);
-  Reg #(Bit #(8))   regSCR <- mkRegU;
-  Reg #(Bit #(8))   regLCR <- mkReg (8'b00000000);
-  Reg #(Bit #(8))   regDLR_LSB <- mkRegU;
-  Reg #(Bit #(8))   regDLR_MSB <- mkRegU;
+  Reg #(Bit #(8))  regIER <- mkReg (8'b00000000);
+  Reg #(Bit #(8))  regSCR <- mkRegU;
+  Reg #(Bit #(8))  regLCR <- mkReg (8'b00000000);
+  Reg #(Bit #(8))  regDLR_LSB <- mkRegU;
+  Reg #(Bit #(8))  regDLR_MSB <- mkRegU;
   Wire #(Bit #(8)) wireIIR <- mkDWire (8'b00000001);
-  PulseWire       pulseIrq <- mkPulseWire;
+  Reg #(Bool)      regTHREmptyIrqPending <- mkReg (False);
+  Reg #(Bool)      regLastTxCanPut <- mkReg (True);
+  PulseWire        pulseIrq <- mkPulseWire;
 
   // rx handling
   Wire #(Bit #(rxData)) rxData <- mkDWire (?);
@@ -95,11 +97,36 @@ module mkAXI4_Fake_16550 (
                                       , tuser: ? });
   endrule
 
-  // irq handling
-  (* fire_when_enabled, no_implicit_conditions *)
-  rule updt_irq (unpack (regIER[0]) && rxShim.master.canPeek);
+  // irq priority
+  (* descending_urgency = "receive_data_ready_irq, thr_empty_irq" *)
+
+  // receive data ready irq handling
+  //////////////////////////////////
+  (* no_implicit_conditions *)
+  rule receive_data_ready_irq (unpack (regIER[0]) && rxShim.master.canPeek);
     pulseIrq.send;
     wireIIR <= 8'b00000100;
+  endrule
+
+  // transmitter holding register empty irq handling
+  //////////////////////////////////////////////////
+  // always latch the last "can put" transmission state...
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule set_last_tx_can_put;
+    regLastTxCanPut <= txShim.slave.canPut;
+  endrule
+  // ... and prepare the irq pending on a rising edge detection
+  (* no_implicit_conditions *)
+  rule set_thr_pending ( ! regLastTxCanPut
+                       && txShim.slave.canPut );
+    regTHREmptyIrqPending <= True;
+  endrule
+  (* no_implicit_conditions *)
+  rule thr_empty_irq (  regTHREmptyIrqPending
+                     && unpack (regIER[1])
+                     && txShim.slave.canPut );
+    pulseIrq.send;
+    wireIIR <= 8'b00000010;
   endrule
 
   // read requests handling
@@ -122,8 +149,10 @@ module mkAXI4_Fake_16550 (
         else // DLR (MSB): Divisor Latch Register (MSB)
           rsp.rdata = zeroExtend (regDLR_MSB);
       end
-      3'h2: // IIR: Interrupt Identification Register
+      3'h2: begin // IIR: Interrupt Identification Register
         rsp.rdata = zeroExtend (wireIIR);
+        regTHREmptyIrqPending <= False;
+      end
       3'h3: // LCR: LINE CONTROL REGISTER
         rsp.rdata = zeroExtend (regLCR);
       3'h5: // LSR: Line Status Register
@@ -148,9 +177,10 @@ module mkAXI4_Fake_16550 (
                              , buser: ? };
     if (w.wstrb[0] == 1'b1) case (aw.awaddr[4:2])
       3'h0: begin
-        if (regLCR[7] == 0) // THR: Transmitter Holding Register
+        if (regLCR[7] == 0) begin // THR: Transmitter Holding Register
           wireTxData <= truncate (w.wdata);
-        else // DLR (LSB): Divisor Latch Register (LSB)
+          regTHREmptyIrqPending <= False;
+        end else // DLR (LSB): Divisor Latch Register (LSB)
           regDLR_LSB <= truncate (w.wdata);
       end
       3'h1: begin
