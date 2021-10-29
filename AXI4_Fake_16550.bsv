@@ -73,7 +73,7 @@ module mkAXI4_Fake_16550 (
   Reg #(Bit #(8))  regDLR_MSB <- mkRegU;
   Wire #(Bit #(8)) wireIIR <- mkDWire (8'b00000001);
   Reg #(Bool)      regTHREmptyIrqPending <- mkReg (False);
-  Reg #(Bool)      regLastTxCanPut <- mkReg (True);
+  Reg #(Bool)      regLastTxReadyIrq <- mkReg (False);
   PulseWire        pulseIrq <- mkPulseWire;
 
   // rx handling
@@ -110,21 +110,21 @@ module mkAXI4_Fake_16550 (
 
   // transmitter holding register empty irq handling
   //////////////////////////////////////////////////
-  // always latch the last "can put" transmission state...
+  // Note: we consider both the tx can put status AND the associated interrupt
+  // enable bit to actually trigger the irq...
+  Bool txReadyIrq = txShim.slave.canPut && unpack (regIER[1]);
+  // always latch the last "tx ready irq" transmission state...
   (* fire_when_enabled, no_implicit_conditions *)
-  rule set_last_tx_can_put;
-    regLastTxCanPut <= txShim.slave.canPut;
+  rule set_last_tx_ready_irq;
+    regLastTxReadyIrq <= txReadyIrq;
   endrule
   // ... and prepare the irq pending on a rising edge detection
   (* no_implicit_conditions *)
-  rule set_thr_pending ( ! regLastTxCanPut
-                       && txShim.slave.canPut );
+  rule set_thr_pending (!regLastTxReadyIrq && txReadyIrq);
     regTHREmptyIrqPending <= True;
   endrule
   (* no_implicit_conditions *)
-  rule thr_empty_irq (  regTHREmptyIrqPending
-                     && unpack (regIER[1])
-                     && txShim.slave.canPut );
+  rule thr_empty_irq (regTHREmptyIrqPending && txReadyIrq);
     pulseIrq.send;
     wireIIR <= 8'b00000010;
   endrule
