@@ -151,7 +151,7 @@ module mkAXI4_Fake_16550 (
       end
       3'h2: begin // IIR: Interrupt Identification Register
         rsp.rdata = zeroExtend (wireIIR);
-        regTHREmptyIrqPending <= False;
+        regTHREmptyIrqPending <= wireIIR[3:1] != 3'b001;
       end
       3'h3: // LCR: LINE CONTROL REGISTER
         rsp.rdata = zeroExtend (regLCR);
