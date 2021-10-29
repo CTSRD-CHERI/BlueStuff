@@ -71,10 +71,11 @@ module mkAXI4_Fake_16550 (
   Reg #(Bit #(8))  regLCR <- mkReg (8'b00000000);
   Reg #(Bit #(8))  regDLR_LSB <- mkRegU;
   Reg #(Bit #(8))  regDLR_MSB <- mkRegU;
-  Wire #(Bit #(8)) wireIIR <- mkDWire (8'b00000001);
+  PulseWire        pulseIrq <- mkPulseWire;
+  PulseWire        irqReceiveDataReady<- mkPulseWire;
+  PulseWire        irqTHREmpty <- mkPulseWire;
   Reg #(Bool)      regTHREmptyIrqPending <- mkReg (False);
   Reg #(Bool)      regLastTxReadyIrq <- mkReg (False);
-  PulseWire        pulseIrq <- mkPulseWire;
 
   // rx handling
   Wire #(Bit #(rxData)) rxData <- mkDWire (?);
@@ -97,15 +98,11 @@ module mkAXI4_Fake_16550 (
                                       , tuser: ? });
   endrule
 
-  // irq priority
-  (* descending_urgency = "receive_data_ready_irq, thr_empty_irq" *)
-
   // receive data ready irq handling
   //////////////////////////////////
-  (* no_implicit_conditions *)
+  (* fire_when_enabled, no_implicit_conditions *)
   rule receive_data_ready_irq (unpack (regIER[0]) && rxShim.master.canPeek);
-    pulseIrq.send;
-    wireIIR <= 8'b00000100;
+    irqReceiveDataReady.send;
   endrule
 
   // transmitter holding register empty irq handling
@@ -123,10 +120,15 @@ module mkAXI4_Fake_16550 (
   rule set_thr_pending (!regLastTxReadyIrq && txReadyIrq);
     regTHREmptyIrqPending <= True;
   endrule
-  (* no_implicit_conditions *)
+  (* fire_when_enabled, no_implicit_conditions *)
   rule thr_empty_irq (regTHREmptyIrqPending && txReadyIrq);
+    irqTHREmpty.send;
+  endrule
+
+  // pulse the exported irq line if any interrupt source is active
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule pulse_irq_line (irqReceiveDataReady || irqTHREmpty);
     pulseIrq.send;
-    wireIIR <= 8'b00000010;
   endrule
 
   // read requests handling
@@ -150,8 +152,14 @@ module mkAXI4_Fake_16550 (
           rsp.rdata = zeroExtend (regDLR_MSB);
       end
       3'h2: begin // IIR: Interrupt Identification Register
-        rsp.rdata = zeroExtend (wireIIR);
-        regTHREmptyIrqPending <= wireIIR[3:1] != 3'b001;
+        // From highest to lowest priority ...
+        if (irqReceiveDataReady)
+          rsp.rdata = zeroExtend (8'b00000100);
+        else if (irqTHREmpty) begin
+          rsp.rdata = zeroExtend (8'b00000010);
+          regTHREmptyIrqPending <= False;
+        end else
+          rsp.rdata = zeroExtend (8'b00000001);
       end
       3'h3: // LCR: LINE CONTROL REGISTER
         rsp.rdata = zeroExtend (regLCR);
