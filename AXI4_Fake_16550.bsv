@@ -164,7 +164,8 @@ module mkAXI4_Fake_16550 (
       3'h3: // LCR: LINE CONTROL REGISTER
         rsp.rdata = zeroExtend (regLCR);
       3'h5: // LSR: Line Status Register
-        rsp.rdata = zeroExtend ({ 2'b00
+        rsp.rdata = zeroExtend ({ 1'b0
+                                , pack (txShim.slave.canPut)
                                 , pack (txShim.slave.canPut)
                                 , 4'b0000
                                 , pack (rxShim.master.canPeek) });
