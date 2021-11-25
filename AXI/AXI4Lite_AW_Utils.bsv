@@ -37,7 +37,25 @@ import SpecialFIFOs :: *;
 // AXI Address Write Channel //
 ////////////////////////////////////////////////////////////////////////////////
 
+// map over flit type
+////////////////////////////////////////////////////////////////////////////////
+
+function AXI4Lite_AWFlit #(addr_out, user)
+  mapAXI4Lite_AWFlit_awaddr ( function Bit #(addr_out) f (Bit #(addr_in) a)
+                            , AXI4Lite_AWFlit #(addr_in, user) x ) =
+  AXI4Lite_AWFlit { awaddr: f (x.awaddr)
+                  , awprot: x.awprot
+                  , awuser: x.awuser };
+
+function AXI4Lite_AWFlit #(addr, user_out)
+  mapAXI4Lite_AWFlit_awuser ( function Bit #(user_out) f (Bit #(user_in) a)
+                            , AXI4Lite_AWFlit #(addr, user_in) x ) =
+  AXI4Lite_AWFlit { awaddr: x.awaddr
+                  , awprot: x.awprot
+                  , awuser: f (x.awuser) };
+
 // typeclasses to convert to/from the flit type
+////////////////////////////////////////////////////////////////////////////////
 
 typeclass ToAXI4Lite_AWFlit#(type t, numeric type addr_, numeric type user_);
   function AXI4Lite_AWFlit#(addr_, user_) toAXI4Lite_AWFlit (t x);

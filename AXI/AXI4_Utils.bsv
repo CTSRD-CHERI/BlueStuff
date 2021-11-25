@@ -300,6 +300,13 @@ function AXI4_Slave #(a, addr_a, c, d, e, f, g, h)
   return mapAXI4_Slave_addr (f, s);
 endfunction
 
+function AXI4_Slave #(a, b, c, d, e, f, g, h)
+  mask_AXI4_Slave_addr ( Bit #(b) mask
+                       , AXI4_Slave #(a, b, c, d, e, f, g, h) s);
+  function f (x) = x & mask;
+  return mapAXI4_Slave_addr (f, s);
+endfunction
+
 function AXI4_Slave #(a, b, c, d_, e_, f_, g_, h_)
   zero_AXI4_Slave_user (AXI4_Slave #(a, b, c, d, e, f, g, h) m) =
   mapAXI4_Slave_user
@@ -760,19 +767,19 @@ function AXI4_Slave#(a,b,c,d,e,f,g,h)
     interface r  = debugSource( s.r, $format(msg, " r"));
   endinterface;
 
+module mkAXI4DebugShim #(String debugTag) (AXI4_Shim#(a,b,c,d,e,f,g,h));
+  let shim <- mkAXI4Shim;
+  interface  slave = shim.slave;
+  interface master = debugAXI4_Master(shim.master, $format(debugTag));
+  interface  clear = shim.clear;
+endmodule
+
 module mkAXI4DebugShimSig #(String debugTag) (AXI4_Shim_Sig#(a,b,c,d,e,f,g,h));
   let shim <- mkAXI4DebugShim(debugTag);
   let masterSig <- toAXI4_Master_Sig(shim.master);
   let  slaveSig <- toAXI4_Slave_Sig(shim.slave);
   interface master = masterSig;
   interface  slave = slaveSig;
-  interface  clear = shim.clear;
-endmodule
-
-module mkAXI4DebugShim #(String debugTag) (AXI4_Shim#(a,b,c,d,e,f,g,h));
-  let shim <- mkAXI4Shim;
-  interface  slave = shim.slave;
-  interface master = debugAXI4_Master(shim.master, $format(debugTag));
   interface  clear = shim.clear;
 endmodule
 

@@ -37,7 +37,16 @@ import SpecialFIFOs :: *;
 // AXI Write Response Channel //
 ////////////////////////////////////////////////////////////////////////////////
 
+// map over flit type
+////////////////////////////////////////////////////////////////////////////////
+
+function AXI4Lite_BFlit #(user_out)
+  mapAXI4Lite_BFlit_buser ( function Bit #(user_out) f (Bit #(user_in) a)
+                          , AXI4Lite_BFlit #(user_in) x ) =
+  AXI4Lite_BFlit { bresp: x.bresp, buser: f (x.buser) };
+
 // typeclasses to convert to/from the flit type
+////////////////////////////////////////////////////////////////////////////////
 
 typeclass ToAXI4Lite_BFlit#(type t, numeric type user_);
   function AXI4Lite_BFlit#(user_) toAXI4Lite_BFlit (t x);

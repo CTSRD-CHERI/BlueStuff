@@ -37,7 +37,21 @@ import SpecialFIFOs :: *;
 // AXI Read Data Channel //
 ////////////////////////////////////////////////////////////////////////////////
 
+// map over flit type
+////////////////////////////////////////////////////////////////////////////////
+
+function AXI4Lite_RFlit #(data_out, user)
+  mapAXI4Lite_RFlit_rdata ( function Bit #(data_out) f (Bit #(data_in) a)
+                          , AXI4Lite_RFlit #(data_in, user) x ) =
+  AXI4Lite_RFlit { rdata: f (x.rdata), rresp: x.rresp, ruser: x.ruser };
+
+function AXI4Lite_RFlit #(data, user_out)
+  mapAXI4Lite_RFlit_ruser ( function Bit #(user_out) f (Bit #(user_in) a)
+                          , AXI4Lite_RFlit #(data, user_in) x ) =
+  AXI4Lite_RFlit { rdata: x.rdata, rresp: x.rresp, ruser: f (x.ruser) };
+
 // typeclasses to convert to/from the flit type
+////////////////////////////////////////////////////////////////////////////////
 
 typeclass ToAXI4Lite_RFlit#(type t, numeric type data_, numeric type user_);
   function AXI4Lite_RFlit#(data_, user_) toAXI4Lite_RFlit (t x);

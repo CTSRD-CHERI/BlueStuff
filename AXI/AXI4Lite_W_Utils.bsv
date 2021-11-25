@@ -37,7 +37,27 @@ import SpecialFIFOs :: *;
 // AXI Write Data Channel //
 ////////////////////////////////////////////////////////////////////////////////
 
+// map over flit type
+////////////////////////////////////////////////////////////////////////////////
+
+function AXI4Lite_WFlit #(data_out, user)
+  mapAXI4Lite_WFlit_wdata (
+    function Bit #(data_out) f (Bit #(data_in) a)
+  , function Bit #(TDiv #(data_out, 8)) g (Bit #(TDiv #(data_in, 8)) a)
+  , AXI4Lite_WFlit #(data_in, user) x ) =
+  AXI4Lite_WFlit { wdata: f (x.wdata)
+                 , wstrb: g (x.wstrb)
+                 , wuser: x.wuser };
+
+function AXI4Lite_WFlit #(data, user_out)
+  mapAXI4Lite_WFlit_wuser ( function Bit #(user_out) f (Bit #(user_in) a)
+                          , AXI4Lite_WFlit #(data, user_in) x ) =
+  AXI4Lite_WFlit { wdata: x.wdata
+                 , wstrb: x.wstrb
+                 , wuser: f (x.wuser) };
+
 // typeclasses to convert to/from the flit type
+////////////////////////////////////////////////////////////////////////////////
 
 typeclass ToAXI4Lite_WFlit#(type t, numeric type data_, numeric type user_);
   function AXI4Lite_WFlit#(data_, user_) toAXI4Lite_WFlit (t x);
