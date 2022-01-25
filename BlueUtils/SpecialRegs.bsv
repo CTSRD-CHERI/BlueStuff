@@ -29,8 +29,10 @@
 package SpecialRegs;
 
 export mkDRegOR;
+export mkRegOR;
 
 import List :: *;
+import Vector :: *;
 import SpecialWires :: *;
 
 module mkDRegOR #( Integer n
@@ -50,6 +52,31 @@ module mkDRegOR #( Integer n
     ifc[i] = interface Wire;
       method _read = register;
       method _write = writeReg (wires[i]);
+    endinterface;
+  end
+  return ifc;
+endmodule
+
+module mkRegOR #( a_bits init )
+    (Vector #(n, Reg #(a_bits))) provisos (
+    Bits #(a_bits, bit_size));
+
+  Vector #(n, RWire #(a_bits)) wires <- replicateM(mkRWire);
+  Reg #(a_bits) register <- mkReg(init);
+
+  // Should only fire if there is an update.
+  rule update_reg;
+      function a_bits mor(Maybe#(a_bits) a, a_bits b) = unpack(pack(fromMaybe(unpack(0),a)) | pack(b));
+      function Maybe#(a_bits) getWget(RWire#(a_bits) w) = w.wget;
+      a_bits folded = foldr(mor, unpack(0), map(getWget, wires));
+      if (any(isValid, map(getWget, wires))) register <= folded;
+  endrule
+
+  Vector #(n, Reg #(a_bits)) ifc = ?;
+  for (Integer i = 0; i < valueOf(n); i = i + 1) begin
+    ifc[i] = interface Reg;
+      method _read = register;
+      method _write = wires[i].wset;
     endinterface;
   end
   return ifc;
