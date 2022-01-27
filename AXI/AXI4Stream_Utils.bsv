@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 2021 Ivan Ribeiro
- * Copyright (c) 2021 Alexandre Joannou
+ * Copyright (c) 2021-2022 Alexandre Joannou
  * All rights reserved.
  *
  * This hardware design was developed by the University of Cambridge Computer
@@ -40,14 +40,19 @@ import SourceSink :: *;
 // AXI4 import
 import AXI4Stream_Types :: *;
 
+module mkAXI4StreamShim
+  #(function module #(FIFOF #(AXI4Stream_Flit #(a, b, c, d))) mkFF ())
+  (AXI4Stream_Shim#(a, b, c, d));
+  let  ff <- mkFF;
+  method clear = ff.clear;
+  interface master = toSource(ff);
+  interface slave  = toSink(ff);
+endmodule
+
 `define defAXI4StreamShimFIFOF (name, mkFF)\
 module mkAXI4StreamShim``name (AXI4Stream_Shim#(a, b, c, d));\
-  let  tff <- mkFF;\
-  method clear = action\
-    tff.clear;\
-  endaction;\
-  interface master = toSource(tff);\
-  interface slave  = toSink(tff);\
+  let shim <- mkAXI4StreamShim (mkFF);\
+  return shim;\
 endmodule
 
 `defAXI4StreamShimFIFOF(BypassFIFOF, mkBypassFIFOF)
@@ -58,7 +63,6 @@ endmodule
 `defAXI4StreamShimFIFOF(SizedFIFOF32, mkSizedFIFOF(32))
 `defAXI4StreamShimFIFOF(UGSizedFIFOF32, mkUGSizedFIFOF(32))
 `defAXI4StreamShimFIFOF(UGSizedFIFOF4, mkUGSizedFIFOF(4))
-
 
 typeclass ToAXI4Stream_Flit #( type t
                              , numeric type id_

@@ -40,6 +40,8 @@ import AXI4Stream :: *;
 import Connectable :: *;
 import SourceSink :: *;
 
+import FIFOF :: *;
+
 // This package aims to provides a simple component exposing a subset of the
 // 16550 register map on 2 AXI4Lite slave interfaces. Each can be memory
 // mapped in AXI4Lite masters' address spaces to allow for simple communication.
@@ -49,20 +51,22 @@ import SourceSink :: *;
 // rx and tx channels as well as an interrupt line.
 // Note that the registers are byte wide registers, and have been remapped to
 // be 4 bytes appart to be accessible easily on a 32-bit wide AXI4Lite bus.
-module mkAXI4_Fake_16550 (
-  Tuple4 #( AXI4Lite_Slave #( addr_, data_
-                            , awuser_, wuser_, buser_, aruser_, ruser_)
-          , AXI4Stream_Master #(txId, txData, txDest, txUser)
-          , AXI4Stream_Slave #(rxId, rxData, rxDest, rxUser)
-          , ReadOnly #(Bool) ))
+module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
+  (Tuple4 #( AXI4Lite_Slave #( addr_, data_
+                             , awuser_, wuser_, buser_, aruser_, ruser_)
+           , AXI4Stream_Master #(txId, txData, txDest, txUser)
+           , AXI4Stream_Slave #(rxId, rxData, rxDest, rxUser)
+           , ReadOnly #(Bool) ))
   provisos ( Add#(_a, txData, data_)
            , Add#(_b, rxData, data_)
            , Add#(_c, 8, data_)
            , Add#(_d, 4, addr_) );
 
   // transaction buffers
-  AXI4Stream_Shim #(txId, txData, txDest, txUser) txShim <- mkAXI4StreamShimFF;
-  AXI4Stream_Shim #(rxId, rxData, rxDest, rxUser) rxShim <- mkAXI4StreamShimFF;
+  AXI4Stream_Shim #(txId, txData, txDest, txUser)
+    txShim <- mkAXI4StreamShim (mkSizedFIFOF (txDepth));
+  AXI4Stream_Shim #(rxId, rxData, rxDest, rxUser)
+    rxShim <- mkAXI4StreamShim (mkSizedFIFOF (rxDepth));
   let axiShim <- mkAXI4LiteShimFF;
 
   // internal state / wires
@@ -219,15 +223,15 @@ endmodule
 // The mkAXI4_Fake_16550_Pair module instantiates two mkAXI4_Fake_16550
 // modules and connects their rx and tx streams, and returns the two remaining
 // AXI4 lite slave interfaces together with their irq line
-module mkAXI4_Fake_16550_Pair (
-  Tuple2 #( Tuple2 #( AXI4Lite_Slave #( addr0_, data0_
-                                      , awuser0_, wuser0_, buser0_
-                                      , aruser0_, ruser0_)
-                    , ReadOnly #(Bool) )
-          , Tuple2 #( AXI4Lite_Slave #( addr1_, data1_
-                                      , awuser1_, wuser1_, buser1_
-                                      , aruser1_, ruser1_)
-                    , ReadOnly #(Bool) )))
+module mkAXI4_Fake_16550_Pair #(Integer txDepth, Integer rxDepth)
+  (Tuple2 #( Tuple2 #( AXI4Lite_Slave #( addr0_, data0_
+                                       , awuser0_, wuser0_, buser0_
+                                       , aruser0_, ruser0_)
+                     , ReadOnly #(Bool) )
+           , Tuple2 #( AXI4Lite_Slave #( addr1_, data1_
+                                       , awuser1_, wuser1_, buser1_
+                                       , aruser1_, ruser1_)
+                     , ReadOnly #(Bool) )))
   provisos ( Add #(_a, 4, addr0_)
            , Add #(_b, 4, addr1_)
            , Add #(_c, 8, data_)
@@ -238,14 +242,14 @@ module mkAXI4_Fake_16550_Pair (
           , AXI4Stream_Master #(0, data_, 0, 0)
           , AXI4Stream_Slave #(0, data_, 0, 0)
           , ReadOnly #(Bool) )
-    half0 <- mkAXI4_Fake_16550;
+    half0 <- mkAXI4_Fake_16550 (txDepth, rxDepth);
   match {.slv0, .tx0, .rx0, .irq0} = half0;
   Tuple4 #( AXI4Lite_Slave #( addr1_, data1_
                             , awuser1_, wuser1_, buser1_, aruser1_, ruser1_)
           , AXI4Stream_Master #(0, data_, 0, 0)
           , AXI4Stream_Slave #(0, data_, 0, 0)
           , ReadOnly #(Bool) )
-    half1 <- mkAXI4_Fake_16550;
+    half1 <- mkAXI4_Fake_16550 (txDepth, rxDepth);
   match {.slv1, .tx1, .rx1, .irq1} = half1;
   mkConnection (tx0, rx1);
   mkConnection (tx1, rx0);
