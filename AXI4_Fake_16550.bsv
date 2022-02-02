@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2021 Alexandre Joannou
+ * Copyright (c) 2021-2022 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -40,6 +40,8 @@ import AXI4Stream :: *;
 import Connectable :: *;
 import SourceSink :: *;
 
+import CounterHelpers :: *;
+
 import FIFOF :: *;
 
 // This package aims to provides a simple component exposing a subset of the
@@ -57,40 +59,76 @@ module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
            , AXI4Stream_Master #(txId, txData, txDest, txUser)
            , AXI4Stream_Slave #(rxId, rxData, rxDest, rxUser)
            , ReadOnly #(Bool) ))
-  provisos ( Add#(_a, txData, data_)
-           , Add#(_b, rxData, data_)
-           , Add#(_c, 8, data_)
-           , Add#(_d, 4, addr_) );
+  provisos ( NumAlias #(8, t_timeoutWidth)
+           , NumAlias #(200, t_timeoutVal)
+           , NumAlias #(16, t_rxLvlWidth)
+           , Add #(_a, txData, data_)
+           , Add #(_b, rxData, data_)
+           , Add #(_c, 8, data_)
+           , Add #(_d, 4, addr_) );
+
+  // AXI interface
+  let axiShim <- mkAXI4LiteShimFF;
 
   // transaction buffers
   AXI4Stream_Shim #(txId, txData, txDest, txUser)
     txShim <- mkAXI4StreamShim (mkSizedFIFOF (txDepth));
   AXI4Stream_Shim #(rxId, rxData, rxDest, rxUser)
     rxShim <- mkAXI4StreamShim (mkSizedFIFOF (rxDepth));
-  let axiShim <- mkAXI4LiteShimFF;
 
   // internal state / wires
-  Reg #(Bit #(8))  regIER <- mkReg (8'b00000000);
-  Reg #(Bit #(8))  regSCR <- mkRegU;
-  Reg #(Bit #(8))  regLCR <- mkReg (8'b00000000);
-  Reg #(Bit #(8))  regDLR_LSB <- mkRegU;
-  Reg #(Bit #(8))  regDLR_MSB <- mkRegU;
-  PulseWire        pulseIrq <- mkPulseWire;
-  PulseWire        irqReceiveDataReady<- mkPulseWire;
-  PulseWire        irqTHREmpty <- mkPulseWire;
-  Reg #(Bool)      regTHREmptyIrqPending <- mkReg (False);
-  Reg #(Bool)      regLastTxReadyIrq <- mkReg (False);
+  Reg #(Bit #(8)) regIER <- mkReg (8'b00000000);
+  Reg #(Bit #(8)) regSCR <- mkRegU;
+  Reg #(Bit #(8)) regLCR <- mkReg (8'b00000000);
+  Reg #(Bit #(8)) regDLR_LSB <- mkRegU;
+  Reg #(Bit #(8)) regDLR_MSB <- mkRegU;
+  Reg #(Bit #(1)) regFIFOMode <- mkReg (1'b1);
+  PulseWire       pulseIrq <- mkPulseWire;
+  PulseWire       irqReceiveDataReady <- mkPulseWire;
+  PulseWire       irqTHREmpty <- mkPulseWire;
+  Reg #(Bool)     regTHREmptyIrqPending <- mkReg (False);
+  Reg #(Bool)     regLastTxReadyIrq <- mkReg (False);
+
+  // receive buffer fill level tracking
+  /////////////////////////////////////
+  TimerIfc #(t_timeoutWidth) irqReceiveTimeout <- mkTimer;
+  LevelTriggeredCounterIfc #(t_rxLvlWidth) rxLvl <- mkLevelTriggeredCounter (1);
+  let rxTimeout = fromInteger (valueOf (t_timeoutVal));
+  let rxShimMaster = interface AXI4Stream_Master;
+    method canPeek = rxShim.master.canPeek;
+    method peek = rxShim.master.peek;
+    method drop = action
+      rxShim.master.drop;
+      rxLvl.decrement;
+    endaction;
+  endinterface;
+  let rxShimSlave = interface AXI4Stream_Slave;
+    method canPut = rxShim.slave.canPut;
+    method put (x) = action
+      rxShim.slave.put (x);
+      rxLvl.increment;
+      irqReceiveTimeout.start (rxTimeout);
+    endaction;
+  endinterface;
 
   // rx handling
+  //////////////
   Wire #(Bit #(rxData)) rxData <- mkDWire (?);
   (* fire_when_enabled *)
-  rule rx_read_data; rxData <= rxShim.master.peek.tdata; endrule
+  rule rx_read_data; rxData <= rxShimMaster.peek.tdata; endrule
   PulseWire rxDropData <- mkPulseWire;
+  PulseWire rxShimClear <- mkPulseWire;
   (* fire_when_enabled *)
-  rule rx_drop_data (rxDropData); rxShim.master.drop; endrule
+  rule rx_clear (rxShimClear); rxShim.clear; endrule
+  (* fire_when_enabled *)
+  rule rx_drop_data (rxDropData); rxShimMaster.drop; endrule
 
   // tx handling
+  //////////////
   Wire #(Bit #(txData)) wireTxData <- mkWire;
+  PulseWire txShimClear <- mkPulseWire;
+  (* fire_when_enabled *)
+  rule tx_clear (txShimClear); txShim.clear; endrule
   (* fire_when_enabled *)
   rule tx_write_data;
     txShim.slave.put (AXI4Stream_Flit { tdata: wireTxData
@@ -104,8 +142,10 @@ module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
 
   // receive data ready irq handling
   //////////////////////////////////
+  //rxShimMaster.canPeek;
+  Bool rxTrigger = rxLvl.levelReached || irqReceiveTimeout.done;
   (* fire_when_enabled, no_implicit_conditions *)
-  rule receive_data_ready_irq (unpack (regIER[0]) && rxShim.master.canPeek);
+  rule receive_data_ready_irq (unpack (regIER[0]) && rxTrigger);
     irqReceiveDataReady.send;
   endrule
 
@@ -145,9 +185,11 @@ module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
       3'h0: begin
         if (regLCR[7] == 0) begin // RBR: Receiver Buffer Register
           rsp.rdata = zeroExtend (rxData);
-          if (rxShim.master.canPeek) rxDropData.send;
+          if (rxShimMaster.canPeek) rxDropData.send;
         end else // DLR (LSB): Divisor Latch Register (LSB)
           rsp.rdata = zeroExtend (regDLR_LSB);
+        // reset receive interrupt timeout
+        irqReceiveTimeout.start (rxTimeout);
       end
       3'h1: begin
         if (regLCR[7] == 0) // IER: Interrupt Enable Register
@@ -156,14 +198,20 @@ module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
           rsp.rdata = zeroExtend (regDLR_MSB);
       end
       3'h2: begin // IIR: Interrupt Identification Register
+        Bit #(8) val = { regFIFOMode == 1'b1 ? 2'b11 : 2'b00 // FIFOs enabled
+                       , 2'b00  // DMA end
+                       , 3'b000 // Interrupt Identification Code
+                       , 1'b0   // Interrupt Status (0: interrupt pending)
+                       };
         // From highest to lowest priority ...
         if (irqReceiveDataReady)
-          rsp.rdata = zeroExtend (8'b00000100);
+          val[3:1] = 3'b010;
         else if (irqTHREmpty) begin
-          rsp.rdata = zeroExtend (8'b00000010);
+          val[3:1] = 3'b001;
           regTHREmptyIrqPending <= False;
         end else
-          rsp.rdata = zeroExtend (8'b00000001);
+          val[0] = 1'b1; // no interrupt pending
+        rsp.rdata = zeroExtend (val);
       end
       3'h3: // LCR: LINE CONTROL REGISTER
         rsp.rdata = zeroExtend (regLCR);
@@ -172,7 +220,7 @@ module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
                                 , pack (txShim.slave.canPut)
                                 , pack (txShim.slave.canPut)
                                 , 4'b0000
-                                , pack (rxShim.master.canPeek) });
+                                , pack (rxShimMaster.canPeek) });
       3'h7: // SCR: Scratch Register
         rsp.rdata = zeroExtend (regSCR);
       default:
@@ -202,6 +250,30 @@ module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
         else // DLR (MSB): Divisor Latch Register (MSB)
           regDLR_MSB <= truncate (w.wdata);
       end
+      3'h2: begin // FCR: FIFO Control Register
+        Bool clearRx = False;
+        Bool clearTx = False;
+        regFIFOMode <= w.wdata[0];
+        if (w.wdata[0] != regFIFOMode) begin
+          clearRx = True;
+          clearTx = True;
+        end
+        if (w.wdata[0] == 1'b1) begin
+          if (w.wdata[1] == 1'b1) clearRx = True;
+          if (w.wdata[2] == 1'b1) clearTx = True;
+          case (w.wdata[7:6])
+            2'b00: rxLvl.setThreshold (1);
+            2'b01: rxLvl.setThreshold (4);
+            2'b10: rxLvl.setThreshold (8);
+            2'b11: rxLvl.setThreshold (fromInteger (rxDepth));
+          endcase
+        end
+        if (clearRx) begin
+          rxShimClear.send;
+          rxLvl.setLevel (0);
+        end
+        if (clearTx) txShimClear.send;
+      end
       3'h3: // LCR: LINE CONTROL REGISTER
         regLCR <= truncate (w.wdata);
       3'h7: // SCR: Scratch Register
@@ -216,7 +288,7 @@ module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
   // export the AXI4 lite 16550 interfaces as well as the tx and rx streams
   return tuple4 ( axiShim.slave
                 , txShim.master
-                , rxShim.slave
+                , rxShimSlave
                 , pulseWireToReadOnly (pulseIrq) );
 endmodule
 
