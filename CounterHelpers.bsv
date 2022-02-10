@@ -88,4 +88,40 @@ module mkTimer (TimerIfc #(n));
 
 endmodule
 
+typedef enum { Rising, Falling } EdgeType deriving (Eq);
+
+module mkEdgeDetector #(t x) (ReadOnly #(EdgeType)) provisos (Bits #(t, 1));
+
+  let r <- mkRegU;
+
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule latchInput; r <= pack (x); endrule
+
+  method _read if (r != pack (x)) = (pack (x) == 1'b0) ? Falling : Rising;
+
+endmodule
+
+module mkSpecificEdgeDetector #(EdgeType edgeType, t x) (ReadOnly #(Bool))
+  provisos (Bits #(t, 1));
+
+  let detector <- mkEdgeDetector (x);
+  let detected <- mkDWire (False);
+
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule detect (detector == edgeType); detected <= True; endrule
+
+  method _read = detected;
+
+endmodule
+
+module mkRisingEdgeDetector #(t x) (ReadOnly #(Bool)) provisos (Bits #(t, 1));
+  let ifc <- mkSpecificEdgeDetector (Rising, x);
+  return ifc;
+endmodule
+
+module mkFallingEdgeDetector #(t x) (ReadOnly #(Bool)) provisos (Bits #(t, 1));
+  let ifc <- mkSpecificEdgeDetector (Falling, x);
+  return ifc;
+endmodule
+
 endpackage
