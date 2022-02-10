@@ -99,7 +99,7 @@ module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
   /////////////////////////////////////
   TimerIfc #(t_rxTimeoutWidth) irqReceiveTimer <- mkTimer;
   // sanity check requested rxDepth
-  if (valueOf (t_rxLvlWidth) >= log2 (rxDepth))
+  if (valueOf (t_rxLvlWidth) < log2 (rxDepth))
     error ( "Requeted rxDepth (" + integerToString (rxDepth)
           + ") should fit in " + integerToString (valueOf (t_rxLvlWidth))
           + "bits" );
