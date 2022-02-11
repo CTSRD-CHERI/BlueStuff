@@ -107,7 +107,9 @@ module mkSpecificEdgeDetector #(EdgeType edgeType, t x) (ReadOnly #(Bool))
   let detector <- mkEdgeDetector (x);
   let detected <- mkDWire (False);
 
-  (* fire_when_enabled, no_implicit_conditions *)
+  // XXX unclear why, but the "no_implicit_conditions" annotation on this rule
+  // seems to cause bsc to choke
+  (* fire_when_enabled *)
   rule detect (detector == edgeType); detected <= True; endrule
 
   method _read = detected;
