@@ -63,9 +63,11 @@ module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
   provisos ( // rx irq timeout mechanism from 16550 spec
              NumAlias #(4000, t_rxTimeout)
            , NumAlias #(TLog #(t_rxTimeout), t_rxTimeoutWidth)
+           /*
              // non standard rx irq rate limiter
            , NumAlias #(50000, t_rxIrqRate)
            , NumAlias #(TLog #(t_rxIrqRate), t_rxIrqRateWidth)
+           */
              // rx depth bitwidth. Note: received rxDepth must fit
            , NumAlias #(16, t_rxLvlWidth)
              // Constraints
@@ -80,6 +82,7 @@ module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
   // transaction buffers
   AXI4Stream_Shim #(txId, txData, txDest, txUser)
     txShim <- mkAXI4StreamShim (mkSizedFIFOF (txDepth));
+  Bool txEmpty = !txShim.master.canPeek;
   AXI4Stream_Shim #(rxId, rxData, rxDest, rxUser)
     rxShim <- mkAXI4StreamShim (mkSizedFIFOF (rxDepth));
 
@@ -93,18 +96,21 @@ module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
   PulseWire       pulseIrq <- mkPulseWire;
   PulseWire       pulseTxIrq <- mkPulseWire;
   PulseWire       pulseRxIrq <- mkPulseWire;
-  Reg #(Bool)     regTxIrqPending <- mkReg (False);
+  Reg #(Bool)     regTxIrqPending[3] <- mkCReg (3, False);
 
   // receive buffer fill level tracking
   /////////////////////////////////////
+  PulseWire irqReceiveTimerRestart <- mkPulseWire;
   TimerIfc #(t_rxTimeoutWidth) irqReceiveTimer <- mkTimer;
+  rule restart_irq_receive_timer (irqReceiveTimerRestart);
+    irqReceiveTimer.start (fromInteger (valueOf (t_rxTimeout)));
+  endrule
   // sanity check requested rxDepth
   if (valueOf (t_rxLvlWidth) < log2 (rxDepth))
     error ( "Requeted rxDepth (" + integerToString (rxDepth)
           + ") should fit in " + integerToString (valueOf (t_rxLvlWidth))
           + "bits" );
   LevelTriggeredCounterIfc #(t_rxLvlWidth) rxLvl <- mkLevelTriggeredCounter (1);
-  let rxTimeout = fromInteger (valueOf (t_rxTimeout));
   let rxShimMaster = interface AXI4Stream_Master;
     method canPeek = rxShim.master.canPeek;
     method peek = rxShim.master.peek;
@@ -118,7 +124,7 @@ module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
     method put (x) = action
       rxShim.slave.put (x);
       rxLvl.increment;
-      irqReceiveTimer.start (rxTimeout);
+      irqReceiveTimerRestart.send;
     endaction;
   endinterface;
 
@@ -157,15 +163,19 @@ module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
   Bool irqReceiveTimeout = irqReceiveTimer.done && rxShimMaster.canPeek;
   Bool rxTrigger =
     unpack (regIER[0]) && (rxLvl.levelReached || irqReceiveTimeout);
-  /**/ let rxRate = fromInteger (valueOf (t_rxIrqRate));
-  /**/ let rxTriggerRising <- mkRisingEdgeDetector (rxTrigger);
-  /**/ TimerIfc #(t_rxIrqRateWidth) rxIrqRateTimer <- mkTimer;
-  /**/ (* fire_when_enabled, no_implicit_conditions *)
-  /**/ rule restart_irq_rate_timer (rxTriggerRising);
-  /**/   rxIrqRateTimer.start (rxRate);
-  /**/ endrule
+  /*
+  let rxRate = fromInteger (valueOf (t_rxIrqRate));
+  let rxTriggerRising <- mkRisingEdgeDetector (rxTrigger);
+  TimerIfc #(t_rxIrqRateWidth) rxIrqRateTimer <- mkTimer;
   (* fire_when_enabled, no_implicit_conditions *)
-  rule receive_data_ready_irq (rxTrigger && /**/ rxIrqRateTimer.done);
+  rule restart_irq_rate_timer (rxTriggerRising);
+    rxIrqRateTimer.start (rxRate);
+  endrule
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule receive_data_ready_irq (rxTrigger && rxIrqRateTimer.done);
+  */
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule receive_data_ready_irq (rxTrigger);
     pulseRxIrq.send;
   endrule
 
@@ -174,16 +184,33 @@ module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
   // Note: we consider both the tx can put status AND the associated interrupt
   // enable bit to actually trigger the irq and prepare the irq pending on a
   // rising edge detection
-  Bool txReadyIrq = txShim.slave.canPut && unpack (regIER[1]);
+  Bool txReadyIrq = txEmpty && unpack (regIER[1]);
   let txReadyIrqRising <- mkRisingEdgeDetector (txReadyIrq);
   (* no_implicit_conditions *)
   rule set_thr_pending (txReadyIrqRising);
-    regTxIrqPending <= True;
+    regTxIrqPending[2] <= True;
   endrule
   (* fire_when_enabled, no_implicit_conditions *)
-  rule thr_empty_irq (regTxIrqPending && txReadyIrq);
+  rule thr_empty_irq (regTxIrqPending[0] && txReadyIrq);
     pulseTxIrq.send;
   endrule
+  /*
+  Reg #(Bool) regLastTxReadyIrq <- mkReg (False);
+  // always latch the last "tx ready irq" transmission state...
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule set_last_tx_ready_irq;
+    regLastTxReadyIrq <= txReadyIrq;
+  endrule
+  // ... and prepare the irq pending on a rising edge detection
+  (* no_implicit_conditions *)
+  rule set_thr_pending (!regLastTxReadyIrq && txReadyIrq);
+    regTxIrqPending[2] <= True;
+  endrule
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule thr_empty_irq (regTxIrqPending[0] && txReadyIrq);
+    pulseTxIrq.send;
+  endrule
+  */
 
   // exported irq line
   ////////////////////
@@ -195,6 +222,7 @@ module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
 
   // read requests handling
   /////////////////////////
+  (* descending_urgency = "read_req, write_req" *)
   rule read_req;
     let r <- get (axiShim.master.ar);
     let rsp = AXI4Lite_RFlit { rdata: 0
@@ -208,7 +236,7 @@ module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
         end else // DLR (LSB): Divisor Latch Register (LSB)
           rsp.rdata = zeroExtend (regDLR_LSB);
         // reset rx irq timeout
-        irqReceiveTimer.start (rxTimeout);
+        irqReceiveTimerRestart.send;
       end
       3'h1: begin
         if (regLCR[7] == 0) // IER: Interrupt Enable Register
@@ -227,7 +255,7 @@ module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
           val[3:1] = 3'b010;
         else if (pulseTxIrq) begin
           val[3:1] = 3'b001;
-          regTxIrqPending <= False;
+          regTxIrqPending[1] <= False;
         end else
           val[0] = 1'b1; // no interrupt pending
         rsp.rdata = zeroExtend (val);
@@ -236,8 +264,8 @@ module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
         rsp.rdata = zeroExtend (regLCR);
       3'h5: // LSR: Line Status Register
         rsp.rdata = zeroExtend ({ 1'b0
-                                , pack (txShim.slave.canPut)
-                                , pack (txShim.slave.canPut)
+                                , pack (txEmpty)
+                                , pack (txEmpty)
                                 , 4'b0000
                                 , pack (rxShimMaster.canPeek) });
       3'h7: // SCR: Scratch Register
@@ -260,7 +288,7 @@ module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
       3'h0: begin
         if (regLCR[7] == 0) begin // THR: Transmitter Holding Register
           wireTxData <= truncate (w.wdata);
-          regTxIrqPending <= False;
+          regTxIrqPending[0] <= False;
         end else // DLR (LSB): Divisor Latch Register (LSB)
           regDLR_LSB <= truncate (w.wdata);
       end
