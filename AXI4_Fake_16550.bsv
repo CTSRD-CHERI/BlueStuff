@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2021 Alexandre Joannou
+ * Copyright (c) 2021-2022 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -51,7 +51,7 @@ import FIFOF :: *;
 // rx and tx channels as well as an interrupt line.
 // Note that the registers are byte wide registers, and have been remapped to
 // be 4 bytes appart to be accessible easily on a 32-bit wide AXI4Lite bus.
-module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
+module mkAXI4_Fake_16550 #(Integer clkFreq, Integer txDepth, Integer rxDepth)
   (Tuple4 #( AXI4Lite_Slave #( addr_, data_
                              , awuser_, wuser_, buser_, aruser_, ruser_)
            , AXI4Stream_Master #(txId, txData, txDest, txUser)
@@ -61,13 +61,6 @@ module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
            , Add#(_b, rxData, data_)
            , Add#(_c, 8, data_)
            , Add#(_d, 4, addr_) );
-
-  // transaction buffers
-  AXI4Stream_Shim #(txId, txData, txDest, txUser)
-    txShim <- mkAXI4StreamShim (mkSizedFIFOF (txDepth));
-  AXI4Stream_Shim #(rxId, rxData, rxDest, rxUser)
-    rxShim <- mkAXI4StreamShim (mkSizedFIFOF (rxDepth));
-  let axiShim <- mkAXI4LiteShimFF;
 
   // internal state / wires
   Reg #(Bit #(8))  regIER <- mkReg (8'b00000000);
@@ -80,6 +73,47 @@ module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
   PulseWire        irqTHREmpty <- mkPulseWire;
   Reg #(Bool)      regTHREmptyIrqPending <- mkReg (False);
   Reg #(Bool)      regLastTxReadyIrq <- mkReg (False);
+
+  // AXI4 Lite interface
+  AXI4Lite_Shim #(addr_, data_ , awuser_, wuser_, buser_, aruser_, ruser_)
+    axiShim <- mkAXI4LiteShimFF;
+
+  // AXI4 Stream transmit interface
+  AXI4Stream_Shim #(txId, txData, txDest, txUser)
+    txShim <- mkAXI4StreamShim (mkSizedFIFOF (txDepth));
+  // rate control
+  Integer txBaudRate = 9600;
+  Reg #(Bit #(64)) regRateTx <- mkReg (0);
+  Bool txRateOK =
+    regRateTx >= fromInteger (clkFreq / (txBaudRate / valueOf(txData)));
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule txRateCount (!txRateOK); regRateTx <= regRateTx + 1; endrule
+  let txShimMaster = interface AXI4Stream_Master;
+    method canPeek = txShim.master.canPeek && txRateOK;
+    method peek if (txShim.master.canPeek && txRateOK) = txShim.master.peek;
+    method drop if (txShim.master.canPeek && txRateOK) = action
+      txShim.master.drop;
+      regRateTx <= 0;
+    endaction;
+  endinterface;
+
+  // AXI4 Stream receive interface
+  AXI4Stream_Shim #(rxId, rxData, rxDest, rxUser)
+    rxShim <- mkAXI4StreamShim (mkSizedFIFOF (rxDepth));
+  // rate control
+  Integer rxBaudRate = 9600;
+  Reg #(Bit #(64)) regRateRx <- mkReg (0);
+  Bool rxRateOK =
+    regRateRx >= fromInteger (clkFreq / (rxBaudRate / valueOf(rxData)));
+  (* fire_when_enabled, no_implicit_conditions *)
+  rule rxRateCount (!rxRateOK); regRateRx <= regRateRx + 1; endrule
+  let rxShimSlave = interface AXI4Stream_Slave;
+    method canPut = rxShim.slave.canPut && rxRateOK;
+    method put (x) if (rxShim.slave.canPut && rxRateOK) = action
+      rxShim.slave.put (x);
+      regRateRx <= 0;
+    endaction;
+  endinterface;
 
   // rx handling
   Wire #(Bit #(rxData)) rxData <- mkDWire (?);
@@ -215,15 +249,17 @@ module mkAXI4_Fake_16550 #(Integer txDepth, Integer rxDepth)
 
   // export the AXI4 lite 16550 interfaces as well as the tx and rx streams
   return tuple4 ( axiShim.slave
-                , txShim.master
-                , rxShim.slave
+                , txShimMaster
+                , rxShimSlave
                 , pulseWireToReadOnly (pulseIrq) );
 endmodule
 
 // The mkAXI4_Fake_16550_Pair module instantiates two mkAXI4_Fake_16550
 // modules and connects their rx and tx streams, and returns the two remaining
 // AXI4 lite slave interfaces together with their irq line
-module mkAXI4_Fake_16550_Pair #(Integer txDepth, Integer rxDepth)
+module mkAXI4_Fake_16550_Pair #( Integer clkFreq
+                               , Integer txDepth
+                               , Integer rxDepth )
   (Tuple2 #( Tuple2 #( AXI4Lite_Slave #( addr0_, data0_
                                        , awuser0_, wuser0_, buser0_
                                        , aruser0_, ruser0_)
@@ -242,14 +278,14 @@ module mkAXI4_Fake_16550_Pair #(Integer txDepth, Integer rxDepth)
           , AXI4Stream_Master #(0, data_, 0, 0)
           , AXI4Stream_Slave #(0, data_, 0, 0)
           , ReadOnly #(Bool) )
-    half0 <- mkAXI4_Fake_16550 (txDepth, rxDepth);
+    half0 <- mkAXI4_Fake_16550 (clkFreq, txDepth, rxDepth);
   match {.slv0, .tx0, .rx0, .irq0} = half0;
   Tuple4 #( AXI4Lite_Slave #( addr1_, data1_
                             , awuser1_, wuser1_, buser1_, aruser1_, ruser1_)
           , AXI4Stream_Master #(0, data_, 0, 0)
           , AXI4Stream_Slave #(0, data_, 0, 0)
           , ReadOnly #(Bool) )
-    half1 <- mkAXI4_Fake_16550 (txDepth, rxDepth);
+    half1 <- mkAXI4_Fake_16550 (clkFreq, txDepth, rxDepth);
   match {.slv1, .tx1, .rx1, .irq1} = half1;
   mkConnection (tx0, rx1);
   mkConnection (tx1, rx0);
