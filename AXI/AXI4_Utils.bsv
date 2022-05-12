@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2021 Alexandre Joannou
+ * Copyright (c) 2018-2022 Alexandre Joannou
  * Copyright (c) 2019 Peter Rugg
  * Copyright (c) 2020 Jonas Fiala
  * Copyright (c) 2021 Marno van der Maas
@@ -44,8 +44,7 @@ import AXI4_R_Utils :: *;
 // BlueStuff import
 import Routable :: *;
 import Monitored :: *;
-// BlueBasics import
-import SourceSink :: *;
+import BlueBasics :: *;
 
 // Standard
 import FIFOF :: *;
@@ -311,6 +310,128 @@ function AXI4_Slave #(a, b, c, d_, e_, f_, g_, h_)
   zero_AXI4_Slave_user (AXI4_Slave #(a, b, c, d, e, f, g, h) m) =
   mapAXI4_Slave_user
     (constFn (0), constFn (0), constFn (0), constFn (0), constFn (0), m);
+
+///////////////////////////
+// ID namespace crossing //
+////////////////////////////////////////////////////////////////////////////////
+
+module mkAXI4IDNameSpaceCrossing
+  // received parameters
+  #( parameter NumProxy #(nbEntries) proxyTableSz
+   , parameter NumProxy #(regsCntSz) proxyRegsCntSz )
+  // returned interface
+  ( Tuple2 #( AXI4_Slave  #( id_X, addr_, data_
+                           , awuser_, wuser_, buser_, aruser_, ruser_ )
+            , AXI4_Master #( id_Y, addr_, data_
+                           , awuser_, wuser_, buser_, aruser_, ruser_ )));
+  match {.aw_X, .b_X, .aw_Y, .b_Y}
+    <- mkAXI4WritesIDNameSpaceCrossing (proxyTableSz, proxyRegsCntSz);
+  match {.ar_X, .r_X, .ar_Y, .r_Y}
+    <- mkAXI4ReadsIDNameSpaceCrossing (proxyTableSz, proxyRegsCntSz);
+  let wff <- mkFIFOF;
+  return tuple2 (
+    interface AXI4_Slave;
+      interface aw = aw_X;
+      interface  w = toSink (wff);
+      interface  b = b_X;
+      interface ar = ar_X;
+      interface  r = r_X;
+    endinterface
+  , interface AXI4_Master;
+      interface aw = aw_Y;
+      interface  w = toSource (wff);
+      interface  b = b_Y;
+      interface ar = ar_Y;
+      interface  r = r_Y;
+    endinterface );
+endmodule
+
+module mkAXI4WritesIDNameSpaceCrossing
+  // received parameters
+  #( parameter NumProxy #(nbEntries) proxyTableSz
+   , parameter NumProxy #(regsCntSz) proxyRegsCntSz )
+  // returned interface
+  ( Tuple4 #( Sink #(AXI4_AWFlit #(id_X, addr_, awuser_))
+            , Source #(AXI4_BFlit #(id_X, buser_))
+            , Source #(AXI4_AWFlit #(id_Y, addr_, awuser_))
+            , Sink #(AXI4_BFlit #(id_Y, buser_)) ));
+  let awff_X <- mkFIFOF;
+  let bff_X  <- mkFIFOF;
+  let awff_Y <- mkFIFOF;
+  let bff_Y  <- mkFIFOF;
+  RegistrationTable #(Bit #(id_X), Bit #(id_Y))
+    idsTable <- mkRegistrationTable (proxyTableSz, proxyRegsCntSz);
+  // handle requests
+  rule req;
+    AXI4_AWFlit #(id_X, addr_, awuser_) awflit_X = awff_X.first;
+    let mawid_Y <- idsTable.registerData (awflit_X.awid);
+    case (mawid_Y) matches
+      tagged Valid .awid_Y: begin
+        awff_X.deq;
+        awff_Y.enq (mapAXI4_AWFlit_awid (constFn (awid_Y), awflit_X));
+      end
+    endcase
+  endrule
+  // handle responses
+  rule rsp;
+    AXI4_BFlit #(id_Y, buser_) bflit_Y = bff_Y.first;
+    let mbid_X <- idsTable.deRegisterKey (bflit_Y.bid);
+    case (mbid_X) matches
+      tagged Valid .bid_X: begin
+        bff_Y.deq;
+        bff_X.enq (mapAXI4_BFlit_bid (constFn (bid_X), bflit_Y));
+      end
+    endcase
+  endrule
+  // interface
+  return tuple4 ( toSink (awff_X), toSource (bff_X)
+                , toSource (awff_Y), toSink (bff_Y) );
+endmodule
+
+module mkAXI4ReadsIDNameSpaceCrossing
+  // received parameters
+  #( parameter NumProxy #(nbEntries) proxyTableSz
+   , parameter NumProxy #(regsCntSz) proxyRegsCntSz )
+  // returned interface
+  ( Tuple4 #( Sink #(AXI4_ARFlit #(id_X, addr_, aruser_))
+            , Source #(AXI4_RFlit #(id_X, data_, ruser_))
+            , Source #(AXI4_ARFlit #(id_Y, addr_, aruser_))
+            , Sink #(AXI4_RFlit #(id_Y, data_, ruser_)) ));
+  let arff_X <- mkFIFOF;
+  let rff_X  <- mkFIFOF;
+  let arff_Y <- mkFIFOF;
+  let rff_Y  <- mkFIFOF;
+  RegistrationTable #(Bit #(id_X), Bit #(id_Y))
+    idsTable <- mkRegistrationTable (proxyTableSz, proxyRegsCntSz);
+  // handle requests
+  rule req;
+    AXI4_ARFlit #(id_X, addr_, aruser_) arflit_X = arff_X.first;
+    let marid_Y <- idsTable.registerData (arflit_X.arid);
+    case (marid_Y) matches
+      tagged Valid .arid_Y: begin
+        arff_X.deq;
+        arff_Y.enq (mapAXI4_ARFlit_arid (constFn (arid_Y), arflit_X));
+      end
+    endcase
+  endrule
+  // handle responses
+  rule rsp;
+    AXI4_RFlit #(id_Y, data_, ruser_) rflit_Y = rff_Y.first;
+    let mrid_X = idsTable.dataLookup (rflit_Y.rid);
+    case (mrid_X) matches
+      tagged Valid .rid_X: begin
+        rff_Y.deq;
+        rff_X.enq (mapAXI4_RFlit_rid (constFn (rid_X), rflit_Y));
+        if (rflit_Y.rlast)
+          // this should never fail
+          let _ <- idsTable.deRegisterKey (rflit_Y.rid);
+      end
+    endcase
+  endrule
+  // interface
+  return tuple4 ( toSink (arff_X), toSource (rff_X)
+                , toSource (arff_Y), toSink (rff_Y) );
+endmodule
 
 /////////////////////////
 // AXI4 "dummy" Slaves //
@@ -728,6 +849,7 @@ endmodule
 `defAXI4ShimFIFOF(SizedFIFOF32, mkSizedFIFOF(32))
 `defAXI4ShimFIFOF(UGSizedFIFOF32, mkUGSizedFIFOF(32))
 `defAXI4ShimFIFOF(UGSizedFIFOF4, mkUGSizedFIFOF(4))
+`defAXI4ShimFIFOF(UGFF, mkUGFIFOF)
 
 module mkAXI4Shim (AXI4_Shim#(a, b, c, d, e, f, g, h));
   AXI4_Shim#(a, b, c, d, e, f, g, h) shim <- mkAXI4ShimBypassFIFOF;
