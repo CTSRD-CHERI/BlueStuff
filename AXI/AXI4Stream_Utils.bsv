@@ -43,7 +43,7 @@ import AXI4Stream_Types :: *;
 module mkAXI4StreamShim
   #(function module #(FIFOF #(AXI4Stream_Flit #(a, b, c, d))) mkFF ())
   (AXI4Stream_Shim#(a, b, c, d));
-  let  ff <- mkFF;
+  let ff <- mkFF;
   method clear = ff.clear;
   interface master = toSource(ff);
   interface slave  = toSink(ff);
@@ -63,6 +63,7 @@ endmodule
 `defAXI4StreamShimFIFOF(SizedFIFOF32, mkSizedFIFOF(32))
 `defAXI4StreamShimFIFOF(UGSizedFIFOF32, mkUGSizedFIFOF(32))
 `defAXI4StreamShimFIFOF(UGSizedFIFOF4, mkUGSizedFIFOF(4))
+`defAXI4StreamShimFIFOF(UGFF, mkUGFIFOF)
 
 typeclass ToAXI4Stream_Flit #( type t
                              , numeric type id_
