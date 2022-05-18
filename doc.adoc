@@ -1,4 +1,16 @@
+:toc: macro
+:toclevels: 4
+:toc-title:
+:toc-placement!:
+:source-highlighter:
+
 = BlueStuff
+
+https://github.com/CTSRD-CHERI/BlueStuff/[BlueStuff] aims to provide a set of BSV modules and functions useful to SoC design. Among others, it curently implements generic interconnect logic as well as AXI4 specific utilities. Following is a description and documentation of some relevant subsets of the library.
+
+toc::[]
+
+:sectnums:
 
 == OneHotArbiter
 
