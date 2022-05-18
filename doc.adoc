@@ -1,5 +1,6 @@
-OneHotArbiter
--------------
+= BlueStuff
+
+== OneHotArbiter
 
 Bluestuff's https://github.com/CTSRD-CHERI/BlueStuff/blob/master/OneHotArbiter.bsv[OneHotArbiter] package provides:
 
@@ -7,8 +8,7 @@ Bluestuff's https://github.com/CTSRD-CHERI/BlueStuff/blob/master/OneHotArbiter.b
 - a `OneHotArbiter` interface with a `method ActionValue#(List#(Bool)) next()` method
 -  a generic one-hot arbiter `module mkOneHotArbiter#(List#(t) xs) (OneHotArbiter) provisos (Arbitrable#(t))` module which takes a list of `Arbitrable`-s to arbitrate between as an argument, and can return the next elected element via its `next()` method using a rotating priority
 
-Routable
---------
+== Routable
 
 Bluestuff's https://github.com/CTSRD-CHERI/BlueStuff/blob/master/Routable`[Routable] package provides:
 
@@ -22,7 +22,7 @@ Bluestuff's https://github.com/CTSRD-CHERI/BlueStuff/blob/master/Routable`[Routa
 - an `ExpandReqRsp` class:
 +
 [source,bsv]
------------------
+------------
  typeclass ExpandReqRsp#(type req_a, type req_b, type rsp_a, type rsp_b, type t)
     dependencies (
       (req_a, req_b, t) determines (rsp_a, rsp_b),
@@ -31,7 +31,7 @@ Bluestuff's https://github.com/CTSRD-CHERI/BlueStuff/blob/master/Routable`[Routa
     function req_b expand(req_a r, t x);
     function Tuple2#(rsp_b, t) shrink(rsp_a r);
   endtypeclass
------------------
+------------
 +
 This class should be implemented by request types whose "id fields" needs to be expanded by interconnect logic in order to later route responses (as required for instance by the `mkTwoWayBus` module provided in the https://github.com/CTSRD-CHERI/BlueStuff/blob/master/Interconnect.bsv[Interconnect] package).
 - a `Range#(numeric type n)` type with two fields `Bit#(n) base` and `Bit#(n) size` an associated functions:
@@ -41,15 +41,14 @@ This class should be implemented by request types whose "id fields" needs to be 
   * `function Bool inRange(Range#(n) range, Bit#(n) addr)`
 - a `MappingTable#(numeric type n, numeric type a)` type which consists in a `Vector#(n, Range#(a)` and an associated `function Vector#(n, Bool) routeFromMappingTable (MappingTable#(n, a) mt, Bit#(a) addr)` function which looks for the given address in each memory range in the mapping table and returns the index of the range that hit as a one-hot value (or 0 for no hit).
 
-Interconnect
-------------
+== Interconnect
 
 All buses provided in Bluestuff's https://github.com/CTSRD-CHERI/BlueStuff/blob/master/Interconnect.bsv[Interconnect] package support multi-flit transactions. The package provides:
 
 - a `mkOneWayBus` module:
 +
 [source,bsv]
------------------
+------------
   module mkOneWayBus#(
     Vector#(nIns, Tuple2#(in_t, path_t)) ins,
     Vector#(nOuts, out_t#(flit_t)) outs
@@ -62,13 +61,13 @@ All buses provided in Bluestuff's https://github.com/CTSRD-CHERI/BlueStuff/blob/
     Add#(1, c__, nIns), // at least one source is needed
     Add#(1, d__, nOuts) // at least one sink is needed
   );
------------------
+------------
 +
 This module connects a vector of sources with a vector of sinks. The sources produce some payload together with their desired destination used to select the appropriate sink. Only a single source can be connected to a single sink at any given time. This bus achieves this by using an instance of the arbiter provided in the https://github.com/CTSRD-CHERI/BlueStuff/blob/master/OneHotArbiter.bsv[OneHotArbiter] package.
 - a `mkTwoWayBus` module:
 +
 [source,bsv]
------------------
+------------
 module mkTwoWayBus#(
   function Vector#(nRoutes, Bool) route (routing_t val),
   Vector#(nMasters, Master#(m2s_a, s2m_b)) ms,
@@ -84,7 +83,7 @@ module mkTwoWayBus#(
   Add#(1, b__, nSlaves), // at least one slave is needed
   Add#(nRoutes, 0, nSlaves) // nRoutes == nSlaves
   );
------------------
+------------
 +
 This module connects a vector of masters with a vector of slaves using a provided routing function. The masters are wrapped such that they provide a source of requests together with a desired destination (using the provided routing function) and a sink of response. The slaves are wrapped such that they provide a sink of "large" requests (with additional provenance information) and a source of responses together with the additional provenance information (see the `ExpandReqRsp` class in the https://github.com/CTSRD-CHERI/BlueStuff/blob/master/Routable.bsv[Routable] package). The pairs of sources and sinks are connected using two `mkOneWayBus`-s.
 - a `mkInOrderTwoWayBus` which imposes in order delivery of requests and responses on a `mkTwoWayBus`.
