@@ -1549,7 +1549,7 @@ function AXI4_Master#(a,b,c,d,e,f,g,h) toGuarded_AXI4_Master
     interface r  = toGuardedSink(m.r);
   endinterface;
 
-module AXI4_Slave#(a,b,c,d,e,f,g,h) toGuarded_AXI4_Slave
+function AXI4_Slave#(a,b,c,d,e,f,g,h) toGuarded_AXI4_Slave
       (AXI4_Slave#(a,b,c,d,e,f,g,h) s) =
   interface AXI4_Slave;
     interface aw = toGuardedSink(s.aw);
