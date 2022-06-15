@@ -1503,8 +1503,8 @@ module sizedSerializeWithId_AXI4_Master
   return axiShim.master;
 endmodule
 
-/////////////////////////////
-// to unguarded interfaces //
+/////////////////////////////////////
+// to guarded/unguarded interfaces //
 ////////////////////////////////////////////////////////////////////////////////
 
 module toUnguarded_AXI4_Master#(AXI4_Master#(a, b, c, d, e, f, g, h) m)
@@ -1538,6 +1538,26 @@ module toUnguarded_AXI4_Slave#(AXI4_Slave#(a, b, c, d, e, f, g, h) s)
     interface r  = u_r;
   endinterface;
 endmodule
+
+function AXI4_Master#(a,b,c,d,e,f,g,h) toGuarded_AXI4_Master
+        (AXI4_Master#(a,b,c,d,e,f,g,h) m) =
+  interface AXI4_Master;
+    interface aw = toGuardedSource(m.aw);
+    interface w  = toGuardedSource(m.w);
+    interface b  = toGuardedSink(m.b);
+    interface ar = toGuardedSource(m.ar);
+    interface r  = toGuardedSink(m.r);
+  endinterface;
+
+module AXI4_Slave#(a,b,c,d,e,f,g,h) toGuarded_AXI4_Slave
+      (AXI4_Slave#(a,b,c,d,e,f,g,h) s) =
+  interface AXI4_Slave;
+    interface aw = toGuardedSink(s.aw);
+    interface w  = toGuardedSink(s.w);
+    interface b  = toGuardedSource(s.b);
+    interface ar = toGuardedSink(s.ar);
+    interface r  = toGuardedSource(s.r);
+  endinterface;
 
 function AXI4_Master#(a,b,c,d,e,f,g,h) guard_AXI4_Master
         (AXI4_Master#(a,b,c,d,e,f,g,h) raw, Bool block) =
