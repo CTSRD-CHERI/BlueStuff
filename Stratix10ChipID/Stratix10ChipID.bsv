@@ -81,10 +81,19 @@ module mkStratix10ChipID(Get#(Bit#(64)));
   return toGet(idfifo);
 endmodule
 
+module mkStratix10ChipID_Sim#(Bit#(64) default_id)(Get#(Bit#(64)));
+  Reg#(Bit#(64)) idreg <- mkReg(default_id);
+  return toGet(idreg);
+endmodule
+
 module mkAXI4_Stratix10ChipID (AXI4Lite_Slave #( addr_, 32
                                                , awuser_, wuser_, buser_
                                                , aruser_, ruser_));
+`ifdef BSIM
+  let chip_id_reader <- mkStratix10ChipID_Sim(10); // Use "10" as chip id in simulation for now.
+`else
   let chip_id_reader <- mkStratix10ChipID;
+`endif
   let axiShim <- mkAXI4LiteShimFF;
   // read requests handling, i.e. return the Stratix10 Chip ID
   rule read_req;
