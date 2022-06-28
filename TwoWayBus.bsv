@@ -7,6 +7,13 @@
  * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
  * DARPA SSITH research programme.
  *
+ * This material is based upon work supported by the DoD Information Analysis
+ * Center Program Management Office (DoD IAC PMO), sponsored by the Defense
+ * Technical Information Center (DTIC) under Contract No. FA807518D0004.  Any
+ * opinions, findings and conclusions or recommendations expressed in this
+ * material are those of the author(s) and do not necessarily reflect the views
+ * of the Air Force Installation Contracting Agency (AFICA).
+ *
  * @BERI_LICENSE_HEADER_START@
  *
  * Licensed to BERI Open Systems C.I.C. (BERI) under one or more contributor
@@ -29,6 +36,7 @@
 package TwoWayBus;
 
 export mkTwoWayBus;
+export mkUpDownSwitch;
 export mkRelaxedTwoWayBus;
 export mkInOrderTwoWayBus;
 
@@ -95,6 +103,41 @@ module mkTwoWayBus #(
               , map (getSlaveRspIfc, cons (innerNoRouteSlv, innerSlaves))
               , map (getMasterRspIfc, innerMasters));
 
+endmodule
+
+////////////////////
+// Up/Down switch //
+////////////////////////////////////////////////////////////////////////////////
+// A simple module routing traffic up from masters to slaves and back down from
+// slaves to masters
+
+module mkUpDownSwitch #(
+  function Vector #(nSlvs, Bool)  routeUp    (r_up_t x)
+, function Vector #(nMsts, Bool)  routeDown  (r_down_t x)
+, Vector #(nMsts, Master #(req_t, rsp_t)) ms
+, Vector #(nSlvs, Slave  #(req_t, rsp_t)) ss
+) (Empty) provisos (
+  Bits #(req_t, req_sz), Bits #(rsp_t, rsp_sz)
+, Routable #(req_t, r_up_t)
+, Routable #(rsp_t, r_down_t)
+, FallibleRoute #(req_t, rsp_t)
+  // assertion on argument sizes
+, Add #(1, _a, nMsts) // at least one Master is needed
+, Add #(1, _b, nSlvs) // at least one slave is needed
+);
+  // no transformation on masters
+  module wrapMaster #(Master #(req_t, rsp_t) m, Integer _idx)
+                     (Master #(req_t, rsp_t));
+    return m;
+  endmodule
+  // no transformation on slaves
+  module wrapSlave #(Slave #(req_t, rsp_t) s) (Slave #(req_t, rsp_t));
+    return s;
+  endmodule
+  // no route slave
+  let noRouteSlv <- mkNoRouteSlave;
+  // inner core bus
+  mkTwoWayBus (routeUp, routeDown, noRouteSlv, wrapMaster, wrapSlave, ms, ss);
 endmodule
 
 /////////////////////////

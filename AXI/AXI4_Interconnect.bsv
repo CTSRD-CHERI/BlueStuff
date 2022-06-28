@@ -1,11 +1,18 @@
 /*-
- * Copyright (c) 2018-2021 Alexandre Joannou
+ * Copyright (c) 2018-2022 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
  * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
  * DARPA SSITH research programme.
+ *
+ * This material is based upon work supported by the DoD Information Analysis
+ * Center Program Management Office (DoD IAC PMO), sponsored by the Defense
+ * Technical Information Center (DTIC) under Contract No. FA807518D0004.  Any
+ * opinions, findings and conclusions or recommendations expressed in this
+ * material are those of the author(s) and do not necessarily reflect the views
+ * of the Air Force Installation Contracting Agency (AFICA).
  *
  * @BERI_LICENSE_HEADER_START@
  *
@@ -30,6 +37,7 @@ package AXI4_Interconnect;
 
 export mkAXI4Bus;
 export mkAXI4Bus_Sig;
+export mkAXI4Switch;
 
 import List   :: *;
 import Vector :: *;
@@ -43,84 +51,122 @@ import ListExtra    :: *;
 import Interconnect :: *;
 import Routable     :: *;
 
+`define PARAMS t_addr, t_data, t_awuser, t_wuser, t_buser, t_aruser, t_ruser
+`define MPARAMS t_mid, `PARAMS
+`define SPARAMS t_sid, `PARAMS
+
+
+///////////////////////////////////////////
+// AXI4 Write merge/split - Read helpers //
+////////////////////////////////////////////////////////////////////////////////
+
+module fromAXI4MasterToWriteMasterReadMaster #(AXI4_Master #(`MPARAMS) m)
+  (Tuple2 #( Master #( AXI4_WriteFlit #( t_mid, t_addr, t_data
+                                       , t_awuser, t_wuser )
+                     , AXI4_BFlit #(t_mid, t_buser) )
+           , Master #( AXI4_ARFlit #(t_mid, t_addr, t_aruser)
+                     , AXI4_RFlit #(t_mid, t_data, t_ruser) ) ));
+  let merged <- mergeWrite (m.aw, m.w);
+  return tuple2 ( interface Master;
+                    interface req = merged;
+                    interface rsp = m.b;
+                  endinterface
+                , interface Master;
+                    interface req = m.ar;
+                    interface rsp = m.r;
+                  endinterface );
+endmodule
+
+module fromAXI4SlaveToWriteSlaveReadSlave #(AXI4_Slave #(`SPARAMS) s)
+  (Tuple2 #( Slave #( AXI4_WriteFlit #(t_sid, t_addr, t_data, t_awuser, t_wuser)
+                    , AXI4_BFlit #(t_sid, t_buser) )
+           , Slave #( AXI4_ARFlit #(t_sid, t_addr, t_aruser)
+                    , AXI4_RFlit #(t_sid, t_data, t_ruser) ) ));
+  let split <- splitWrite (s.aw, s.w);
+  return tuple2 ( interface Slave;
+                    interface req = split;
+                    interface rsp = s.b;
+                  endinterface
+                , interface Slave;
+                    interface req = s.ar;
+                    interface rsp = s.r;
+                  endinterface );
+endmodule
+
 //////////////
 // AXI4 bus //
 ////////////////////////////////////////////////////////////////////////////////
+// This AXI4 bus will route requests from AXI4 masters to an AXI4 slave based on
+// the provided routing function, and will automatically take care of augmenting
+// the ID field for appropriate routing back of the response (hence the size
+// difference between the master side ID field and the slave side ID field as
+// captured in the provisos)
 
-`define PARAMS addr_, data_, awuser_, wuser_, buser_, aruser_, ruser_
-`define MPARAMS id_, `PARAMS
-`define SPARAMS sid_, `PARAMS
+module mkAXI4Bus #(
+  function Vector #(nSlaves, Bool) route (Bit #(t_addr) val)
+, Vector #(nMasters, AXI4_Master #(`MPARAMS)) masters
+, Vector #(nSlaves,  AXI4_Slave  #(`SPARAMS)) slaves
+) (Empty) provisos (
+  Add #(1, a__, nSlaves)
+, Add #(1, b__, nMasters)
+, Add #(t_mid, TLog #(nMasters), t_sid)
+);
+
+  // prepare masters and slaves
+  let mPairs <- mapM (fromAXI4MasterToWriteMasterReadMaster, masters);
+  match {.write_masters, .read_masters} = unzip (mPairs);
+  let sPairs <- mapM (fromAXI4SlaveToWriteSlaveReadSlave, slaves);
+  match {.write_slaves, .read_slaves} = unzip (sPairs);
+
+  // connect with standard busses
+  mkRelaxedTwoWayBus (route, write_masters, write_slaves);
+  mkRelaxedTwoWayBus (route, read_masters,  read_slaves);
+
+endmodule
 
 module mkAXI4Bus_Sig #(
-  function Vector #(nSlaves, Bool) route (Bit #(addr_) val)
+  function Vector #(nSlaves, Bool) route (Bit #(t_addr) val)
 , Vector #(nMasters, AXI4_Master_Sig #(`MPARAMS)) masters
 , Vector #(nSlaves,  AXI4_Slave_Sig  #(`SPARAMS)) slaves
 ) (Empty) provisos (
   Add #(1, a__, nSlaves)
 , Add #(1, b__, nMasters)
-, Add #(id_, TLog #(nMasters), sid_)
+, Add #(t_mid, TLog #(nMasters), t_sid)
 );
   let msNoSig <- mapM (fromAXI4_Master_Sig, masters);
   let ssNoSig <- mapM (fromAXI4_Slave_Sig,  slaves);
   mkAXI4Bus (route, msNoSig, ssNoSig);
 endmodule
 
-module mkAXI4Bus #(
-  function Vector #(nSlaves, Bool) route (Bit #(addr_) val)
+/////////////////
+// AXI4 switch //
+////////////////////////////////////////////////////////////////////////////////
+// This module takes care of routing the requests from AXI4 masters to AXI4
+// slaves using the provided request routing function and the address field, and
+// routes the responses from AXI4 slaves to AXI4 masters using the provided
+// response routing function. It DOES NOT alter the ID field in any way, unlike
+// the mkAXI4Bus module.
+
+module mkAXI4Switch #(
+  function Vector #(nSlaves, Bool) routeReq (Bit #(t_addr) val)
+, function Vector #(nMasters, Bool) routeRsp (Bit #(t_mid) val)
 , Vector #(nMasters, AXI4_Master #(`MPARAMS)) masters
 , Vector #(nSlaves,  AXI4_Slave  #(`SPARAMS)) slaves
 ) (Empty) provisos (
   Add #(1, a__, nSlaves)
 , Add #(1, b__, nMasters)
-, Add #(id_, TLog #(nMasters), sid_)
+, Add #(0, t_mid, t_sid) // Masters and Slaves with same width ID field
 );
 
-  // prepare masters
-  Vector #( nMasters
-          , Master #( AXI4_WriteFlit #(id_, addr_, data_, awuser_, wuser_)
-                    , AXI4_BFlit #(id_, buser_)))
-    write_masters = newVector;
-  Vector #(nMasters, Master #( AXI4_ARFlit #(id_, addr_, aruser_)
-                             , AXI4_RFlit #(id_, data_, ruser_)))
-    read_masters = newVector;
-  for (Integer i = 0; i < valueOf (nMasters); i = i + 1) begin
-    Bit #(TLog #(nMasters)) mid = fromInteger (i);
-    // merge from write masters
-    let merged <- mergeWrite (masters[i].aw, masters[i].w);
-    write_masters[i] = interface Master;
-      interface req = merged;
-      interface rsp = masters[i].b;
-    endinterface;
-    read_masters[i] = interface Master;
-      interface req = masters[i].ar;
-      interface rsp = masters[i].r;
-    endinterface;
-  end
-
-  // prepare slaves
-  Vector #( nSlaves
-          , Slave #( AXI4_WriteFlit #(sid_, addr_, data_, awuser_, wuser_)
-                   , AXI4_BFlit #(sid_, buser_)))
-    write_slaves = newVector;
-  Vector #(nSlaves, Slave #( AXI4_ARFlit #(sid_, addr_, aruser_)
-                           , AXI4_RFlit #(sid_, data_, ruser_)))
-    read_slaves = newVector;
-  for (Integer i = 0; i < valueOf (nSlaves); i = i + 1) begin
-    // split to write slaves
-    let split <- splitWrite (slaves[i].aw, slaves[i].w);
-    write_slaves[i] = interface Slave;
-      interface req = split;
-      interface rsp = slaves[i].b;
-    endinterface;
-    read_slaves[i] = interface Slave;
-      interface req = slaves[i].ar;
-      interface rsp = slaves[i].r;
-    endinterface;
-  end
+  // prepare masters and slaves
+  let mPairs <- mapM (fromAXI4MasterToWriteMasterReadMaster, masters);
+  match {.write_masters, .read_masters} = unzip (mPairs);
+  let sPairs <- mapM (fromAXI4SlaveToWriteSlaveReadSlave, slaves);
+  match {.write_slaves, .read_slaves} = unzip (sPairs);
 
   // connect with standard busses
-  mkRelaxedTwoWayBus (route, write_masters, write_slaves);
-  mkRelaxedTwoWayBus (route, read_masters,  read_slaves);
+  mkUpDownSwitch (routeReq, routeRsp, write_masters, write_slaves);
+  mkUpDownSwitch (routeReq, routeRsp, read_masters, read_slaves);
 
 endmodule
 

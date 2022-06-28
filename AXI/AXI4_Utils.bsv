@@ -228,9 +228,9 @@ function AXI4_Master #(a, b, c, d_, e_, f_, g_, h_)
 
 //------------------------------------------------------------------------------
 
-function AXI4_Slave #(a, addr_b, c, d, e, f, g, h)
-  mapAXI4_Slave_addr ( function Bit #(addr_a) fun (Bit #(addr_b) x)
-                     , AXI4_Slave #(a, addr_a, c, d, e, f, g, h) s) =
+function AXI4_Slave #(a, addr_in, c, d, e, f, g, h)
+  mapAXI4_Slave_addr ( function Bit #(addr_out) fun (Bit #(addr_in) x)
+                     , AXI4_Slave #(a, addr_out, c, d, e, f, g, h) s) =
   interface AXI4_Slave;
     interface aw = mapSink (mapAXI4_AWFlit_awaddr (fun), s.aw);
     interface  w = s.w;
@@ -259,22 +259,23 @@ function AXI4_Slave #(a, b, c, d_, e_, f_, g_, h_)
 ////////////////////////////////////////////////////////////////////////////////
 
 function AXI4_Master #(id_out, b, c, d, e, f, g, h)
-  prepend_AXI4_Master_id ( Bit #(TSub #(id_out, id_in)) upperBits
+  prepend_AXI4_Master_id ( Bit #(t_upper_sz) upperBits
                          , AXI4_Master #(id_in, b, c, d, e, f, g, h) m)
-  provisos (Add#(_a, id_in, id_out)); // id_out >= id_in
+  provisos (Add #(t_upper_sz, id_in, id_out)); // id_out = t_upper_sz + id_in
   function fun (x) = {upperBits, x};
   return mapAXI4_Master_id (fun, truncate, m);
 endfunction
 
 function AXI4_Master #(a, addr_out, c, d, e, f, g, h)
   truncate_AXI4_Master_addr (AXI4_Master #(a, addr_in, c, d, e, f, g, h) m)
-  provisos (Add#(_a, addr_out, addr_in)) // addr_in >= addr_out
+  provisos (Add #(_a, addr_out, addr_in)) // addr_in >= addr_out
   = mapAXI4_Master_addr (truncate, m);
 
-function AXI4_Master #(a, addr_b, c, d, e, f, g, h)
-  prepend_AXI4_Master_addr ( Bit #(TSub #(addr_b, addr_a)) upperBits
-                          , AXI4_Master #(a, addr_a, c, d, e, f, g, h) m)
-  provisos (Add#(_a, addr_a, addr_b)); // addr_b >= addr_a
+function AXI4_Master #(a, addr_out, c, d, e, f, g, h)
+  prepend_AXI4_Master_addr ( Bit #(t_upper_sz) upperBits
+                          , AXI4_Master #(a, addr_in, c, d, e, f, g, h) m)
+  provisos (Add #(t_upper_sz, addr_in, addr_out)); // addr_out = t_upper_sz
+                                                   //            + addr_in
   function f (x) = {upperBits, x};
   return mapAXI4_Master_addr (f, m);
 endfunction
@@ -286,15 +287,16 @@ function AXI4_Master #(a, b, c, d_, e_, f_, g_, h_)
 
 //------------------------------------------------------------------------------
 
-function AXI4_Slave #(a, addr_out, c, d, e, f, g, h)
-  truncate_AXI4_Slave_addr (AXI4_Slave #(a, addr_in, c, d, e, f, g, h) s)
-  provisos (Add#(_a, addr_in, addr_out)) // addr_out >= addr_in
+function AXI4_Slave #(a, addr_in, c, d, e, f, g, h)
+  truncate_AXI4_Slave_addr (AXI4_Slave #(a, addr_out, c, d, e, f, g, h) s)
+  provisos (Add #(_a, addr_out, addr_in)) // addr_in >= addr_out
   = mapAXI4_Slave_addr (truncate, s);
 
-function AXI4_Slave #(a, addr_a, c, d, e, f, g, h)
-  prepend_AXI4_Slave_addr ( Bit #(TSub #(addr_b, addr_a)) upperBits
-                          , AXI4_Slave #(a, addr_b, c, d, e, f, g, h) s)
-  provisos (Add#(_a, addr_a, addr_b)); // addr_b >= addr_b
+function AXI4_Slave #(a, addr_in, c, d, e, f, g, h)
+  prepend_AXI4_Slave_addr ( Bit #(t_upper_sz) upperBits
+                          , AXI4_Slave #(a, addr_out, c, d, e, f, g, h) s)
+  provisos (Add #(t_upper_sz, addr_in, addr_out)); // addr_out = t_upper_sz
+                                                   //            + addr_in
   function f (x) = {upperBits, x};
   return mapAXI4_Slave_addr (f, s);
 endfunction
@@ -314,6 +316,36 @@ function AXI4_Slave #(a, b, c, d_, e_, f_, g_, h_)
 ///////////////////////////
 // ID namespace crossing //
 ////////////////////////////////////////////////////////////////////////////////
+
+module change_AXI4_Master_Id #( // received parameters
+                                parameter NumProxy #(nbEntries) proxyTableSz
+                              , parameter NumProxy #(regsCntSz) proxyRegsCntSz
+                                // received master port
+                              , AXI4_Master #(t_id_a,b,c,d,e,f,g,h) mstr_a )
+  // returned interface
+  (AXI4_Master #(t_id_b,b,c,d,e,f,g,h));
+  Tuple2 #( AXI4_Slave  #(t_id_a,b,c,d,e,f,g,h)
+          , AXI4_Master #(t_id_b,b,c,d,e,f,g,h) )
+    ifcs <- mkAXI4IDNameSpaceCrossing (proxyTableSz, proxyRegsCntSz);
+  match {.slv_a, .mstr_b} = ifcs;
+  mkConnection (mstr_a, slv_a);
+  return mstr_b;
+endmodule
+
+module change_AXI4_Slave_Id #( // received parameters
+                               parameter NumProxy #(nbEntries) proxyTableSz
+                             , parameter NumProxy #(regsCntSz) proxyRegsCntSz
+                               // received master port
+                             , AXI4_Slave #(t_id_a,b,c,d,e,f,g,h) slv_a )
+  // returned interface
+  (AXI4_Slave #(t_id_b,b,c,d,e,f,g,h));
+  Tuple2 #( AXI4_Slave  #(t_id_b,b,c,d,e,f,g,h)
+          , AXI4_Master #(t_id_a,b,c,d,e,f,g,h) )
+    ifcs <- mkAXI4IDNameSpaceCrossing (proxyTableSz, proxyRegsCntSz);
+  match {.slv_b, .mstr_a} = ifcs;
+  mkConnection (mstr_a, slv_a);
+  return slv_b;
+endmodule
 
 module mkAXI4IDNameSpaceCrossing
   // received parameters

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2021 Alexandre Joannou
+ * Copyright (c) 2018-2022 Alexandre Joannou
  * Copyright (c) 2019 Peter Rugg
  * Copyright (c) 2020 Jonas Fiala
  * Copyright (c) 2021 Ivan Ribeiro
@@ -11,6 +11,13 @@
  * Cambridge Computer Laboratory (Department of Computer Science and
  * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
  * DARPA SSITH research programme.
+ *
+ * This material is based upon work supported by the DoD Information Analysis
+ * Center Program Management Office (DoD IAC PMO), sponsored by the Defense
+ * Technical Information Center (DTIC) under Contract No. FA807518D0004.  Any
+ * opinions, findings and conclusions or recommendations expressed in this
+ * material are those of the author(s) and do not necessarily reflect the views
+ * of the Air Force Installation Contracting Agency (AFICA).
  *
  * @BERI_LICENSE_HEADER_START@
  *
@@ -263,6 +270,9 @@ typedef struct {
 instance DefaultValue#(AXI4_BFlit#(id_, user_));
   function defaultValue = AXI4_BFlit { bid: 0, bresp: OKAY, buser: ? };
 endinstance
+instance Has_routingField #(AXI4_BFlit #(id_, user_), Bit #(id_));
+  function routingField (x) = x.bid;
+endinstance
 instance Has_isLast #(AXI4_BFlit #(id_, user_));
   function isLast = constFn (True);
 endinstance
@@ -468,6 +478,9 @@ instance DefaultValue#(AXI4_RFlit#(id_, data_, user_));
   function defaultValue = AXI4_RFlit {
     rid: 0, rdata: ?, rresp: OKAY, rlast: True, ruser: ?
   };
+endinstance
+instance Has_routingField #(AXI4_RFlit #(id_, data_, user_), Bit #(id_));
+  function routingField (x) = x.rid;
 endinstance
 instance Has_isLast #(AXI4_RFlit #(id_, data_, user_));
   function isLast (x) = x.rlast;

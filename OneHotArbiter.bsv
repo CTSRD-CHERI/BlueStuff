@@ -31,6 +31,7 @@ package OneHotArbiter;
 import FIFOF :: *;
 import Printf :: *;
 
+import List :: *;
 import ListExtra :: *;
 import SourceSink :: *;
 
