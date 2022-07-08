@@ -34,7 +34,7 @@
  */
 
 import Virtualizable :: *;
-import AXI :: *;
+import BlueAXI4 :: *;
 
 import MasterSlave :: *;
 import Printf :: *;

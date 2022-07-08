@@ -4,3 +4,6 @@
 [submodule "SocketPacketUtils"]
 	path = SocketPacketUtils
 	url = https://github.com/CTSRD-CHERI/SocketPacketUtils.git
+[submodule "BlueAXI4"]
+	path = BlueAXI4
+	url = https://github.com/CTSRD-CHERI/BlueAXI4.git

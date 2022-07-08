@@ -26,7 +26,7 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
-import AXI :: *;
+import BlueAXI4 :: *;
 import SourceSink :: *;
 
 import FIFOF :: *;

@@ -48,7 +48,7 @@ export mkAXI4LiteSimpleMem;
 export mkAXI4LiteMem;
 export mkAXI4LiteMem2;
 
-import AXI         :: *;
+import BlueAXI4    :: *;
 import FIFO        :: *;
 import MemSim      :: *;
 import MemBRAM     :: *;
