@@ -89,11 +89,9 @@ endmodule
 module mkAXI4_Stratix10ChipID (AXI4Lite_Slave #( addr_, 32
                                                , awuser_, wuser_, buser_
                                                , aruser_, ruser_));
-`ifdef BSIM
-  let chip_id_reader <- mkStratix10ChipID_Sim(10); // Use "10" as chip id in simulation for now.
-`else
-  let chip_id_reader <- mkStratix10ChipID;
-`endif
+  Get #(Bit #(64)) chip_id_reader <-
+    (genC) ? mkStratix10ChipID_Sim (10) // Use "10" as chip id in simulation for now.
+           : mkStratix10ChipID;
   let axiShim <- mkAXI4LiteShimFF;
   // read requests handling, i.e. return the Stratix10 Chip ID
   rule read_req;
