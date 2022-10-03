@@ -60,7 +60,7 @@ import MasterSlave :: *;
 // 1 port memory //
 ////////////////////////////////////////////////////////////////////////////////
 
-module mkMem #(Integer size, Maybe #(String) file) (Mem #(addr_t, data_t))
+module mkMem #(Integer size, MemInit init) (Mem #(addr_t, data_t))
   provisos ( NumAlias #(nbChunks, TDiv #(data_sz, SizeOf #(MemSimDataT)))
            , Bits #(addr_t, addr_sz)
            , Bits #(data_t, data_sz)
@@ -71,12 +71,17 @@ module mkMem #(Integer size, Maybe #(String) file) (Mem #(addr_t, data_t))
            , Add #(_b, TDiv #(data_sz, 8), TMul #(nbChunks, 8))
            , Add #(_c, data_sz, TMul #(nbChunks, SizeOf #(MemSimDataT))) );
   `ifdef ALTERA
+    String initStr = case (init) matches
+      tagged UnInit: "UNUSED"
+      tagged FilePath .f: f
+      default: error ("unsupported memory initialization method")
+    endcase;
     BRAM #(idx_sz, data_sz)
-      m <- mkAlteraBRAM (size, fromMaybe ("UNUSED", file));
+      m <- mkAlteraBRAM (size, initStr);
     Mem #(addr_t, data_t) mem <- wrapUnaligned ("port 0", m);
     return mem;
   `else
-    Mem #(addr_t, data_t) mem[1] <- mkMemSim (1, size, file);
+    Mem #(addr_t, data_t) mem[1] <- mkMemSim (1, size, init);
     return mem[0];
   `endif
 endmodule
@@ -85,7 +90,7 @@ endmodule
 // 2 ports memory //
 ////////////////////////////////////////////////////////////////////////////////
 
-module mkMem2 #(Integer size, Maybe #(String) file)
+module mkMem2 #(Integer size, MemInit init)
                (Array #(Mem #(addr_t, data_t)))
   provisos ( NumAlias #(nbChunks, TDiv #(data_sz, SizeOf #(MemSimDataT)))
            , Bits #(addr_t, addr_sz)
@@ -97,14 +102,19 @@ module mkMem2 #(Integer size, Maybe #(String) file)
            , Add #(_b, TDiv #(data_sz, 8), TMul #(nbChunks, 8))
            , Add #(_c, data_sz, TMul #(nbChunks, SizeOf #(MemSimDataT))) );
   `ifdef ALTERA
+    String initStr = case (init) matches
+      tagged UnInit: "UNUSED"
+      tagged FilePath .f: f
+      default: error ("unsupported memory initialization method")
+    endcase;
     BRAM2 #(idx_sz, data_sz, idx_sz, data_sz)
-      m <- mkAlteraBRAM2 (size, fromMaybe ("UNUSED", file));
+      m <- mkAlteraBRAM2 (size, initStr);
     Mem #(addr_t, data_t) mem[2];
     mem[0] <- wrapUnaligned ("port0", m.p0);
     mem[1] <- wrapUnaligned ("port1", m.p1);
     return mem;
   `else
-    Mem #(addr_t, data_t) mem[2] <- mkMemSim (2, size, file);
+    Mem #(addr_t, data_t) mem[2] <- mkMemSim (2, size, init);
     return mem;
   `endif
 endmodule
@@ -113,7 +123,7 @@ endmodule
 // AXI4Lite memories //
 ////////////////////////////////////////////////////////////////////////////////
 
-module mkAXI4LiteSimpleMem #(Integer size, Maybe #(String) file)
+module mkAXI4LiteSimpleMem #(Integer size, MemInit init)
                             (AXI4Lite_Slave #( addr_sz, data_sz
                                              , awuser_sz, wuser_sz, buser_sz
                                              , aruser_sz, ruser_sz ))
@@ -125,7 +135,7 @@ module mkAXI4LiteSimpleMem #(Integer size, Maybe #(String) file)
            , Add #(_c, addr_sz, MemSimMaxAddrSize)
            , Add #(_e, TDiv #(data_sz, 8), TMul #(nbChunks, 8))
            , Add #(_f, data_sz, TMul #(nbChunks, SizeOf #(MemSimDataT))) );
-  Mem #(Bit #(addr_sz), Bit #(data_sz)) mem <- mkMem (size, file);
+  Mem #(Bit #(addr_sz), Bit #(data_sz)) mem <- mkMem (size, init);
   Mem #(Bit #(addr_sz), Bit #(data_sz)) m[2];
   m[0] = mem;
   m[1] = mem;
@@ -133,7 +143,7 @@ module mkAXI4LiteSimpleMem #(Integer size, Maybe #(String) file)
   return ifc;
 endmodule
 
-module mkAXI4LiteMem #(Integer size, Maybe #(String) file)
+module mkAXI4LiteMem #(Integer size, MemInit init)
                       (AXI4Lite_Slave #( addr_sz, data_sz
                                        , awuser_sz, wuser_sz, buser_sz
                                        , aruser_sz, ruser_sz ))
@@ -145,7 +155,7 @@ module mkAXI4LiteMem #(Integer size, Maybe #(String) file)
            , Add #(_d, addr_sz, MemSimMaxAddrSize)
            , Add #(_e, TDiv #(data_sz, 8), TMul #(nbChunks, 8))
            , Add #(_f, data_sz, TMul #(nbChunks, SizeOf #(MemSimDataT))) );
-  Mem #(Bit #(addr_sz), Bit #(data_sz)) mem[2] <- mkMem2 (size, file);
+  Mem #(Bit #(addr_sz), Bit #(data_sz)) mem[2] <- mkMem2 (size, init);
   AXI4Lite_Slave #( addr_sz, data_sz
                   , awuser_sz, wuser_sz, buser_sz
                   , aruser_sz, ruser_sz) ifc;
@@ -153,7 +163,7 @@ module mkAXI4LiteMem #(Integer size, Maybe #(String) file)
   return ifc;
 endmodule
 
-module mkAXI4LiteMem2 #(Integer size, Maybe #(String) file)
+module mkAXI4LiteMem2 #(Integer size, MemInit init)
                        (Array #(AXI4Lite_Slave #( addr_sz, data_sz
                                                 , awuser_sz, wuser_sz, buser_sz
                                                 , aruser_sz, ruser_sz )))
@@ -165,7 +175,7 @@ module mkAXI4LiteMem2 #(Integer size, Maybe #(String) file)
            , Add #(_d, addr_sz, MemSimMaxAddrSize)
            , Add #(_e, TDiv #(data_sz, 8), TMul #(nbChunks, 8))
            , Add #(_f, data_sz, TMul #(nbChunks, SizeOf #(MemSimDataT))) );
-  Mem #(Bit #(addr_sz), Bit #(data_sz)) mem[2] <- mkMem2 (size, file);
+  Mem #(Bit #(addr_sz), Bit #(data_sz)) mem[2] <- mkMem2 (size, init);
   Mem #(Bit #(addr_sz), Bit #(data_sz)) portA[2];
   portA[0] = mem[0];
   portA[1] = mem[0];
@@ -184,7 +194,7 @@ endmodule
 // AXI4 memories //
 ////////////////////////////////////////////////////////////////////////////////
 
-module mkAXI4SimpleMem #(Integer size, Maybe #(String) file)
+module mkAXI4SimpleMem #(Integer size, MemInit init)
                         (AXI4_Slave #( id_sz, addr_sz, data_sz
                                      , awuser_sz, wuser_sz, buser_sz
                                      , aruser_sz, ruser_sz ))
@@ -205,7 +215,7 @@ module mkAXI4SimpleMem #(Integer size, Maybe #(String) file)
            , Add #(_d, addr_sz, MemSimMaxAddrSize)
            , Add #(_e, TDiv #(data_sz, 8), TMul #(nbChunks, 8))
            , Add #(_f, data_sz, TMul #(nbChunks, SizeOf #(MemSimDataT))) );
-  Mem #(Bit #(addr_sz), Bit #(data_sz)) mem <- mkMem (size, file);
+  Mem #(Bit #(addr_sz), Bit #(data_sz)) mem <- mkMem (size, init);
   Mem #(Bit #(addr_sz), Bit #(data_sz)) m[2];
   m[0] = mem;
   m[1] = mem;
@@ -213,7 +223,7 @@ module mkAXI4SimpleMem #(Integer size, Maybe #(String) file)
   return ifc;
 endmodule
 
-module mkAXI4Mem #(Integer size, Maybe #(String) file)
+module mkAXI4Mem #(Integer size, MemInit init)
                   (AXI4_Slave #( id_sz, addr_sz, data_sz
                                , awuser_sz, wuser_sz, buser_sz
                                , aruser_sz, ruser_sz ))
@@ -234,7 +244,7 @@ module mkAXI4Mem #(Integer size, Maybe #(String) file)
            , Add #(_d, addr_sz, MemSimMaxAddrSize)
            , Add #(_e, TDiv #(data_sz, 8), TMul #(nbChunks, 8))
            , Add #(_f, data_sz, TMul #(nbChunks, SizeOf #(MemSimDataT))) );
-  Mem #(Bit #(addr_sz), Bit #(data_sz)) mem[2] <- mkMem2 (size, file);
+  Mem #(Bit #(addr_sz), Bit #(data_sz)) mem[2] <- mkMem2 (size, init);
   AXI4_Slave #( id_sz, addr_sz, data_sz
               , awuser_sz, wuser_sz, buser_sz
               , aruser_sz, ruser_sz) ifc;
@@ -242,7 +252,7 @@ module mkAXI4Mem #(Integer size, Maybe #(String) file)
   return ifc;
 endmodule
 
-module mkAXI4Mem2 #(Integer size, Maybe #(String) file)
+module mkAXI4Mem2 #(Integer size, MemInit init)
                    (Array #(AXI4_Slave #( id_sz, addr_sz, data_sz
                                         , awuser_sz, wuser_sz, buser_sz
                                         , aruser_sz, ruser_sz )))
@@ -263,7 +273,7 @@ module mkAXI4Mem2 #(Integer size, Maybe #(String) file)
            , Add #(_d, addr_sz, MemSimMaxAddrSize)
            , Add #(_e, TDiv #(data_sz, 8), TMul #(nbChunks, 8))
            , Add #(_f, data_sz, TMul #(nbChunks, SizeOf #(MemSimDataT))) );
-  Mem #(Bit #(addr_sz), Bit #(data_sz)) mem[2] <- mkMem2 (size, file);
+  Mem #(Bit #(addr_sz), Bit #(data_sz)) mem[2] <- mkMem2 (size, init);
   Mem #(Bit #(addr_sz), Bit #(data_sz)) portA[2];
   portA[0] = mem[0];
   portA[1] = mem[0];

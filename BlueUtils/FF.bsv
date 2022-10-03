@@ -502,7 +502,7 @@ provisos(
     Add #(_b, TDiv #(data_width, 8), TMul #(nbChunks, 8)),
     Add #(_c, data_width, TMul #(nbChunks, SizeOf #(MemSimDataT)))
   );
-  Mem#(Bit#(logDepth),data) mem <- mkMem(valueOf(depth)*(valueOf(data_width)/8), Invalid); // BRAM
+  Mem#(Bit#(logDepth),data) mem <- mkMem(valueOf(depth)*(valueOf(data_width)/8), UnInit); // BRAM
   Reg#(data) latchMemOut[2] <- mkCRegU(2);
   Reg#(Bit#(TAdd#(logDepth,1))) lhead <- mkConfigRegA(0);
   Reg#(Bit#(TAdd#(logDepth,1))) ltail <- mkConfigRegA(0);

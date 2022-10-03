@@ -35,6 +35,8 @@
 
 package MemSim;
 
+export MemInit (..);
+export MemSimParams;
 export mkMemSim;
 export mkMemSimWithOffset;
 export MemSimMaxAddrSize;
@@ -75,6 +77,11 @@ import "BDPI" mem_init =
                            , String hexFile
                            , MemSimAddrT offset );
 
+import "BDPI" mem_init_from_env =
+  function Action mem_init_from_env ( MemSimCHandle mem
+                                    , String envVar
+                                    , MemSimAddrT offset );
+
 import "BDPI" mem_zero = function Action mem_zero (MemSimCHandle mem);
 import "BDPI" mem_read =
   function ActionValue #(MemSimDataT) mem_read ( MemSimCHandle mem
@@ -86,14 +93,26 @@ import "BDPI" mem_write =
                             , MemSimByteEnT byteEn
                             , MemSimDataT data );
 
+// Memory static parameterization types
+////////////////////////////////////////////////////////////////////////////////
+
+typedef union tagged {
+  void UnInit;
+  String FilePath;
+  String FilePathEnvVar;
+} MemInit;
+
+typedef struct {
+  Integer nIfcs;
+  Integer offset;
+  Integer size;
+  MemInit init;
+} MemSimParams;
+
 // Simulation memory with explicit offset
 ////////////////////////////////////////////////////////////////////////////////
 
-module mkMemSimWithOffset #( Integer nIfcs
-                           , Integer offset
-                           , Integer size
-                           , Maybe #(String) file)
-  (Array #(Mem #(addr_t, data_t)))
+module mkMemSimWithOffset #(MemSimParams ps) (Array #(Mem #(addr_t, data_t)))
   provisos ( NumAlias #(nbChunks, TDiv #(data_sz, SizeOf #(MemSimDataT)))
            , Bits #(addr_t, addr_sz)
            , Bits #(data_t, data_sz)
@@ -102,9 +121,9 @@ module mkMemSimWithOffset #( Integer nIfcs
            , Add #(_c, data_sz, TMul #(nbChunks, SizeOf #(MemSimDataT))) );
 
   // sanitize size input
-  MemSimSizeT actualSize = fromInteger (size);
-  if (2**(log2 (size)) != size) begin
-    MemSimSizeT powerOf2Size = fromInteger (2**log2 (size));
+  MemSimSizeT actualSize = fromInteger (ps.size);
+  if (2**(log2 (ps.size)) != ps.size) begin
+    MemSimSizeT powerOf2Size = fromInteger (2**log2 (ps.size));
     errorM (sprintf ( "Error: mkMemSimWithOffset called with non-power-of 2"
                     + " size %0d (nearest power-of-2 is %0d)"
                     , actualSize, powerOf2Size ));
@@ -123,8 +142,10 @@ module mkMemSimWithOffset #( Integer nIfcs
     isAllocated <= True;
   endrule
   rule do_init (isAllocated && !isInitialized);
-    case (file) matches
-      tagged Valid .f: mem_init (memCHandle, f, fromInteger (0));
+    case (ps.init) matches
+      tagged FilePath .f: mem_init (memCHandle, f, fromInteger (0));
+      tagged FilePathEnvVar .v:
+        mem_init_from_env (memCHandle, v, fromInteger (0));
       default: mem_zero (memCHandle);
     endcase
     isInitialized <= True;
@@ -144,14 +165,14 @@ module mkMemSimWithOffset #( Integer nIfcs
   function memWriteElem (addr, be, d) =
     (be == 0) ? noAction : mem_write (memCHandle, addr, be, d);
 
-  Mem #(addr_t, data_t) ifcs[nIfcs];
-  for (Integer i = 0; i < nIfcs; i = i + 1) begin
+  Mem #(addr_t, data_t) ifcs[ps.nIfcs];
+  for (Integer i = 0; i < ps.nIfcs; i = i + 1) begin
     FIFO #(MemRsp #(data_t)) rsp <- mkPipelineFIFO;
     ifcs[i] = interface Slave;
       interface req = interface Sink;
         method canPut = isInitialized;
         method put (req) if (isInitialized) = action
-          case (offsetMemReq (req, fromInteger (-offset))) matches
+          case (offsetMemReq (req, fromInteger (-ps.offset))) matches
             tagged ReadReq .r: begin
               Vector #(nbChunks, MemSimDataT)
                 res <- zipWithM ( memReadElem (r.numBytes)
@@ -186,7 +207,7 @@ endmodule
 // Simulation memory
 ////////////////////////////////////////////////////////////////////////////////
 
-module mkMemSim #(Integer nIfcs, Integer size, Maybe #(String) file)
+module mkMemSim #(Integer nIfcs, Integer size, MemInit init)
   (Array #(Mem #(addr_t, data_t)))
   provisos ( NumAlias #(nbChunks, TDiv #(data_sz, SizeOf #(MemSimDataT)))
            , Bits #(addr_t, addr_sz)
@@ -194,7 +215,10 @@ module mkMemSim #(Integer nIfcs, Integer size, Maybe #(String) file)
            , Add #(_a, addr_sz, MemSimMaxAddrSize)
            , Add #(_b, TDiv #(data_sz, 8), TMul #(nbChunks, 8))
            , Add #(_c, data_sz, TMul #(nbChunks, SizeOf #(MemSimDataT))) );
-  let mem <- mkMemSimWithOffset (nIfcs, 0, size, file);
+  let mem <- mkMemSimWithOffset (MemSimParams { nIfcs: nIfcs
+                                              , offset: 0
+                                              , size: size
+                                              , init: init });
   return mem;
 endmodule
 

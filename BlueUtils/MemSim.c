@@ -186,6 +186,25 @@ void mem_init ( t_mem * mem_ptr
   #endif
 }
 
+void mem_init_from_env ( t_mem * mem_ptr
+                       , char * envvar
+                       , t_addr offset )
+{
+  #if (DEBUG_LVL > 0)
+  printf("---- mem_init_from_env ----\n");
+  #endif
+  char * hexfile = getenv(envvar);
+  if (!hexfile) {
+    printf ("%0s not found in env", envvar);
+    exit (EXIT_FAILURE);
+  }
+  load_hex(hexfile, &(mem_ptr->data[offset]), mem_ptr->size - offset);
+  #if (DEBUG_LVL > 2)
+  printf("loaded hex file...\n");
+  print_mem(mem_ptr->data, 0, 2048, 4);
+  #endif
+}
+
 void mem_zero (t_mem * mem_ptr)
 {
   #if (DEBUG_LVL > 0)
