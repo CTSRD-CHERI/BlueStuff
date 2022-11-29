@@ -114,6 +114,7 @@ typedef struct {
 
 module mkMemSimWithOffset #(MemSimParams ps) (Array #(Mem #(addr_t, data_t)))
   provisos ( NumAlias #(nbChunks, TDiv #(data_sz, SizeOf #(MemSimDataT)))
+           , NumAlias #(elemLogSz, TLog #(TDiv #(SizeOf #(MemSimDataT), 8)))
            , Bits #(addr_t, addr_sz)
            , Bits #(data_t, data_sz)
            , Add #(_a, addr_sz, MemSimMaxAddrSize)
@@ -156,10 +157,11 @@ module mkMemSimWithOffset #(MemSimParams ps) (Array #(Mem #(addr_t, data_t)))
   function memAddrs (base, i) = zeroExtend (pack (base) + fromInteger (8*i));
   // elements read
   function memReadElem (nBytes, addr, i);
-    if (i == 0) return mem_read (memCHandle, addr, 8'h01 << nBytes[1:0]);
-    else if (fromInteger ((i+1)*8) <= (1 << nBytes))
+    if (i == 0 && (nBytes < fromInteger (valueOf (elemLogSz)))) begin
+      return mem_read (memCHandle, addr, 8'h01 << nBytes);
+    end else if (fromInteger ((i+1)*8) <= (1 << nBytes))
       return mem_read (memCHandle, addr, 8'h08);
-      else return actionvalue return 0; endactionvalue;
+    else return actionvalue return 0; endactionvalue;
   endfunction
   // element write
   function memWriteElem (addr, be, d) =
