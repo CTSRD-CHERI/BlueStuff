@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2021 Alexandre Joannou
+ * Copyright (c) 2021-2023 Alexandre Joannou
  * All rights reserved.
  *
  * This material is based upon work supported by the DoD Information Analysis
@@ -33,6 +33,10 @@ import "DPI-C" function chandle mem_create (longint unsigned memSize);
 import "DPI-C" function void mem_init ( chandle mem_ptr
                                       , string hexfile
                                       , longint unsigned offset );
+
+import "DPI-C" function void mem_init_from_env ( chandle mem_ptr
+                                               , string envvar
+                                               , longint unsigned offset );
 
 import "DPI-C" function void mem_zero (chandle mem_ptr);
 
