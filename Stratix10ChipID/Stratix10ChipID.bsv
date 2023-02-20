@@ -46,7 +46,8 @@ import "BVI" chipid =
     schedule (chip_id) C  (chip_id);
     schedule (start)   C  (start);
     schedule (start)   SB (chip_id);
-    default_clock clk (clkin, (*unused*) clk_gate);
+    //default_clock clk (clkin, (*unused*) clk_gate);
+    default_clock clk (clk, (*unused*) clk_gate);
     default_reset rst (reset);
   endmodule
 
