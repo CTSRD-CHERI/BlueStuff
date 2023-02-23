@@ -28,6 +28,7 @@
 
 import AXI4 :: *;
 
+import MemSim :: *;
 import MemUtils :: *;
 import SourceSink :: *;
 import StmtFSM :: *;
@@ -36,7 +37,7 @@ import Connectable :: *;
 
 typedef  0 IdT;
 typedef 32 AddrT;
-typedef 32 DataT;
+typedef 512 DataT;
 
 module mkAXI4TraficGenerator (AXI4_Master #( IdT, AddrT, DataT
                                            , 0, 0, 0, 0, 0));
@@ -50,18 +51,18 @@ module mkAXI4TraficGenerator (AXI4_Master #( IdT, AddrT, DataT
     shim.slave.aw.put (AXI4_AWFlit { awaddr: 32'h00000010
                                    , awsize: 4
                                    , awlen: 1 });
-    shim.slave.w.put (AXI4_WFlit { wdata: 32'hdeadbeef
-                                 , wstrb: 4'b1111
+    shim.slave.w.put (AXI4_WFlit { wdata: zeroExtend (32'hdeadbeef)
+                                 , wstrb: zeroExtend (4'b1111)
                                  , wlast: False });
-    shim.slave.w.put (AXI4_WFlit { wdata: 32'hdeadbeef
-                                 , wstrb: 4'b0101
+    shim.slave.w.put (AXI4_WFlit { wdata: zeroExtend (32'hdeadbeef)
+                                 , wstrb: zeroExtend (4'b0101)
                                  , wlast: True });
     noAction;
     noAction;
     noAction;
     noAction;
     noAction;
-    shim.slave.ar.put (AXI4_ARFlit { araddr: 32'h00000010
+    shim.slave.ar.put (AXI4_ARFlit { araddr: zeroExtend (32'h00000010)
                                    , arsize: 4
                                    , arlen: arlen });
   endseq);
@@ -93,7 +94,7 @@ module top (Empty);
   AXI4_Master #(IdT, AddrT, DataT, 0, 0, 0, 0, 0)
     m <- mkAXI4TraficGenerator;
   AXI4_Slave #(IdT, AddrT, DataT, 0, 0, 0, 0, 0)
-    s <- mkAXI4Mem (4096, Nothing);
+    s <- mkAXI4Mem (4096, UnInit);
   mkConnection( debugAXI4_Master (m, $format ("traffic generator"))
               , debugAXI4_Slave (s, $format ("memory")) );
 endmodule
