@@ -7,3 +7,6 @@
 [submodule "BlueAXI4"]
 	path = BlueAXI4
 	url = https://github.com/CTSRD-CHERI/BlueAXI4.git
+[submodule "BlueAvalon"]
+	path = BlueAvalon
+	url = https://github.com/CTSRD-CHERI/BlueAvalon.git
