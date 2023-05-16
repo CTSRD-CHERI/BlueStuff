@@ -40,79 +40,82 @@ import SourceSink :: *;
 import BlueAXI4 :: *;
 import BlueAvalon :: *;
 
-function MemAccessPacketT #(waddr_, data_) axi4WriteReq2AvalonWriteReq
-  ( AXI4_AWFlit #(id_, addr_, awuser_) awflit
-  , AXI4_WFlit #(data_, wuser_) wflit )
-  provisos ( Log #(TDiv #(data_, 8), offset_bits_)
-           , Add #(waddr_, offset_bits_, addr_) ) =
-  MemAccessPacketT { rw: MemWrite
-                   , addr: unpack (truncateLSB (awflit.awaddr))
-                   , data: unpack (wflit.wdata)
-                   , arbiterlock: False
-                   , byteenable: wflit.wstrb };
+function Bit #(2) axi4Rsp2AvalonRsp (AXI4_Resp rsp) = case (rsp)
+  OKAY: 2'h00;
+  EXOKAY: 2'b01;
+  SLVERR: 2'b10;
+  DECERR: 2'b11;
+endcase;
 
-function MemAccessPacketT #(waddr_, data_) axi4ReadReq2AvalonReadReq
-  (AXI4_ARFlit #(id_, addr_, aruser_) arflit)
-  provisos ( Log #(TDiv #(data_, 8), offset_bits_)
-           , Add #(waddr_, offset_bits_, addr_) ) =
-  MemAccessPacketT { rw: MemRead
-                   , addr: unpack (truncateLSB (arflit.araddr))
-                   , data: ?
-                   , arbiterlock: False
-                   , byteenable: ? };
+function AXI4_Resp avalonRsp2AXI4Rsp (Bit #(2) rsp) = case (rsp)
+  2'b00: OKAY;
+  2'b01: SLVERR; //EXOKAY;
+  2'b10: SLVERR;
+  2'b11: DECERR;
+endcase;
+
+function AvalonRequest #(addr_, data_) axi4WriteReq2AvalonWriteReq
+  ( AXI4_AWFlit #(id_, addr_, awuser_) awflit
+  , AXI4_WFlit #(data_, wuser_) wflit ) =
+  AvalonRequest { address: awflit.awaddr
+                , lock: awflit.awlock == EXCLUSIVE
+                , operation: tagged Write { byteenable: wflit.wstrb
+                                          , writedata: wflit.wdata } };
+
+function AvalonRequest #(addr_, data_) axi4ReadReq2AvalonReadReq
+  (AXI4_ARFlit #(id_, addr_, aruser_) arflit) =
+  AvalonRequest { address: arflit.araddr
+                , lock: arflit.arlock == EXCLUSIVE
+                , operation: tagged Read };
 
 function AXI4_RFlit #(id_, data_, ruser_) avalonReadRsp2AXI4ReadRsp
-  (Bit #(id_) rid, Bit #(data_) data) =
+  (Bit #(id_) rid, AvalonResponse #(data_) rsp) =
   AXI4_RFlit { rid: rid
-             , rdata: data
-             , rresp: OKAY
+             , rdata: rsp.operation.Read
+             , rresp: avalonRsp2AXI4Rsp (rsp.response)
              , rlast: True
              , ruser: ? };
 
 module mkAXI4Manager_to_AvalonHost #(AXI4_Master #( id_, addr_, data_
                                                   , awuser_, wuser_, buser_
                                                   , aruser_, ruser_) axm)
-  (AvalonMasterIfc #(waddr_, data_))
-  provisos ( Log #(TDiv #(data_, 8), offset_bits_)
-           , Add #(waddr_, offset_bits_, addr_)
-           , Add #(_a, SizeOf #(AXI4_Len), addr_) );
+  (AvalonHost #(addr_, data_))
+  provisos ( Add #(_a, SizeOf #(AXI4_Len), addr_) );
   // deburst the axi manager
   AXI4_Shim #(id_, addr_, data_ , awuser_, wuser_, buser_ , aruser_, ruser_)
     deBurst <- mkAXI4DeBurst;
   mkConnection (axm, deBurst.slave);
   // convert axi traffic into avalon traffic
-  let s2avm <- mkServer2AvalonMaster;
-  let observableRsp <- mkBypassFIFOF;
-  rule observeRsp;
-    let rsp <- s2avm.server.response.get;
-    observableRsp.enq (rsp);
-  endrule
+  FIFOF #(AvalonRequest #(addr_, data_)) avReq <- mkFIFOF;
+  FIFOF #(AvalonResponse #(data_)) avRsp <- mkBypassFIFOF;
+  let is_read_rsp =
+    avRsp.first.operation matches tagged Read .* ? True : False;
   let write_id_ff <- mkFIFOF;
   let read_id_ff <- mkFIFOF;
   rule forward_write_req;
     let awflit <- get (deBurst.master.aw);
     let  wflit <- get (deBurst.master.w);
-    s2avm.server.request.put (axi4WriteReq2AvalonWriteReq (awflit, wflit));
+    avReq.enq (axi4WriteReq2AvalonWriteReq (awflit, wflit));
     write_id_ff.enq (awflit.awid);
   endrule
-  rule forward_write_rsp (!isValid (observableRsp.first));
-    observableRsp.deq;
+  rule forward_write_rsp (!is_read_rsp);
+    avRsp.deq;
     let bid <- get (write_id_ff);
     deBurst.master.b.put (AXI4_BFlit {bid: bid, bresp: OKAY, buser: ?});
   endrule
   rule forward_read_req;
     let arflit <- get (deBurst.master.ar);
-    s2avm.server.request.put (axi4ReadReq2AvalonReadReq (arflit));
+    avReq.enq (axi4ReadReq2AvalonReadReq (arflit));
     read_id_ff.enq (arflit.arid);
   endrule
-  rule forward_read_rsp (isValid (observableRsp.first));
-    let rsp = observableRsp.first;
-    observableRsp.deq;
+  rule forward_read_rsp (is_read_rsp);
+    avRsp.deq;
     let rid <- get (read_id_ff);
-    deBurst.master.r.put (avalonReadRsp2AXI4ReadRsp (rid, pack (rsp.Valid)));
+    deBurst.master.r.put (avalonReadRsp2AXI4ReadRsp (rid, avRsp.first));
   endrule
-  // return the avalon master side of the converter
-  return s2avm.avm;
+  // return an avalon host interface
+  let ifc <- toAvalonHost (toSource (avReq), toSink (avRsp));
+  return ifc;
 endmodule
 
 endpackage
