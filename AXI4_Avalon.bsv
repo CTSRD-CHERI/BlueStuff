@@ -40,54 +40,54 @@ import SourceSink :: *;
 import BlueAXI4 :: *;
 import BlueAvalon :: *;
 
-function Bit #(2) axi4Rsp2AvalonRsp (AXI4_Resp rsp) = case (rsp)
+function Bit #(2) axi4Rsp2AvalonMMRsp (AXI4_Resp rsp) = case (rsp)
   OKAY: 2'h00;
   EXOKAY: 2'b01;
   SLVERR: 2'b10;
   DECERR: 2'b11;
 endcase;
 
-function AXI4_Resp avalonRsp2AXI4Rsp (Bit #(2) rsp) = case (rsp)
+function AXI4_Resp avalonMMRsp2AXI4Rsp (Bit #(2) rsp) = case (rsp)
   2'b00: OKAY;
   2'b01: SLVERR; //EXOKAY;
   2'b10: SLVERR;
   2'b11: DECERR;
 endcase;
 
-function AvalonRequest #(addr_, data_) axi4WriteReq2AvalonWriteReq
+function AvalonMMRequest #(addr_, data_) axi4WriteReq2AvalonMMWriteReq
   ( AXI4_AWFlit #(id_, addr_, awuser_) awflit
   , AXI4_WFlit #(data_, wuser_) wflit ) =
-  AvalonRequest { address: awflit.awaddr
-                , lock: awflit.awlock == EXCLUSIVE
-                , operation: tagged Write { byteenable: wflit.wstrb
-                                          , writedata: wflit.wdata } };
+  AvalonMMRequest { address: awflit.awaddr
+                  , lock: awflit.awlock == EXCLUSIVE
+                  , operation: tagged Write { byteenable: wflit.wstrb
+                                            , writedata: wflit.wdata } };
 
-function AvalonRequest #(addr_, data_) axi4ReadReq2AvalonReadReq
+function AvalonMMRequest #(addr_, data_) axi4ReadReq2AvalonMMReadReq
   (AXI4_ARFlit #(id_, addr_, aruser_) arflit) =
-  AvalonRequest { address: arflit.araddr
-                , lock: arflit.arlock == EXCLUSIVE
-                , operation: tagged Read };
+  AvalonMMRequest { address: arflit.araddr
+                  , lock: arflit.arlock == EXCLUSIVE
+                  , operation: tagged Read };
 
-function AXI4_RFlit #(id_, data_, ruser_) avalonReadRsp2AXI4ReadRsp
-  (Bit #(id_) rid, AvalonResponse #(data_) rsp) =
+function AXI4_RFlit #(id_, data_, ruser_) avalonMMReadRsp2AXI4ReadRsp
+  (Bit #(id_) rid, AvalonMMResponse #(data_) rsp) =
   AXI4_RFlit { rid: rid
              , rdata: rsp.operation.Read
-             , rresp: avalonRsp2AXI4Rsp (rsp.response)
+             , rresp: avalonMMRsp2AXI4Rsp (rsp.response)
              , rlast: True
              , ruser: ? };
 
-module mkAXI4Manager_to_AvalonHost #(AXI4_Master #( id_, addr_, data_
-                                                  , awuser_, wuser_, buser_
-                                                  , aruser_, ruser_) axm)
-  (AvalonHost #(addr_, data_))
+module mkAXI4Manager_to_AvalonMMHost #(AXI4_Master #( id_, addr_, data_
+                                                    , awuser_, wuser_, buser_
+                                                    , aruser_, ruser_) axm)
+  (AvalonMMHost #(addr_, data_))
   provisos ( Add #(_a, SizeOf #(AXI4_Len), addr_) );
   // deburst the axi manager
   AXI4_Shim #(id_, addr_, data_ , awuser_, wuser_, buser_ , aruser_, ruser_)
     deBurst <- mkAXI4DeBurst;
   mkConnection (axm, deBurst.slave);
   // convert axi traffic into avalon traffic
-  FIFOF #(AvalonRequest #(addr_, data_)) avReq <- mkFIFOF;
-  FIFOF #(AvalonResponse #(data_)) avRsp <- mkBypassFIFOF;
+  FIFOF #(AvalonMMRequest #(addr_, data_)) avReq <- mkFIFOF;
+  FIFOF #(AvalonMMResponse #(data_)) avRsp <- mkBypassFIFOF;
   let is_read_rsp =
     avRsp.first.operation matches tagged Read .* ? True : False;
   let write_id_ff <- mkFIFOF;
@@ -95,7 +95,7 @@ module mkAXI4Manager_to_AvalonHost #(AXI4_Master #( id_, addr_, data_
   rule forward_write_req;
     let awflit <- get (deBurst.master.aw);
     let  wflit <- get (deBurst.master.w);
-    avReq.enq (axi4WriteReq2AvalonWriteReq (awflit, wflit));
+    avReq.enq (axi4WriteReq2AvalonMMWriteReq (awflit, wflit));
     write_id_ff.enq (awflit.awid);
   endrule
   rule forward_write_rsp (!is_read_rsp);
@@ -105,16 +105,16 @@ module mkAXI4Manager_to_AvalonHost #(AXI4_Master #( id_, addr_, data_
   endrule
   rule forward_read_req;
     let arflit <- get (deBurst.master.ar);
-    avReq.enq (axi4ReadReq2AvalonReadReq (arflit));
+    avReq.enq (axi4ReadReq2AvalonMMReadReq (arflit));
     read_id_ff.enq (arflit.arid);
   endrule
   rule forward_read_rsp (is_read_rsp);
     avRsp.deq;
     let rid <- get (read_id_ff);
-    deBurst.master.r.put (avalonReadRsp2AXI4ReadRsp (rid, avRsp.first));
+    deBurst.master.r.put (avalonMMReadRsp2AXI4ReadRsp (rid, avRsp.first));
   endrule
   // return an avalon host interface
-  let ifc <- toAvalonHost (toSource (avReq), toSink (avRsp));
+  let ifc <- toAvalonMMHost (toSource (avReq), toSink (avRsp));
   return ifc;
 endmodule
 
