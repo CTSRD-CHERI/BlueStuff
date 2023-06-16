@@ -35,8 +35,8 @@ import SpecialFIFOs :: *;
 import GetPut :: *;
 import ClientServer :: *;
 import Connectable :: *;
-import SourceSink :: *;
 
+import BlueBasics :: *;
 import BlueAXI4 :: *;
 import BlueAvalon :: *;
 
@@ -137,8 +137,10 @@ module mkAXI4Manager_to_PipelinedAvalonMMHost #(
                , awuser_, wuser_, buser_
                , aruser_, ruser_) axm
   ) (PipelinedAvalonMMHost #(addr_, data_))
-  provisos ( Add #(_a, SizeOf #(AXI4_Len), addr_) );
-  let ifc <- mkAXI4Manager_to_Avalon (toPipelinedAvalonMMHost (4), axm);
+  provisos ( Add #(_a, SizeOf #(AXI4_Len), addr_)
+           , Add #(_b, TLog #(TDiv #(data_, 8)), addr_) );
+  NumProxy #(4) depth_pxy = ?;
+  let ifc <- mkAXI4Manager_to_Avalon (toPipelinedAvalonMMHost (depth_pxy), axm);
   return ifc;
 endmodule
 
