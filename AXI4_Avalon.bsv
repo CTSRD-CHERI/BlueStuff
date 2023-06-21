@@ -59,13 +59,14 @@ function AvalonMMRequest #(addr_, data_) axi4WriteReq2AvalonMMWriteReq
   , AXI4_WFlit #(data_, wuser_) wflit ) =
   AvalonMMRequest { address: awflit.awaddr
                   , lock: awflit.awlock == EXCLUSIVE
-                  , operation: tagged Write { byteenable: wflit.wstrb
-                                            , writedata: wflit.wdata } };
+                  , byteenable: wflit.wstrb
+                  , operation: tagged Write wflit.wdata };
 
 function AvalonMMRequest #(addr_, data_) axi4ReadReq2AvalonMMReadReq
   (AXI4_ARFlit #(id_, addr_, aruser_) arflit) =
   AvalonMMRequest { address: arflit.araddr
                   , lock: arflit.arlock == EXCLUSIVE
+                  , byteenable: ~((~0 << 1) << fromAXI4_Size (arflit.arsize))
                   , operation: tagged Read };
 
 function AXI4_RFlit #(id_, data_, ruser_) avalonMMReadRsp2AXI4ReadRsp
