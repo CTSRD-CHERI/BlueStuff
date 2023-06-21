@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2021 Alexandre Joannou
+ * Copyright (c) 2018-2023 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -48,13 +48,15 @@ export mkAXI4LiteSimpleMem;
 export mkAXI4LiteMem;
 export mkAXI4LiteMem2;
 
+export mkAvalonMMMem;
+
+import BlueBasics  :: *;
 import BlueAXI4    :: *;
+import BlueAvalon  :: *;
 import FIFO        :: *;
 import MemSim      :: *;
 import MemBRAM     :: *;
 import MemTypes    :: *;
-import SourceSink  :: *;
-import MasterSlave :: *;
 
 ///////////////////
 // 1 port memory //
@@ -62,13 +64,14 @@ import MasterSlave :: *;
 
 module mkMem #(Integer size, MemInit init) (Mem #(addr_t, data_t))
   provisos ( NumAlias #(nbChunks, TDiv #(data_sz, SizeOf #(MemSimDataT)))
-           , Bits #(addr_t, addr_sz)
-           , Bits #(data_t, data_sz)
-           , Add #(idx_sz, TLog #(TDiv #(data_sz, 8)), addr_sz)
-           , Log #( TAdd #(1, TDiv #(data_sz, 8))
-                  , TAdd #(TLog #(TDiv #(data_sz, 8)), 1) )
+           , NumAlias #(addr_sz, SizeOf #(addr_t))
+           , NumAlias #(data_sz, SizeOf #(data_t))
+           , NumAlias #(be_sz, TDiv #(data_sz, 8))
+           , Add #(idx_sz, TLog #(be_sz), addr_sz)
+           , Log #( TAdd #(1, be_sz)
+                  , TAdd #(TLog #(be_sz), 1) )
            , Add #(_a, addr_sz, MemSimMaxAddrSize)
-           , Add #(_b, TDiv #(data_sz, 8), TMul #(nbChunks, 8))
+           , Add #(_b, be_sz, TMul #(nbChunks, 8))
            , Add #(_c, data_sz, TMul #(nbChunks, SizeOf #(MemSimDataT))) );
   `ifdef ALTERA
     String initStr = case (init) matches
@@ -486,6 +489,35 @@ module mkMem2ToAXI4_Slave #(Array #(Mem #(addr_t, data_t)) mem)
 
   // return the slave interface
   return shim.slave;
+endmodule
+
+////////////////////////
+// Avalon Mem wrapper //
+////////////////////////////////////////////////////////////////////////////////
+
+function Slave #(AvalonMMRequest #(addr_sz, data_sz), AvalonMMResponse #(data_sz))
+  memSlaveToAvalonMMSlave (Mem #(addr_t, data_t) mem)
+  provisos ( Bits #(addr_t, addr_sz)
+           , Bits #(data_t, data_sz)
+           , NumAlias #(be_sz, TDiv #(data_sz, 8))
+           , Add #(_a, TMax #(1, TLog#(TAdd #(1, TLog#(be_sz))))
+                     , TLog #(TAdd #(1, be_sz))) ) =
+  mapSlave (avalonMMReqToMemReq, memRspToAvalonMMRsp, mem);
+
+module mkAvalonMMMem #(Integer size, MemInit init)
+  (Slave #(AvalonMMRequest #(addr_sz, data_sz), AvalonMMResponse #(data_sz)))
+  provisos ( NumAlias #(nbChunks, TDiv #(data_sz, SizeOf #(MemSimDataT)))
+           , NumAlias #(be_sz, TDiv #(data_sz, 8))
+           , Add #(idx_sz, TLog #(be_sz), addr_sz)
+           , Log #( TAdd #(1, be_sz)
+                  , TAdd #(TLog #(be_sz), 1) )
+           , Add #(_a, addr_sz, MemSimMaxAddrSize)
+           , Add #(_b, be_sz, TMul #(nbChunks, 8))
+           , Add #(_c, data_sz, TMul #(nbChunks, SizeOf #(MemSimDataT)))
+           , Add #(_d, TMax #(1, TLog #(TAdd #(1, TLog#(be_sz))))
+                     , TLog #(TAdd #(1, be_sz))) );
+  Mem #(Bit #(addr_sz), Bit #(data_sz)) mem <- mkMem (size, init);
+  return memSlaveToAvalonMMSlave (mem);
 endmodule
 
 endpackage

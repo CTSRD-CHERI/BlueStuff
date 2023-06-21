@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2021 Alexandre Joannou
+ * Copyright (c) 2018-2023 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -33,10 +33,10 @@
  * @BERI_LICENSE_HEADER_END@
  */
 
-import Virtualizable :: *;
-import BlueAXI4 :: *;
+import BlueBasics :: *;
+import BlueAXI4   :: *;
+import BlueAvalon :: *;
 
-import MasterSlave :: *;
 import Printf :: *;
 
 ///////////////////////
@@ -162,6 +162,23 @@ instance ToAXI4Lite_ARFlit #(MemReq #(addr_t, data_t), addr_sz, user_sz)
                     , aruser: 0 };
 endinstance
 
+function MemReq #(addr_t, data_t) avalonMMReqToMemReq
+  (AvalonMMRequest #(addr_sz, data_sz) r)
+  provisos ( Bits #(addr_t, addr_sz)
+           , Bits #(data_t, data_sz)
+           , NumAlias #(be_sz, TDiv #(data_sz, 8))
+           , Add #(_a, TMax #(1, TLog #(TAdd #(1, TLog #(be_sz))))
+                     , TLog #(TAdd #(1, be_sz))) ) =
+  case (r.operation) matches
+    tagged Read: tagged ReadReq {
+        addr: unpack (r.address)
+      , numBytes: truncate (pack (countZerosLSB (~r.byteenable)) - 1)
+    };
+    tagged Write .wdata: tagged WriteReq { addr: unpack (r.address)
+                                         , byteEnable: r.byteenable
+                                         , data: unpack (wdata) };
+  endcase;
+
 // Mem response
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -188,6 +205,18 @@ instance FromAXI4Lite_BFlit #(MemRsp #(data_t), user_sz);
     default: ErrorRsp;
   endcase;
 endinstance
+
+function AvalonMMResponse #(data_sz) memRspToAvalonMMRsp
+  (MemRsp #(data_t) r) provisos (Bits #(data_t, data_sz)) = case (r) matches
+    tagged ReadRsp .rdata: AvalonMMResponse {
+        response: 2'b00 // OKAY
+      , operation: tagged Read pack (rdata)
+    };
+    tagged WriteRsp: AvalonMMResponse { response: 2'b00 // OKAY
+                                      , operation: tagged Write };
+    tagged ErrorRsp: AvalonMMResponse { response: 2'b10 // SLVERR
+                                      , operation: ? };
+  endcase;
 
 // Mem interface
 ////////////////////////////////////////////////////////////////////////////////
