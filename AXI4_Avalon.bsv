@@ -40,6 +40,15 @@ import BlueBasics :: *;
 import BlueAXI4 :: *;
 import BlueAvalon :: *;
 
+export axi4Rsp2AvalonMMRsp;
+export avalonMMRsp2AXI4Rsp;
+export axi4WriteReq2AvalonMMWriteReq;
+export axi4ReadReq2AvalonMMReadReq;
+export avalonMMReadRsp2AXI4ReadRsp;
+export mkAXI4Manager_to_AvalonMMHost;
+export mkAXI4Manager_to_PipelinedAvalonMMHost;
+
+////////////////////////////////////////////////////////////////////////////////
 function Bit #(2) axi4Rsp2AvalonMMRsp (AXI4_Resp rsp) = case (rsp)
   OKAY: 2'h00;
   EXOKAY: 2'b01;
@@ -77,6 +86,7 @@ function AXI4_RFlit #(id_, data_, ruser_) avalonMMReadRsp2AXI4ReadRsp
              , rlast: True
              , ruser: ? };
 
+////////////////////////////////////////////////////////////////////////////////
 module mkAXI4Manager_to_Avalon #(
     function module #(
                Tuple3 #( Sink #(AvalonMMRequest #(addr_, data_))
@@ -144,5 +154,6 @@ module mkAXI4Manager_to_PipelinedAvalonMMHost #(
   let ifc <- mkAXI4Manager_to_Avalon (toPipelinedAvalonMMHost (depth_pxy), axm);
   return ifc;
 endmodule
+////////////////////////////////////////////////////////////////////////////////
 
 endpackage
