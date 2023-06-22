@@ -48,6 +48,12 @@ export avalonMMReadRsp2AXI4ReadRsp;
 export mkAXI4Manager_to_AvalonMMHost;
 export mkAXI4Manager_to_PipelinedAvalonMMHost;
 
+// debug prints
+Integer curLvl = 0;
+function Action dbgPrint (Integer tgtLvl, Fmt msg) = action
+  if (curLvl >= tgtLvl) $display ("<%0t> ", $time, msg);
+endaction;
+
 ////////////////////////////////////////////////////////////////////////////////
 function Bit #(2) axi4Rsp2AvalonMMRsp (AXI4_Resp rsp) = case (rsp)
   OKAY: 2'h00;
@@ -109,22 +115,26 @@ module mkAXI4Manager_to_Avalon #(
   let write_id_ff <- mkFIFOF;
   let read_id_ff <- mkFIFOF;
   rule forward_write_req;
+    dbgPrint (1, $format ("%m.forward_write_req"));
     let awflit <- get (deBurst.master.aw);
     let  wflit <- get (deBurst.master.w);
     avReqSnk.put (axi4WriteReq2AvalonMMWriteReq (awflit, wflit));
     write_id_ff.enq (awflit.awid);
   endrule
   rule forward_write_rsp (!is_read_rsp);
+    dbgPrint (1, $format ("%m.forward_write_rsp"));
     avRspSrc.drop;
     let bid <- get (write_id_ff);
     deBurst.master.b.put (AXI4_BFlit {bid: bid, bresp: OKAY, buser: ?});
   endrule
   rule forward_read_req;
+    dbgPrint (1, $format ("%m.forward_read_req"));
     let arflit <- get (deBurst.master.ar);
     avReqSnk.put (axi4ReadReq2AvalonMMReadReq (arflit));
     read_id_ff.enq (arflit.arid);
   endrule
   rule forward_read_rsp (is_read_rsp);
+    dbgPrint (1, $format ("%m.forward_read_rsp"));
     avRspSrc.drop;
     let rid <- get (read_id_ff);
     deBurst.master.r.put (avalonMMReadRsp2AXI4ReadRsp (rid, avRspSrc.peek));
