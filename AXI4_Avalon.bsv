@@ -105,7 +105,8 @@ module mkAXI4Manager_to_Avalon #(
   provisos ( Add #(_a, SizeOf #(AXI4_Len), addr_) );
   // deburst the axi manager
   AXI4_Shim #(id_, addr_, data_ , awuser_, wuser_, buser_ , aruser_, ruser_)
-    deBurst <- mkAXI4DeBurst;
+    //deBurst <- mkAXI4DeBurst;
+    deBurst <- mkBurstToNoBurst;
   mkConnection (axm, deBurst.slave);
   // pipelined avalon mm transactor
   match {.avReqSnk, .avRspSrc, .avmmh} <- transactor;
