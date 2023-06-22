@@ -50,6 +50,8 @@ export mkAXI4LiteMem2;
 
 export mkAvalonMMMem;
 
+export MemInit (..);
+
 import BlueBasics  :: *;
 import BlueAXI4    :: *;
 import BlueAvalon  :: *;

@@ -48,23 +48,41 @@ module mkAXI4TraficGenerator (AXI4_Master #( IdT, AddrT, DataT
   let arlen = 5;
   // traffic state machine definition
   Stmt driveTraffic = (seq
-    shim.slave.aw.put (AXI4_AWFlit { awaddr: 32'h00000010
+    shim.slave.aw.put (AXI4_AWFlit { awid: ?
+                                   , awaddr: 32'h00000010
+                                   , awlen: 1
                                    , awsize: 4
-                                   , awlen: 1 });
+                                   , awburst: ?
+                                   , awlock: ?
+                                   , awcache: ?
+                                   , awprot: ?
+                                   , awqos: ?
+                                   , awregion: ?
+                                   , awuser: ? });
     shim.slave.w.put (AXI4_WFlit { wdata: zeroExtend (32'hdeadbeef)
                                  , wstrb: zeroExtend (4'b1111)
-                                 , wlast: False });
+                                 , wlast: False
+                                 , wuser: ? });
     shim.slave.w.put (AXI4_WFlit { wdata: zeroExtend (32'hdeadbeef)
                                  , wstrb: zeroExtend (4'b0101)
-                                 , wlast: True });
+                                 , wlast: True
+                                 , wuser: ? });
     noAction;
     noAction;
     noAction;
     noAction;
     noAction;
-    shim.slave.ar.put (AXI4_ARFlit { araddr: zeroExtend (32'h00000010)
+    shim.slave.ar.put (AXI4_ARFlit { arid: ?
+                                   , araddr: zeroExtend (32'h00000010)
+                                   , arlen: arlen
                                    , arsize: 4
-                                   , arlen: arlen });
+                                   , arburst: ?
+                                   , arlock: ?
+                                   , arcache: ?
+                                   , arprot: ?
+                                   , arqos: ?
+                                   , arregion: ?
+                                   , aruser: ? });
   endseq);
   FSM driveTrafficFSM <- mkFSM(driveTraffic);
   // trigger the state machine

@@ -45,19 +45,29 @@ module mkAXI4LiteTraficGenerator (AXI4Lite_Master #( AddrT, DataT
 
   // traffic state machine definition
   Stmt driveTraffic = (seq
-    shim.slave.aw.put (AXI4Lite_AWFlit { awaddr: 32'h00000010 });
+    shim.slave.aw.put (AXI4Lite_AWFlit { awaddr: 32'h00000010
+                                       , awprot: ?
+                                       , awuser: ? });
     shim.slave.w.put (AXI4Lite_WFlit { wdata: 32'hdeadbeef
-                                     , wstrb: 4'b1111 });
-    shim.slave.aw.put (AXI4Lite_AWFlit { awaddr: 32'h00000014 });
+                                     , wstrb: 4'b1111
+                                     , wuser: ? });
+    shim.slave.aw.put (AXI4Lite_AWFlit { awaddr: 32'h00000014
+                                       , awprot: ?
+                                       , awuser: ? });
     shim.slave.w.put (AXI4Lite_WFlit { wdata: 32'hdeadbeef
-                                     , wstrb: 4'b0101 });
+                                     , wstrb: 4'b0101
+                                     , wuser: ? });
     noAction;
     noAction;
     noAction;
     noAction;
     noAction;
-    shim.slave.ar.put (AXI4Lite_ARFlit { araddr: 32'h00000010 });
-    shim.slave.ar.put (AXI4Lite_ARFlit { araddr: 32'h00000014 });
+    shim.slave.ar.put (AXI4Lite_ARFlit { araddr: 32'h00000010
+                                       , arprot: ?
+                                       , aruser: ? });
+    shim.slave.ar.put (AXI4Lite_ARFlit { araddr: 32'h00000014
+                                       , arprot: ?
+                                       , aruser: ? });
   endseq);
   FSM driveTrafficFSM <- mkFSM(driveTraffic);
   // trigger the state machine
@@ -87,7 +97,7 @@ module top (Empty);
   AXI4Lite_Master #(AddrT, DataT, 0, 0, 0, 0, 0)
     m <- mkAXI4LiteTraficGenerator;
   AXI4Lite_Slave #(AddrT, DataT, 0, 0, 0, 0, 0)
-    s <- mkAXI4LiteMem (4096, Nothing);
+    s <- mkAXI4LiteMem (4096, UnInit);
   mkConnection( debugAXI4Lite_Master (m, $format ("traffic generator"))
               , debugAXI4Lite_Slave (s, $format ("memory")) );
 endmodule
