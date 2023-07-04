@@ -168,16 +168,19 @@ function MemReq #(addr_t, data_t) avalonMMReqToMemReq
            , Bits #(data_t, data_sz)
            , NumAlias #(be_sz, TDiv #(data_sz, 8))
            , Add #(_a, TMax #(1, TLog #(TAdd #(1, TLog #(be_sz))))
-                     , TLog #(TAdd #(1, be_sz))) ) =
-  case (r.operation) matches
+                     , TLog #(TAdd #(1, be_sz))) );
+  Bit #(addr_sz) mask = ~0 << valueOf (TLog #(be_sz));
+  Bit #(addr_sz) addr = r.address & mask;
+  return case (r.operation) matches
     tagged Read: tagged ReadReq {
-        addr: unpack (r.address)
-      , numBytes: truncate (pack (countZerosLSB (~r.byteenable)) - 1)
+        addr: unpack (addr)
+      , numBytes: fromInteger (valueOf (TLog #(be_sz)))
     };
-    tagged Write .wdata: tagged WriteReq { addr: unpack (r.address)
+    tagged Write .wdata: tagged WriteReq { addr: unpack (addr)
                                          , byteEnable: r.byteenable
                                          , data: unpack (wdata) };
   endcase;
+endfunction
 
 // Mem response
 ////////////////////////////////////////////////////////////////////////////////
