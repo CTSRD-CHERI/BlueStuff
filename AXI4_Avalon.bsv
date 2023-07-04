@@ -95,50 +95,52 @@ function AXI4_RFlit #(id_, data_, ruser_) avalonMMReadRsp2AXI4ReadRsp
 ////////////////////////////////////////////////////////////////////////////////
 module mkAXI4Manager_to_Avalon #(
     function module #(
-               Tuple3 #( Sink #(AvalonMMRequest #(addr_, data_))
-                       , Source #(AvalonMMResponse #(data_))
+               Tuple2 #( Slave #( AvalonMMRequest #(addr_, data_)
+                                , AvalonMMResponse #(data_) )
                        , ret_ )) transactor
   , AXI4_Master #( id_, addr_, data_
                  , awuser_, wuser_, buser_
                  , aruser_, ruser_ ) axm )
   (ret_)
-  provisos ( Add #(_a, SizeOf #(AXI4_Len), addr_) );
+  provisos ( Add #(_a, SizeOf #(AXI4_Len), addr_)
+           , Add #(_b, TLog #(TDiv #(data_, 8)), addr_) );
   // deburst the axi manager
   AXI4_Shim #(id_, addr_, data_ , awuser_, wuser_, buser_ , aruser_, ruser_)
     //deBurst <- mkAXI4DeBurst;
     deBurst <- mkBurstToNoBurst;
   mkConnection (axm, deBurst.slave);
   // pipelined avalon mm transactor
-  match {.avReqSnk, .avRspSrc, .avmmh} <- transactor;
+  match {.avSlv, .avmmh} <- transactor;
   // convert axi traffic into avalon traffic
-  let is_read_rsp =
-    avRspSrc.peek.operation matches tagged Read .* ? True : False;
+  let is_read_rsp = avSlv.rsp.canPeek
+    && (avSlv.rsp.peek.operation matches tagged Read .* ? True : False);
   let write_id_ff <- mkFIFOF;
   let read_id_ff <- mkFIFOF;
+  (* descending_urgency = "forward_write_req, forward_read_req" *)
   rule forward_write_req;
     dbgPrint (1, $format ("%m.forward_write_req"));
     let awflit <- get (deBurst.master.aw);
     let  wflit <- get (deBurst.master.w);
-    avReqSnk.put (axi4WriteReq2AvalonMMWriteReq (awflit, wflit));
+    avSlv.req.put (axi4WriteReq2AvalonMMWriteReq (awflit, wflit));
     write_id_ff.enq (awflit.awid);
-  endrule
-  rule forward_write_rsp (!is_read_rsp);
-    dbgPrint (1, $format ("%m.forward_write_rsp"));
-    avRspSrc.drop;
-    let bid <- get (write_id_ff);
-    deBurst.master.b.put (AXI4_BFlit {bid: bid, bresp: OKAY, buser: ?});
   endrule
   rule forward_read_req;
     dbgPrint (1, $format ("%m.forward_read_req"));
     let arflit <- get (deBurst.master.ar);
-    avReqSnk.put (axi4ReadReq2AvalonMMReadReq (arflit));
+    avSlv.req.put (axi4ReadReq2AvalonMMReadReq (arflit));
     read_id_ff.enq (arflit.arid);
   endrule
   rule forward_read_rsp (is_read_rsp);
     dbgPrint (1, $format ("%m.forward_read_rsp"));
-    avRspSrc.drop;
+    avSlv.rsp.drop;
     let rid <- get (read_id_ff);
-    deBurst.master.r.put (avalonMMReadRsp2AXI4ReadRsp (rid, avRspSrc.peek));
+    deBurst.master.r.put (avalonMMReadRsp2AXI4ReadRsp (rid, avSlv.rsp.peek));
+  endrule
+  rule forward_write_rsp (!is_read_rsp);
+    dbgPrint (1, $format ("%m.forward_write_rsp"));
+    avSlv.rsp.drop;
+    let bid <- get (write_id_ff);
+    deBurst.master.b.put (AXI4_BFlit {bid: bid, bresp: OKAY, buser: ?});
   endrule
   // return an avalon host interface
   return avmmh;
@@ -149,8 +151,9 @@ module mkAXI4Manager_to_AvalonMMHost #(
                , awuser_, wuser_, buser_
                , aruser_, ruser_) axm
   ) (AvalonMMHost #(addr_, data_))
-  provisos ( Add #(_a, SizeOf #(AXI4_Len), addr_) );
-  let ifc <- mkAXI4Manager_to_Avalon (toAvalonMMHost, axm);
+  provisos ( Add #(_a, SizeOf #(AXI4_Len), addr_)
+           , Add #(_b, TLog #(TDiv #(data_, 8)), addr_) );
+  let ifc <- mkAXI4Manager_to_Avalon (avalonMMHostTransactor, axm);
   return ifc;
 endmodule
 
@@ -162,7 +165,8 @@ module mkAXI4Manager_to_PipelinedAvalonMMHost #(
   provisos ( Add #(_a, SizeOf #(AXI4_Len), addr_)
            , Add #(_b, TLog #(TDiv #(data_, 8)), addr_) );
   NumProxy #(4) depth_pxy = ?;
-  let ifc <- mkAXI4Manager_to_Avalon (toPipelinedAvalonMMHost (depth_pxy), axm);
+  let ifc <-
+    mkAXI4Manager_to_Avalon (pipelinedAvalonMMHostTransactor (depth_pxy), axm);
   return ifc;
 endmodule
 ////////////////////////////////////////////////////////////////////////////////
