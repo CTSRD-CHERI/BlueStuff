@@ -43,6 +43,7 @@ export MemSimMaxAddrSize;
 export MemSimDataT;
 
 import FIFO         :: *;
+import FIFOF        :: *;
 import Vector       :: *;
 import Printf       :: *;
 import Clocks       :: *;
@@ -169,11 +170,11 @@ module mkMemSimWithOffset #(MemSimParams ps) (Array #(Mem #(addr_t, data_t)))
 
   Mem #(addr_t, data_t) ifcs[ps.nIfcs];
   for (Integer i = 0; i < ps.nIfcs; i = i + 1) begin
-    FIFO #(MemRsp #(data_t)) rsp <- mkPipelineFIFO;
+    FIFOF #(MemRsp #(data_t)) rsp <- mkPipelineFIFOF;
     ifcs[i] = interface Slave;
       interface req = interface Sink;
-        method canPut = isInitialized;
-        method put (req) if (isInitialized) = action
+        method canPut = isInitialized && rsp.notFull;
+        method put (req) if (isInitialized && rsp.notFull) = action
           case (offsetMemReq (req, fromInteger (-ps.offset))) matches
             tagged ReadReq .r: begin
               Vector #(nbChunks, MemSimDataT)
@@ -195,9 +196,9 @@ module mkMemSimWithOffset #(MemSimParams ps) (Array #(Mem #(addr_t, data_t)))
         endaction;
       endinterface;
       interface rsp = interface Source;
-        method canPeek = isInitialized;
-        method peek if (isInitialized) = rsp.first;
-        method drop if (isInitialized) = rsp.deq;
+        method canPeek = isInitialized && rsp.notEmpty;
+        method peek if (isInitialized && rsp.notEmpty) = rsp.first;
+        method drop if (isInitialized && rsp.notEmpty) = rsp.deq;
       endinterface;
     endinterface;
   end
