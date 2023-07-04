@@ -78,11 +78,17 @@ function AvalonMMRequest #(addr_, data_) axi4WriteReq2AvalonMMWriteReq
                   , operation: tagged Write wflit.wdata };
 
 function AvalonMMRequest #(addr_, data_) axi4ReadReq2AvalonMMReadReq
-  (AXI4_ARFlit #(id_, addr_, aruser_) arflit) =
-  AvalonMMRequest { address: arflit.araddr
-                  , lock: arflit.arlock == EXCLUSIVE
-                  , byteenable: ~((~0 << 1) << fromAXI4_Size (arflit.arsize))
-                  , operation: tagged Read };
+  (AXI4_ARFlit #(id_, addr_, aruser_) arflit)
+  provisos ( NumAlias #(TDiv #(data_, 8), strb_)
+           , NumAlias #(TLog #(strb_), strb_idx_)
+           , Add #(_a, strb_idx_, addr_) );
+  Bit #(strb_idx_) offset = truncate (arflit.araddr);
+  Bit #(strb_) be = ~(~0 << fromAXI4_Size (arflit.arsize)) << offset;
+  return AvalonMMRequest { address: arflit.araddr
+                         , lock: arflit.arlock == EXCLUSIVE
+                         , byteenable: be
+                         , operation: tagged Read };
+endfunction
 
 function AXI4_RFlit #(id_, data_, ruser_) avalonMMReadRsp2AXI4ReadRsp
   (Bit #(id_) rid, AvalonMMResponse #(data_) rsp) =
