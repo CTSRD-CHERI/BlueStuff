@@ -29,16 +29,16 @@
 import BlueBasics :: *;
 import BlueAXI4 :: *;
 import BlueAvalon :: *;
+import BlueUtils :: *;
 import AXI4_Avalon :: *;
 
 import StmtFSM :: *;
+import Vector :: *;
+import FIFOF :: *;
 
 import Connectable :: *;
 
 typedef 1 NMASTERS;
-typedef 1 NSLAVES;
-
-typedef TExp#(19) SlaveWidth;
 
 typedef 0 MID_sz;
 typedef TAdd#(MID_sz, TLog#(NMASTERS)) SID_sz;
@@ -64,34 +64,6 @@ Integer verboselvl = 3;
 function Action lvlprint (Integer lvl, Fmt msg) =
   when (verboselvl >= lvl, $display ("<%0t> ", $time, msg));
 
-module mkPipelinedAvalonMMAgent (PipelinedAvalonMMAgent #(ADDR_sz, DATA_sz));
-  NumProxy #(2) depthProxy = ?;
-  let {master, ifc} <- pipelinedAvalonMMAgentTransactor (depthProxy);
-
-  // artificial dealy in the agent
-  let delay <- mkReg (`DELAY);
-  rule dec_delay (delay > 0); delay <= delay - 1; endrule
-
-  rule handleReq (delay == 0);
-    let req = master.req.peek;
-    AvalonMMResponse #(DATA_sz) rsp = case (req.operation) matches
-      tagged Read: AvalonMMResponse {
-        response: 2'h00
-      , operation: tagged Read zeroExtend (req.address)
-      };
-      tagged Write .*: AvalonMMResponse { response: 2'h00
-                                        , operation: tagged Write };
-    endcase;
-    $display ( "<%0t> AGENT> received: ", $time, fshow (req)
-             , "\n       sending: ", fshow (rsp) );
-    master.req.drop;
-    master.rsp.put (rsp);
-    delay <= `DELAY;
-  endrule
-
-  return ifc;
-endmodule
-
 function Action checkBFlit (AXI4_BFlit #(MID_sz, BUSER_sz) bflit) = action
   if (bflit.bresp != OKAY) begin
     lvlprint (2, $format ("Broken write"));
@@ -99,13 +71,20 @@ function Action checkBFlit (AXI4_BFlit #(MID_sz, BUSER_sz) bflit) = action
   end
 endaction;
 
-function Action checkRFlit ( AXI4_RFlit #(MID_sz, DATA_sz, RUSER_sz) rflit
+function Action checkRFlit ( Bit #(ADDR_sz) addr
+                           , Bit #(TLog #(DATA_sz)) nbytes
+                           , AXI4_RFlit #(MID_sz, DATA_sz, RUSER_sz) rflit
                            , Bit #(DATA_sz) expData ) = action
+  Bit #(TLog #(TDiv #(DATA_sz, 8))) offset = truncate (addr);
+  Bit #(TAdd #(TLog #(TDiv #(DATA_sz, 8)), 3)) bitOffset =
+    zeroExtend (offset) << 3;
+  Bit #(TAdd #(TLog #(DATA_sz), 3)) nBits = zeroExtend (nbytes) << 3;
+  Bit #(DATA_sz) mask = (~((~0) << nBits)) << bitOffset;
   if (rflit.rresp != OKAY) begin
     lvlprint (2, $format ("Broken read"));
     $finish;
   end
-  if (rflit.rdata != expData) begin
+  if ((rflit.rdata & mask) != (expData & mask)) begin
     lvlprint (2, $format ( "Expected read data:", fshow (expData)
                          , ", got: ", fshow (rflit.rdata) ));
     $finish;
@@ -120,21 +99,27 @@ module mkAXI4Master (`MASTER_T);
                         , Bit #(DATA_sz) data) = seq
     action
       AXI4_AWFlit #(MID_sz, DATA_sz, AWUSER_sz) awflit = ?;
+      awflit.awid = 0;
       awflit.awaddr = addr;
-      awflit.awsize = toAXI4_Size (zeroExtend (pack (countOnes (be)))).Valid;
       awflit.awlen = 0;
+      awflit.awsize = toAXI4_Size (zeroExtend (pack (countOnes (be)))).Valid;
+      awflit.awburst = INCR;
+      awflit.awlock = NORMAL;
+      awflit.awcache = ?;
+      awflit.awprot = ?;
+      awflit.awqos = ?;
+      awflit.awregion = ?;
+      awflit.awuser = ?;
       shim.slave.aw.put (awflit);
       AXI4_WFlit #(DATA_sz, WUSER_sz) wflit = ?;
       wflit.wdata = data;
       wflit.wstrb = be;
       wflit.wlast = True;
+      wflit.wuser = ?;
       shim.slave.w.put (wflit);
-      lvlprint (1, $format ("HOST> sent:", fshow (awflit)));
-      lvlprint (1, $format ("HOST> sent:", fshow (wflit)));
     endaction
     action
       let bflit <- get (shim.slave.b);
-      lvlprint (1, $format ("HOST> received:", fshow (bflit)));
       checkBFlit (bflit);
     endaction
   endseq;
@@ -144,14 +129,22 @@ module mkAXI4Master (`MASTER_T);
                        , Bit #(DATA_sz) expData) = seq
     action
       AXI4_ARFlit #(MID_sz, DATA_sz, ARUSER_sz) arflit = ?;
+      arflit.arid = 0;
       arflit.araddr = addr;
-      arflit.arsize = toAXI4_Size (zeroExtend (nbytes)).Valid;
       arflit.arlen = 0;
+      arflit.arsize = toAXI4_Size (zeroExtend (nbytes)).Valid;
+      arflit.arburst = INCR;
+      arflit.arlock = NORMAL;
+      arflit.arcache = ?;
+      arflit.arprot = ?;
+      arflit.arqos = ?;
+      arflit.arregion = ?;
+      arflit.aruser = ?;
       shim.slave.ar.put (arflit);
     endaction
     action
       let rflit <- get (shim.slave.r);
-      checkRFlit (rflit, expData);
+      checkRFlit (addr, nbytes, rflit, expData);
     endaction
   endseq;
 
@@ -163,23 +156,66 @@ module mkAXI4Master (`MASTER_T);
     doWrite ('h0c, ~0, 'hffeeddcc);
     doWrite ('h10, ~0, 'hdeadbeef);
     lvlprint (1, $format ("HOST>---------- check mem ------------"));
-    doRead ('h00, 4, 'h0);
-    doRead ('h04, 4, 'h04);
-    doRead ('h08, 4, 'h08);
-    doRead ('h0c, 4, 'h0c);
-    doRead ('h10, 4, 'h10);
+    doRead ('h00, 4, 'h33221100);
+    doRead ('h04, 4, 'h77665544);
+    doRead ('h08, 4, 'hbbaa9988);
+    doRead ('h0c, 4, 'hffeeddcc);
+    doRead ('h10, 4, 'hdeadbeef);
+    lvlprint (1, $format ("HOST>-------- unaligned sub word access --------"));
+    doRead ('h00, 2, 'hFFFF1100);
+    doRead ('h02, 2, 'h3322FFFF);
+    doRead ('h01, 2, 'hFF2211FF);
+    doWrite ('h1, 'b0110, 'hdeadbeef);
+    doRead ('h1, 2, 'h33adbe00);
+    doRead ('h1, 4, 'h33adbe00);
     $display ("success");
   endseq);
 
   // return AXI interface
-  return debugAXI4_Master (shim.master, $format ("mkAXI4Master"));
+  return shim.master;
 
+endmodule
+
+module mkAvalonMem (Slave #( AvalonMMRequest #(ADDR_sz, DATA_sz)
+                           , AvalonMMResponse #(DATA_sz) ));
+  Vector #(32, Reg #(Bit #(DATA_sz))) mem <- replicateM (mkRegU);
+  let ff_req <- mkFIFOF;
+  let ff_rsp <- mkFIFOF;
+
+  AvalonMMRequest #(ADDR_sz, DATA_sz) req = ff_req.first;
+  Integer lo = log2 (valueOf (DATA_sz)/8);
+  Bit #(TLog #(32)) regNo = req.address[lo+valueOf (TLog #(32))-1:lo];
+  Reg #(Bit #(DATA_sz)) upReg = asReg (mem [regNo]);
+  rule handle_req;
+    AvalonMMResponse #(DATA_sz) rsp = ?;
+    rsp.response = 2'b00; // OKAY
+    case (req.operation) matches
+      tagged Read: rsp.operation = tagged Read upReg;
+      tagged Write .val: begin
+        upReg <= mergeWithBE (req.byteenable, upReg, val);
+        rsp.operation = tagged Write;
+      end
+      default: rsp.response = 2'b10;
+    endcase
+    ff_req.deq;
+    ff_rsp.enq (rsp);
+  endrule
+
+  return toSlave (ff_req, ff_rsp);
 endmodule
 
 module top (Empty);
   let axm <- mkAXI4Master;
-  let avh <- mkAXI4Manager_to_PipelinedAvalonMMHost (axm);
-  let ava <- mkPipelinedAvalonMMAgent;
+  let avh <- mkAXI4Manager_to_PipelinedAvalonMMHost (
+    debugAXI4_Master (axm, $format ("axm"))
+  );
+  Slave #(AvalonMMRequest #(ADDR_sz, DATA_sz), AvalonMMResponse #(DATA_sz))
+    avmem <- mkAvalonMMMem (4096, UnInit);
+    //avmem <- mkAvalonMem;
+  NumProxy #(4) proxy_depth = error ("Never look inside a NumProxy");
+  let ava <- toPipelinedAvalonMMAgent ( proxy_depth
+                                      , debugSlave (avmem, $format ("avmem"))
+                                      );
   (* fire_when_enabled, no_implicit_conditions *)
   rule debug;
     $display ("-------------------- <t = %0t> --------------------", $time);
@@ -194,4 +230,3 @@ endmodule
 `undef SPARAMS
 `undef MASTER_T
 `undef SLAVE_T
-`undef DELAY
