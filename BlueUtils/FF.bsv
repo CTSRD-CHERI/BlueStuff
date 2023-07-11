@@ -58,8 +58,7 @@ import SpecialFIFOs::*;
 import Assert :: *;
 
 import Mem :: *;
-import MasterSlave :: *;
-import SourceSink :: *;
+import BlueBasics :: *;
 
 interface FF#(type data, numeric type depth);
   method Action enq(data x);
@@ -70,6 +69,21 @@ interface FF#(type data, numeric type depth);
   method Action clear();
   method Bit#(TAdd#(TLog#(depth), 1)) remaining();
 endinterface
+
+instance ToSource #(FF #(t, d), t);
+  function toSource (ff) = interface Source #(t);
+    method canPeek = ff.notEmpty;
+    method peek    = ff.first;
+    method drop    = ff.deq;
+  endinterface;
+endinstance
+
+instance ToSink #(FF #(t, d), t);
+  function toSink (ff) = interface Sink;
+    method canPut = ff.notFull;
+    method put    = ff.enq;
+  endinterface;
+endinstance
 
 interface FFNext#(type data, numeric type depth);
   method Action enq(data x);
