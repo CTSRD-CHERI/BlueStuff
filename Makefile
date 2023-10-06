@@ -31,7 +31,7 @@ BSC = bsc
 
 BLUESTUFFDIR = $(CURDIR)
 include $(BLUESTUFFDIR)/bluestuff.inc.mk
-BSVPATH = +:$(BLUESTUFF_DIRS)
+BSVPATH = +:$(BLUESTUFF_DIRS):$(BLUESTUFFDIR)/cheri-cap-lib
 
 BSCFLAGS = -p $(BSVPATH)
 

@@ -42,10 +42,12 @@ interface AXI4_CapChecker #(
   numeric type id_,
   numeric type addr_,
   numeric type data_,
-  numeric type awuser_,
+  numeric type s_awuser_,
+  numeric type m_awuser_,
   numeric type wuser_,
   numeric type buser_,
-  numeric type aruser_,
+  numeric type s_aruser_,
+  numeric type m_aruser_,
   numeric type ruser_,
   numeric type mgnt_id_,
   numeric type mgnt_addr_,
@@ -55,12 +57,12 @@ interface AXI4_CapChecker #(
   numeric type mgnt_buser_,
   numeric type mgnt_aruser_,
   numeric type mgnt_ruser_);
-  interface AXI4_Master #( id_, addr_, data_
-                         , awuser_, wuser_, buser_
-                         , aruser_, ruser_ ) master;
   interface AXI4_Slave #( id_, addr_, data_
-                        , awuser_, wuser_, buser_
-                        , aruser_, ruser_ ) slave;
+                        , s_awuser_, wuser_, buser_
+                        , s_aruser_, ruser_ ) slave;
+  interface AXI4_Master #( id_, addr_, data_
+                         , m_awuser_, wuser_, buser_
+                         , m_aruser_, ruser_ ) master;
   interface AXI4_Slave #( mgnt_id_, mgnt_addr_, mgnt_data_
                         , mgnt_awuser_, mgnt_wuser_, mgnt_buser_
                         , mgnt_aruser_, mgnt_ruser_ ) management;
@@ -75,8 +77,8 @@ typedef TAdd #( // AXI4 len width + 1 because of representation is -1
 
 module mkAXI4_CapChecker #(NumProxy #(rawN) nCapProxy)
   (AXI4_CapChecker #( id_, addr_, data_
-                    , awuser_, wuser_, buser_
-                    , aruser_, ruser_
+                    , s_awuser_, m_awuser_, wuser_, buser_
+                    , s_aruser_, m_aruser_, ruser_
                     , mgnt_id_, mgnt_addr_, mgnt_data_
                     , mgnt_awuser_, mgnt_wuser_, mgnt_buser_
                     , mgnt_aruser_, mgnt_ruser_ ))
@@ -91,15 +93,15 @@ module mkAXI4_CapChecker #(NumProxy #(rawN) nCapProxy)
            , Add #(128, 0, mgnt_data_)
            , Add #(1, 0, mgnt_wuser_)
            , Add #(1, 0, mgnt_ruser_)
-           , Add #(a__, TLog#(n), mgnt_addr_)
+           , Add #(a__, idxSz, mgnt_addr_)
            );
 
   AXI4_Shim #( id_, addr_, data_
-             , awuser_, wuser_, buser_
-             , aruser_, ruser_ ) inShim <- mkAXI4Shim;
+             , s_awuser_, wuser_, buser_
+             , s_aruser_, ruser_ ) inShim <- mkAXI4Shim;
   AXI4_Shim #( id_, addr_, data_
-             , awuser_, wuser_, buser_
-             , aruser_, ruser_ ) outShim <- mkAXI4Shim;
+             , m_awuser_, wuser_, buser_
+             , m_aruser_, ruser_ ) outShim <- mkAXI4Shim;
   AXI4_Shim #( mgnt_id_, mgnt_addr_, mgnt_data_
              , mgnt_awuser_, mgnt_wuser_, mgnt_buser_
              , mgnt_aruser_, mgnt_ruser_ ) ctrlShim <- mkAXI4Shim;
@@ -112,7 +114,8 @@ module mkAXI4_CapChecker #(NumProxy #(rawN) nCapProxy)
     let awflit <- get (ctrlShim.master.aw);
     let wflit <- get (ctrlShim.master.w);
     Bit #(idxSz) idx = truncate (awflit.awaddr >> 4);
-    caps[idx] <= fromMem (tuple2 (unpack(wflit.wuser), wflit.wdata));
+    //XXX TODO caps[idx] <= fromMem (tuple2 (unpack(wflit.wuser), wflit.wdata));
+    caps[idx] <= ?;
     ctrlShim.master.b.put (AXI4_BFlit {
       bid: awflit.awid, bresp: OKAY, buser: ?
     });
@@ -120,7 +123,8 @@ module mkAXI4_CapChecker #(NumProxy #(rawN) nCapProxy)
   rule readCap;
     let arflit <- get (ctrlShim.master.ar);
     Bit #(idxSz) idx = truncate (arflit.araddr >> 4);
-    match {.user, .data} = toMem (caps[idx]);
+    //XXX TODO match {.user, .data} = toMem (caps[idx]);
+    match {.user, .data} = tuple2(1'b0, 128'h0);
     ctrlShim.master.r.put (AXI4_RFlit {
       rid: arflit.arid, rdata: data, rresp: OKAY, rlast: True, ruser: pack(user)
     });
@@ -134,8 +138,10 @@ module mkAXI4_CapChecker #(NumProxy #(rawN) nCapProxy)
                            , Bit#(MaxBytesSz) nBytes
                            , Bool isWrite
                            , Bool isRead );
-    Bit#(addrW) base = getBase(cap);
-    Bit#(TAdd #(addrW, 1)) top = getTop(cap);
+    //XXX TODO Bit#(addrW) base = getBase(cap);
+    Bit#(addrW) base = 0;
+    //XXX TODO Bit#(TAdd #(addrW, 1)) top = getTop(cap);
+    Bit#(TAdd #(addrW, 1)) top = 0;
     Bit#(addrW) endAddr = addr + zeroExtend(nBytes);
     let perms = getHardPerms(cap);
     let wraps = False; // XXX TODO check if the access wraps the address space
@@ -149,9 +155,9 @@ module mkAXI4_CapChecker #(NumProxy #(rawN) nCapProxy)
   rule checkWrite(forwardWriteFF.notFull);
     let awflit <- get(inShim.master.aw);
     let nBytes = (zeroExtend (awflit.awlen) + 1) << pack (awflit.awsize);
-    let cap = caps[awflit.awid];
+    let cap = caps[awflit.awuser];
     let forward = checkAccess(cap, awflit.awaddr, nBytes, True, False);
-    if (forward) outShim.slave.aw.put(awflit);
+    if (forward) outShim.slave.aw.put(mapAXI4_AWFlit_awuser(constFn(?), awflit));
     forwardWriteFF.enq(tuple2(awflit.awid, forward));
   endrule
   rule forwardW (forwardWriteFF.notEmpty && tpl_2(forwardWriteFF.first));
@@ -173,9 +179,9 @@ module mkAXI4_CapChecker #(NumProxy #(rawN) nCapProxy)
   rule checkRead;
     let arflit <- get(inShim.master.ar);
     let nBytes = (zeroExtend (arflit.arlen) + 1) << pack (arflit.arsize);
-    let cap = caps[arflit.arid];
+    let cap = caps[arflit.aruser];
     if (checkAccess(cap, arflit.araddr, nBytes, False, True))
-      outShim.slave.ar.put(arflit);
+      outShim.slave.ar.put(mapAXI4_ARFlit_aruser(constFn(?), arflit));
     else
       inShim.master.r.put(AXI4_RFlit {
         rid: arflit.arid, rdata: ?, rresp: DECERR, rlast: True, ruser: ?
