@@ -145,49 +145,97 @@ module mkAXI4_CapChecker #(NumProxy #(rawN) nCapProxy)
     Bit#(addrW) endAddr = addr + zeroExtend(nBytes);
     let perms = getHardPerms(cap);
     let wraps = False; // XXX TODO check if the access wraps the address space
-    return    (base <= addr && {1'b0, endAddr} < top && !wraps)
+    return    isValidCap(cap)
+           && base <= addr
+           && {1'b0, endAddr} < top
+           && !wraps
            && (!isWrite || perms.permitStore)
            && ( !isRead ||  perms.permitLoad);
   endfunction
 
-  FIFOF#(Tuple2 #(Bit#(id_), Bool)) forwardWriteFF <- mkFIFOF;
+  // write rules
+  //////////////
 
-  rule checkWrite(forwardWriteFF.notFull);
+  let forwardWFF <- mkFIFOF;
+  let forwardBFF <- mkFIFOF;
+
+  rule checkWrite(forwardWFF.notFull);
     let awflit <- get(inShim.master.aw);
     let nBytes = (zeroExtend (awflit.awlen) + 1) << pack (awflit.awsize);
     let cap = caps[awflit.awuser];
     let forward = checkAccess(cap, awflit.awaddr, nBytes, True, False);
     if (forward) outShim.slave.aw.put(mapAXI4_AWFlit_awuser(constFn(?), awflit));
-    forwardWriteFF.enq(tuple2(awflit.awid, forward));
+    forwardWFF.enq(tuple2(awflit.awid, forward));
   endrule
-  rule forwardW (forwardWriteFF.notEmpty && tpl_2(forwardWriteFF.first));
+  rule forwardW ( forwardWFF.notEmpty && tpl_2(forwardWFF.first)
+                                      && forwardBFF.notFull );
     let wflit <- get(inShim.master.w);
     outShim.slave.w.put(wflit);
-    if (wflit.wlast) forwardWriteFF.deq;
-  endrule
-  mkConnection(outShim.slave.b, inShim.master.b);
-  rule drainW (forwardWriteFF.notEmpty && !tpl_2(forwardWriteFF.first));
-    let wflit <- get(inShim.master.w);
     if (wflit.wlast) begin
-      forwardWriteFF.deq;
-      inShim.master.b.put(AXI4_BFlit {
-        bid: tpl_1(forwardWriteFF.first), bresp: DECERR, buser: ?
-      });
+      forwardWFF.deq;
+      forwardBFF.enq(True);
     end
   endrule
+  rule drainW ( forwardWFF.notEmpty && !tpl_2(forwardWFF.first)
+                                    && forwardBFF.notFull );
+    let wflit <- get(inShim.master.w);
+    if (wflit.wlast) begin
+      forwardWFF.deq;
+      forwardBFF.enq(False);
+    end
+  endrule
+  rule forwardB ( forwardBFF.notEmpty && forwardBFF.first
+                                      && outShim.slave.b.canPeek
+                                      && inShim.master.b.canPut );
+    let bflit <- get(outShim.slave.b);
+    inShim.master.b.put(bflit);
+    forwardBFF.deq;
+  endrule
+  rule errorB ( forwardBFF.notEmpty && !forwardBFF.first
+                                    && inShim.master.b.canPut );
+    inShim.master.b.put(AXI4_BFlit {
+      bid: tpl_1(forwardWFF.first), bresp: DECERR, buser: ?
+    });
+    forwardBFF.deq;
+  endrule
 
+  // read rules
+  /////////////
+
+  let forwardRFF <- mkFIFOF;
   rule checkRead;
     let arflit <- get(inShim.master.ar);
     let nBytes = (zeroExtend (arflit.arlen) + 1) << pack (arflit.arsize);
     let cap = caps[arflit.aruser];
-    if (checkAccess(cap, arflit.araddr, nBytes, False, True))
+    let forward = checkAccess(cap, arflit.araddr, nBytes, False, True);
+    if (forward)
       outShim.slave.ar.put(mapAXI4_ARFlit_aruser(constFn(?), arflit));
-    else
-      inShim.master.r.put(AXI4_RFlit {
-        rid: arflit.arid, rdata: ?, rresp: DECERR, rlast: True, ruser: ?
-      });
+    forwardRFF.enq(tuple3(arflit.arid, arflit.arlen, forward));
   endrule
-  mkConnection(outShim.slave.r, inShim.master.r);
+  rule forwardR ( forwardRFF.notEmpty && tpl_3(forwardRFF.first)
+                                      && outShim.slave.r.canPeek
+                                      && inShim.master.r.canPut );
+    let rflit <- get(outShim.slave.r);
+    inShim.master.r.put(rflit);
+    if (rflit.rlast) forwardRFF.deq;
+  endrule
+  let cntErrorR <- mkReg(0);
+  rule errorR ( forwardRFF.notEmpty && !tpl_3(forwardRFF.first)
+                                    && outShim.slave.r.canPeek
+                                    && inShim.master.r.canPut );
+    let isLast = cntErrorR == tpl_2(forwardRFF.first);
+    inShim.master.r.put(AXI4_RFlit {
+      rid: tpl_1(forwardRFF.first), rdata: ?
+    , rresp: DECERR, rlast: isLast, ruser: ?
+    });
+    if (isLast) begin
+      forwardRFF.deq;
+      cntErrorR <= 0;
+    end else cntErrorR <= cntErrorR + 1;
+  endrule
+
+  // interfaces
+  //////////////////////////////////////////////////////////////////////////////
 
   interface slave = inShim.slave;
   interface master = outShim.master;
