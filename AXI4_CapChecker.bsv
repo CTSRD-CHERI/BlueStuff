@@ -83,7 +83,7 @@ module mkAXI4_CapChecker #(NumProxy #(rawN) nCapProxy)
                     , mgnt_awuser_, mgnt_wuser_, mgnt_buser_
                     , mgnt_aruser_, mgnt_ruser_ ))
   provisos ( // aliases
-             Alias #(cap_t, CapMem)
+             Alias #(cap_t, CapPipe)
            , NumAlias #(n, TExp #(TLog #(rawN)))
            , NumAlias #(idxSz, TLog #(n))
              // constraints
@@ -114,8 +114,7 @@ module mkAXI4_CapChecker #(NumProxy #(rawN) nCapProxy)
     let awflit <- get (ctrlShim.master.aw);
     let wflit <- get (ctrlShim.master.w);
     Bit #(idxSz) idx = truncate (awflit.awaddr >> 4);
-    //XXX TODO caps[idx] <= fromMem (tuple2 (unpack(wflit.wuser), wflit.wdata));
-    caps[idx] <= ?;
+    caps[idx] <= fromMem (tuple2 (unpack(wflit.wuser), wflit.wdata));
     ctrlShim.master.b.put (AXI4_BFlit {
       bid: awflit.awid, bresp: OKAY, buser: ?
     });
@@ -123,8 +122,7 @@ module mkAXI4_CapChecker #(NumProxy #(rawN) nCapProxy)
   rule readCap;
     let arflit <- get (ctrlShim.master.ar);
     Bit #(idxSz) idx = truncate (arflit.araddr >> 4);
-    //XXX TODO match {.user, .data} = toMem (caps[idx]);
-    match {.user, .data} = tuple2(1'b0, 128'h0);
+    match {.user, .data} = toMem (caps[idx]);
     ctrlShim.master.r.put (AXI4_RFlit {
       rid: arflit.arid, rdata: data, rresp: OKAY, rlast: True, ruser: pack(user)
     });
@@ -138,10 +136,8 @@ module mkAXI4_CapChecker #(NumProxy #(rawN) nCapProxy)
                            , Bit#(MaxBytesSz) nBytes
                            , Bool isWrite
                            , Bool isRead );
-    //XXX TODO Bit#(addrW) base = getBase(cap);
-    Bit#(addrW) base = 0;
-    //XXX TODO Bit#(TAdd #(addrW, 1)) top = getTop(cap);
-    Bit#(TAdd #(addrW, 1)) top = 0;
+    Bit#(addrW) base = getBase(cap);
+    Bit#(TAdd #(addrW, 1)) top = getTop(cap);
     Bit#(addrW) endAddr = addr + zeroExtend(nBytes);
     let perms = getHardPerms(cap);
     let wraps = False; // XXX TODO check if the access wraps the address space
