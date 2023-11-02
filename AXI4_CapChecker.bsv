@@ -138,12 +138,12 @@ module mkAXI4_CapChecker #(NumProxy #(rawN) nCapProxy)
                            , Bool isRead );
     Bit#(addrW) base = getBase(cap);
     Bit#(TAdd #(addrW, 1)) top = getTop(cap);
-    Bit#(addrW) endAddr = addr + zeroExtend(nBytes);
+    Bit#(TAdd #(addrW, 1)) accessTopAddr = {1'b0, addr} + zeroExtend(nBytes);
     let perms = getHardPerms(cap);
     let wraps = False; // XXX TODO check if the access wraps the address space
     return    isValidCap(cap)
            && base <= addr
-           && {1'b0, endAddr} < top
+           && accessTopAddr <= top
            && !wraps
            && (!isWrite || perms.permitStore)
            && ( !isRead ||  perms.permitLoad);
