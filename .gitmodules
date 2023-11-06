@@ -13,3 +13,6 @@
 [submodule "cheri-cap-lib"]
 	path = cheri-cap-lib
 	url = https://github.com/CTSRD-CHERI/cheri-cap-lib.git
+[submodule "Recipe"]
+	path = Recipe
+	url = https://github.com/CTSRD-CHERI/Recipe.git
