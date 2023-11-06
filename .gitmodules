@@ -10,3 +10,6 @@
 [submodule "BlueAvalon"]
 	path = BlueAvalon
 	url = https://github.com/CTSRD-CHERI/BlueAvalon.git
+[submodule "Recipe"]
+	path = Recipe
+	url = https://github.com/CTSRD-CHERI/Recipe.git
