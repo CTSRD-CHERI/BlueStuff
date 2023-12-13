@@ -98,10 +98,10 @@ module mkAXI4_CapChecker #(NumProxy #(rawN) nCapProxy)
 
   AXI4_Shim #( id_, addr_, data_
              , s_awuser_, wuser_, buser_
-             , s_aruser_, ruser_ ) inShim <- mkAXI4ShimBypassFIFOF;
+             , s_aruser_, ruser_ ) inShim <- mkAXI4Shim;
   AXI4_Shim #( id_, addr_, data_
              , m_awuser_, wuser_, buser_
-             , m_aruser_, ruser_ ) outShim <- mkAXI4ShimBypassFIFOF;
+             , m_aruser_, ruser_ ) outShim <- mkAXI4Shim;
   AXI4_Shim #( mgnt_id_, mgnt_addr_, mgnt_data_
              , mgnt_awuser_, mgnt_wuser_, mgnt_buser_
              , mgnt_aruser_, mgnt_ruser_ ) ctrlShim <- mkAXI4Shim;
