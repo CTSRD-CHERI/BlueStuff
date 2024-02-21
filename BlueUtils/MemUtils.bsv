@@ -428,7 +428,7 @@ module mkMem2ToAXI4_Slave #(Array #(Mem #(addr_t, data_t)) mem)
     awAddrReg <= nextAddr (awflit.awburst, awflit.awsize, addr);
 
     // perform the memory write
-    Bit #(byteIdx_sz) byteShift = truncate (awflit.awaddr);
+    Bit #(byteIdx_sz) byteShift = truncate (addr);
     let bitShift = {byteShift, 3'b000};
     mem[0].req.put (
       tagged WriteReq { addr: unpack (addr)
