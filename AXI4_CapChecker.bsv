@@ -75,6 +75,10 @@ typedef TAdd #( // AXI4 len width + 1 because of representation is -1
                 // (2^(AXI4 size width))-1 maximum shift amount
               , TSub #(TExp #(SizeOf #(AXI4_Size)), 1) ) MaxBytesSz;
 
+Integer verboselvl = 3;
+function Action lvlprint (Integer lvl, Fmt msg) =
+  when (verboselvl >= lvl, $display ("<%0t> ", $time, msg));
+
 module mkAXI4_CapChecker #(NumProxy #(rawN) nCapProxy)
   (AXI4_CapChecker #( id_, addr_, data_
                     , s_awuser_, m_awuser_, wuser_, buser_
@@ -114,10 +118,12 @@ module mkAXI4_CapChecker #(NumProxy #(rawN) nCapProxy)
     let awflit <- get (ctrlShim.master.aw);
     let wflit <- get (ctrlShim.master.w);
     Bit #(idxSz) idx = truncate (awflit.awaddr >> 4);
-    caps[idx] <= fromMem (tuple2 (unpack(wflit.wuser), wflit.wdata));
+    cap_t new_cap = fromMem (tuple2 (unpack(wflit.wuser), wflit.wdata));
+    caps[idx] <= new_cap;
     ctrlShim.master.b.put (AXI4_BFlit {
       bid: awflit.awid, bresp: OKAY, buser: ?
     });
+    lvlprint (2, $format ( "%m.mkAXI4_CapChecker: write caps[", fshow (idx), "] <= ", fshow (new_cap)));
   endrule
   rule readCap;
     let arflit <- get (ctrlShim.master.ar);
@@ -126,6 +132,7 @@ module mkAXI4_CapChecker #(NumProxy #(rawN) nCapProxy)
     ctrlShim.master.r.put (AXI4_RFlit {
       rid: arflit.arid, rdata: data, rresp: OKAY, rlast: True, ruser: pack(user)
     });
+    lvlprint (2, $format ( "%m.mkAXI4_CapChecker: read caps[", fshow (idx), "] == ", fshow (toMem (caps[idx]))));
   endrule
 
   // CapChecker dataflow
@@ -162,6 +169,15 @@ module mkAXI4_CapChecker #(NumProxy #(rawN) nCapProxy)
     let forward = checkAccess(cap, awflit.awaddr, nBytes, True, False);
     if (forward) outShim.slave.aw.put(mapAXI4_AWFlit_awuser(constFn(?), awflit));
     forwardWFF.enq(tuple2(awflit.awid, forward));
+    lvlprint (2, $format ( "%m.mkAXI4_CapChecker: checkWrite: ", fshow (forward)));
+    `ifdef CAPCHECKER_UNFORGIVING
+    if (!forward) begin
+      $display("CapChecker write access violation:");
+      $display(fshow(awflit));
+      $display(fshow(cap));
+      $finish(0);
+    end
+    `endif
   endrule
   rule forwardW ( forwardWFF.notEmpty && tpl_2(forwardWFF.first)
                                       && forwardBFF.notFull );
@@ -207,6 +223,15 @@ module mkAXI4_CapChecker #(NumProxy #(rawN) nCapProxy)
     if (forward)
       outShim.slave.ar.put(mapAXI4_ARFlit_aruser(constFn(?), arflit));
     forwardRFF.enq(tuple3(arflit.arid, arflit.arlen, forward));
+    lvlprint (2, $format ( "%m.mkAXI4_CapChecker: checkRead: ", fshow (forward)));
+    `ifdef CAPCHECKER_UNFORGIVING
+    if (!forward) begin
+      $display("CapChecker read access violation:");
+      $display(fshow(arflit));
+      $display(fshow(cap));
+      $finish(0);
+    end
+    `endif
   endrule
   rule forwardR ( forwardRFF.notEmpty && tpl_3(forwardRFF.first)
                                       && outShim.slave.r.canPeek
