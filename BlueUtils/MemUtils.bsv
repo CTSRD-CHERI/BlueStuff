@@ -392,6 +392,7 @@ module mkMem2ToAXI4_Slave #(Array #(Mem #(addr_t, data_t)) mem)
     FIXED: addr;
     default: (addr + zeroExtend (fromAXI4_Size (size)));
   endcase;
+  function alignToSize (addr, size) = addr & (~0 << pack (size));
   function nextLen (len) = len - 1;
 
   // Force some prioritisation to cope with the case where both mem interfaces
@@ -466,7 +467,8 @@ module mkMem2ToAXI4_Slave #(Array #(Mem #(addr_t, data_t)) mem)
     end
     // get the current address
     // (from the arflit on first rflit, from a register on subsequent rflits)
-    let addr = (rflitCount == 0) ? arflit.araddr : arAddrReg;
+    let addr = (rflitCount == 0) ? alignToSize(arflit.araddr, arflit.arsize)
+                                 : arAddrReg;
     // update the rflit count
     rflitCount <= rflitCountNext;
     // update the address register
