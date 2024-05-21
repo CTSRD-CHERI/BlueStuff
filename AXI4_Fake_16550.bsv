@@ -81,7 +81,6 @@ module mkAXI4_Fake_16550 #(Integer clkFreq, Integer txDepth, Integer rxDepth)
   // AXI4 Stream transmit interface
   AXI4Stream_Shim #(txId, txData, txDest, txUser)
     txShim <- mkAXI4StreamShim (mkSizedFIFOF (txDepth));
-  (* fire_when_enabled, no_implicit_conditions *)
   let txShimMaster = interface AXI4Stream_Master;
     method canPeek = txShim.master.canPeek;
     method peek if (txShim.master.canPeek) = txShim.master.peek;
@@ -91,7 +90,6 @@ module mkAXI4_Fake_16550 #(Integer clkFreq, Integer txDepth, Integer rxDepth)
   // AXI4 Stream receive interface
   AXI4Stream_Shim #(rxId, rxData, rxDest, rxUser)
     rxShim <- mkAXI4StreamShim (mkSizedFIFOF (rxDepth));
-  (* fire_when_enabled, no_implicit_conditions *)
   let rxShimSlave = interface AXI4Stream_Slave;
     method canPut = rxShim.slave.canPut;
     method put if (rxShim.slave.canPut) = rxShim.slave.put;
