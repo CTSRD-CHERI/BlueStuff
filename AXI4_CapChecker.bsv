@@ -239,4 +239,19 @@ module mkAXI4_CapChecker #(NumProxy #(rawN) nCapProxy)
 
 endmodule
 
+// for isolated synthesis purposes:
+
+(* synthesize *)
+module mkAXI4_CapChecker_synth
+  (AXI4_CapChecker #( 8 /*id_*/, 64 /*addr_*/, 64 /*data_*/
+                    , 0 /*s_awuser_*/, 0 /*m_awuser_*/, 1 /*wuser_*/, 0 /*buser_*/
+                    , 0 /*s_aruser_*/, 0 /*m_aruser_*/, 1 /*ruser_*/
+                    , 8 /*mgnt_id_*/, 64 /*mgnt_addr_*/, 128 /*mgnt_data_*/
+                    , 0 /*mgnt_awuser_*/, 1 /*mgnt_wuser_*/, 0 /*mgnt_buser_*/
+                    , 0 /*mgnt_aruser_*/, 1 /*mgnt_ruser_*/ ));
+  NumProxy#(256) nCapProxy = error("Don't look inside a proxy");
+  let ifc <- mkAXI4_CapChecker(nCapProxy);
+  return ifc;
+endmodule
+
 endpackage
