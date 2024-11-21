@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2023 Alexandre Joannou
+ * Copyright (c) 2018-2024 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -53,5 +53,18 @@ void getenv_as_64hex (unsigned int * maybe_ret, const char * varname)
   {
     *maybe_tag = 1;
     *maybe_val = strtoll(varval, NULL, 16);
+  }
+}
+
+void getenv_as_uint (unsigned int * maybe_ret, const char * varname)
+{
+  uint8_t* maybe_tag = & (((uint8_t*) maybe_ret)[8]);
+  uint64_t* maybe_val = (uint64_t*) maybe_ret;
+  *maybe_tag = 0;
+  char * varval = getenv(varname);
+  if (varval)
+  {
+    *maybe_tag = 1;
+    *maybe_val = strtoll(varval, NULL, 10);
   }
 }
